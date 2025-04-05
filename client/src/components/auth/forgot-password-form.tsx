@@ -3,18 +3,17 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { forgotPasswordSchema, type ForgotPasswordData } from "@shared/schema";
 import { Link } from "wouter";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/context/auth-context";
 
 export default function ForgotPasswordForm() {
-  const { resetPassword } = useAuth();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
   const form = useForm<ForgotPasswordData>({
@@ -24,20 +23,32 @@ export default function ForgotPasswordForm() {
     }
   });
 
-  const onSubmit = async (data: ForgotPasswordData) => {
-    try {
-      setIsLoading(true);
-      await resetPassword(data.email);
+  // Folosim react-query pentru a trimite cererea de resetare parolă
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (data: ForgotPasswordData) => {
+      const response = await apiRequest('POST', '/api/reset-password', data);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Nu s-a putut trimite email-ul de resetare.' }));
+        throw new Error(errorData.message || 'Nu s-a putut trimite email-ul de resetare.');
+      }
+      
+      return await response.json();
+    },
+    onSuccess: () => {
       setIsSuccess(true);
-    } catch (error) {
+    },
+    onError: (error) => {
       toast({
         title: "Eroare",
         description: error instanceof Error ? error.message : "Nu s-a putut trimite email-ul de resetare. Încearcă din nou.",
         variant: "destructive"
       });
-    } finally {
-      setIsLoading(false);
     }
+  });
+
+  const onSubmit = async (data: ForgotPasswordData) => {
+    await resetPasswordMutation.mutateAsync(data);
   };
 
   return (
@@ -49,7 +60,7 @@ export default function ForgotPasswordForm() {
         <div className="space-y-6">
           <Alert className="bg-green-50 border border-green-100">
             <AlertDescription className="text-green-600">
-              Un email cu instrucțiuni pentru resetarea parolei a fost trimis. Verifică căsuța de email.
+              Dacă adresa de email există în baza noastră de date, vei primi instrucțiuni pentru resetarea parolei. Verifică căsuța de email.
             </AlertDescription>
           </Alert>
           
@@ -71,7 +82,7 @@ export default function ForgotPasswordForm() {
                       type="email"
                       placeholder="nume@companie.ro"
                       {...field}
-                      disabled={isLoading}
+                      disabled={resetPasswordMutation.isPending}
                     />
                   </FormControl>
                   <FormMessage />
@@ -79,8 +90,8 @@ export default function ForgotPasswordForm() {
               )}
             />
             
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Se procesează..." : "Trimite link de resetare"}
+            <Button type="submit" className="w-full" disabled={resetPasswordMutation.isPending}>
+              {resetPasswordMutation.isPending ? "Se procesează..." : "Trimite link de resetare"}
             </Button>
             
             <Link href="/auth/login" className="w-full">

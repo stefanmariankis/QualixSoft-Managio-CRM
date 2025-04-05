@@ -1,13 +1,22 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 import { AuthState, User, Organization } from "@/types";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { LoginData, RegistrationData } from "@shared/schema";
 
 interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, userData: any) => Promise<void>;
+  signUp: (email: string, password: string, userData: Omit<RegistrationData, 'email' | 'password'>) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  updateUserData: (data: any) => Promise<void>;
+  updateUserData: (data: Partial<User>) => Promise<void>;
+  refreshUserData: () => Promise<void>;
+}
+
+interface AuthResponse {
+  user: User;
+  organization: Organization | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,49 +30,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Verifică sesiunea curentă
-    const checkSession = async () => {
+  // Folosim react-query pentru a verifica sesiunea
+  const { refetch } = useQuery<AuthResponse>({
+    queryKey: ['/api/me'],
+    queryFn: async () => {
       try {
-        setState(prev => ({ ...prev, loading: true }));
-        
-        // Folosim API-ul nostru pentru a verifica sesiunea
-        let response;
-        try {
-          response = await fetch('/api/me', {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include', // Importante pentru a trimite cookie-urile
-          });
-        } catch (fetchError) {
-          console.error('Eroare de conexiune:', fetchError);
-          setState(prev => ({ ...prev, loading: false }));
-          return;
-        }
+        const response = await fetch('/api/me', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
         
         if (!response.ok) {
           if (response.status === 401) {
-            // Utilizatorul nu este autentificat, ceea ce este normal
-            setState(prev => ({ ...prev, loading: false }));
-            return;
+            setState(prev => ({ ...prev, loading: false, user: null, organization: null }));
+            return { user: null, organization: null } as any;
           }
-          
-          // Altă eroare
-          let errorMessage = 'Eroare la verificarea sesiunii';
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorMessage;
-          } catch (e) {}
-          
-          setState(prev => ({ 
-            ...prev, 
-            error: errorMessage, 
-            loading: false 
-          }));
-          return;
+          throw new Error('Eroare la verificarea sesiunii');
         }
         
-        // Avem un utilizator logat
         const data = await response.json();
         setState({
           user: data.user,
@@ -71,229 +56,288 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           loading: false,
           error: null,
         });
+        return data;
       } catch (error) {
         setState(prev => ({ 
           ...prev, 
           error: error instanceof Error ? error.message : 'A apărut o eroare la verificarea sesiunii', 
           loading: false 
         }));
+        throw error;
       }
-    };
+    },
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
-    checkSession();
-  }, []);
-
-  const signIn = async (email: string, password: string) => {
-    try {
+  // Folosim mutații pentru operațiile de autentificare
+  const loginMutation = useMutation({
+    mutationFn: async (credentials: LoginData) => {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      let response;
       try {
-        response = await fetch('/api/login', {
+        const response = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify(credentials),
           credentials: 'include',
         });
-      } catch (fetchError) {
-        throw new Error("Conexiune eșuată la server");
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: 'Autentificare eșuată' }));
+          throw new Error(errorData.message || 'Autentificare eșuată');
+        }
+        
+        const data = await response.json();
+        setState({
+          user: data.user,
+          organization: data.organization,
+          loading: false,
+          error: null,
+        });
+
+        // Invalidăm query-ul curent pentru a forța o reîncărcare
+        queryClient.invalidateQueries({ queryKey: ['/api/me'] });
+        
+        return data;
+      } catch (error) {
+        setState(prev => ({ 
+          ...prev, 
+          loading: false,
+          error: error instanceof Error ? error.message : 'Autentificare eșuată'
+        }));
+        throw error;
       }
+    }
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: async (regData: RegistrationData) => {
+      setState(prev => ({ ...prev, loading: true, error: null }));
       
-      if (!response.ok) {
-        let errorMessage = 'Autentificare eșuată';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {}
-        throw new Error(errorMessage);
+      try {
+        const response = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(regData),
+          credentials: 'include',
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: 'Înregistrare eșuată' }));
+          throw new Error(errorData.message || 'Înregistrare eșuată');
+        }
+        
+        const data = await response.json();
+        setState({
+          user: data.user,
+          organization: data.organization,
+          loading: false,
+          error: null,
+        });
+
+        // Invalidăm query-ul curent pentru a forța o reîncărcare
+        queryClient.invalidateQueries({ queryKey: ['/api/me'] });
+        
+        return data;
+      } catch (error) {
+        setState(prev => ({ 
+          ...prev, 
+          loading: false,
+          error: error instanceof Error ? error.message : 'Înregistrare eșuată'
+        }));
+        throw error;
       }
+    }
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      setState(prev => ({ ...prev, loading: true }));
       
-      const data = await response.json();
+      try {
+        const response = await fetch('/api/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: 'Deconectare eșuată' }));
+          throw new Error(errorData.message || 'Deconectare eșuată');
+        }
+        
+        setState({ 
+          user: null, 
+          organization: null,
+          loading: false, 
+          error: null 
+        });
+
+        // Invalidăm query-ul curent pentru a forța o reîncărcare
+        queryClient.invalidateQueries({ queryKey: ['/api/me'] });
+        
+        return await response.json();
+      } catch (error) {
+        setState(prev => ({ 
+          ...prev, 
+          loading: false,
+          error: error instanceof Error ? error.message : 'Deconectare eșuată'
+        }));
+        throw error;
+      }
+    }
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (email: string) => {
+      setState(prev => ({ ...prev, loading: true, error: null }));
       
-      setState({
-        user: data.user,
-        organization: data.organization,
-        loading: false,
-        error: null,
-      });
+      try {
+        // În viitor, va exista un endpoint /api/reset-password
+        // Deocamdată, simulăm comportamentul
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setState(prev => ({ ...prev, loading: false }));
+        return { success: true };
+      } catch (error) {
+        setState(prev => ({ 
+          ...prev, 
+          loading: false,
+          error: error instanceof Error ? error.message : 'Resetare parolă eșuată'
+        }));
+        throw error;
+      }
+    }
+  });
+
+  const updateUserMutation = useMutation({
+    mutationFn: async (userData: Partial<User>) => {
+      setState(prev => ({ ...prev, loading: true }));
       
-      // Afișăm un mesaj de succes
+      try {
+        // În viitor, va exista un endpoint /api/user pentru actualizarea datelor
+        // Deocamdată, simulăm comportamentul
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Actualizăm starea utilizatorului local
+        setState(prev => ({
+          ...prev,
+          user: prev.user ? {
+            ...prev.user,
+            ...userData
+          } : null,
+          loading: false,
+          error: null,
+        }));
+        
+        return { success: true };
+      } catch (error) {
+        setState(prev => ({ 
+          ...prev, 
+          loading: false,
+          error: error instanceof Error ? error.message : 'Actualizare date eșuată'
+        }));
+        throw error;
+      }
+    }
+  });
+
+  // Funcții wrapper pentru a face API-ul mai ușor de utilizat
+  const signIn = async (email: string, password: string) => {
+    try {
+      await loginMutation.mutateAsync({ email, password, rememberMe: true });
       toast({
         title: "Autentificare reușită",
-        description: `Bine ai revenit, ${data.user.first_name || 'utilizator'}!`,
+        description: `Bine ai revenit, ${state.user?.first_name || 'utilizator'}!`,
       });
     } catch (error) {
-      setState(prev => ({ 
-        ...prev, 
-        error: error instanceof Error ? error.message : 'Autentificare eșuată', 
-        loading: false 
-      }));
+      toast({
+        title: "Autentificare eșuată",
+        description: error instanceof Error ? error.message : 'Autentificare eșuată',
+        variant: "destructive"
+      });
       throw error;
     }
   };
 
-  const signUp = async (email: string, password: string, userData: any) => {
+  const signUp = async (email: string, password: string, userData: Omit<RegistrationData, 'email' | 'password'>) => {
     try {
-      setState(prev => ({ ...prev, loading: true, error: null }));
-      
-      // Înregistrare directă utilizator cu toate datele
-      let registerResponse;
-      try {
-        registerResponse = await fetch('/api/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email,
-            password,
-            firstName: userData.firstName,
-            lastName: userData.lastName,
-            organizationType: userData.organizationType,
-            companyName: userData.companyName,
-            termsAccepted: userData.termsAccepted
-          }),
-          credentials: 'include',
-        });
-      } catch (fetchError) {
-        throw new Error("Conexiune eșuată la server");
-      }
-      
-      if (!registerResponse.ok) {
-        let errorMessage = 'Înregistrare eșuată';
-        try {
-          const errorData = await registerResponse.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {}
-        throw new Error(errorMessage);
-      }
-      
-      const data = await registerResponse.json();
-      
-      // Afișăm un mesaj de succes
+      await registerMutation.mutateAsync({
+        email,
+        password,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        organizationType: userData.organizationType,
+        companyName: userData.companyName,
+        termsAccepted: userData.termsAccepted
+      });
       toast({
         title: "Cont creat cu succes",
-        description: "Te-ai înregistrat cu succes.",
-      });
-      
-      setState({
-        user: data.user,
-        organization: data.organization,
-        loading: false,
-        error: null,
+        description: "Te-ai înregistrat cu succes în platforma Managio.",
       });
     } catch (error) {
-      console.error('Eroare înregistrare:', error);
-      setState(prev => ({ 
-        ...prev, 
-        error: error instanceof Error ? error.message : 'Înregistrare eșuată', 
-        loading: false 
-      }));
+      toast({
+        title: "Înregistrare eșuată",
+        description: error instanceof Error ? error.message : 'Înregistrare eșuată',
+        variant: "destructive"
+      });
       throw error;
     }
   };
 
   const signOut = async () => {
     try {
-      setState(prev => ({ ...prev, loading: true }));
-      
-      let response;
-      try {
-        response = await fetch('/api/logout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        });
-      } catch (fetchError) {
-        throw new Error("Conexiune eșuată la server");
-      }
-      
-      if (!response.ok) {
-        let errorMessage = 'Deconectare eșuată';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {}
-        throw new Error(errorMessage);
-      }
-      
-      setState({ 
-        user: null, 
-        organization: null,
-        loading: false, 
-        error: null 
-      });
-      
-      // Afișăm un mesaj de succes
+      await logoutMutation.mutateAsync();
       toast({
         title: "Deconectat",
         description: "Te-ai deconectat cu succes.",
       });
     } catch (error) {
-      setState(prev => ({ 
-        ...prev, 
-        error: error instanceof Error ? error.message : 'Deconectare eșuată', 
-        loading: false 
-      }));
+      toast({
+        title: "Deconectare eșuată",
+        description: error instanceof Error ? error.message : 'Deconectare eșuată',
+        variant: "destructive"
+      });
     }
   };
 
   const resetPassword = async (email: string) => {
     try {
-      setState(prev => ({ ...prev, loading: true, error: null }));
-      
-      // Notă: În viitor, vom implementa un endpoint /api/reset-password
-      // Deocamdată, doar simulăm funcționalitatea
-      
-      // Simulăm un delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setState(prev => ({ ...prev, loading: false }));
+      await resetPasswordMutation.mutateAsync(email);
       toast({
         title: "Email trimis",
         description: "Un email pentru resetarea parolei a fost trimis la adresa ta.",
       });
     } catch (error) {
-      setState(prev => ({ 
-        ...prev, 
-        error: error instanceof Error ? error.message : 'Resetare parolă eșuată', 
-        loading: false 
-      }));
+      toast({
+        title: "Resetare parolă eșuată",
+        description: error instanceof Error ? error.message : 'Resetare parolă eșuată',
+        variant: "destructive"
+      });
       throw error;
     }
   };
 
-  const updateUserData = async (data: any) => {
+  const updateUserData = async (data: Partial<User>) => {
     try {
-      setState(prev => ({ ...prev, loading: true }));
-      
-      // Notă: În viitor, vom implementa un endpoint /api/user pentru actualizarea datelor
-      // Deocamdată, doar simulăm funcționalitatea
-      
-      // Simulăm un delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Actualizăm starea utilizatorului local
-      setState(prev => ({
-        ...prev,
-        user: prev.user ? {
-          ...prev.user,
-          ...data
-        } : null,
-        loading: false,
-        error: null,
-      }));
-      
+      await updateUserMutation.mutateAsync(data);
       toast({
         title: "Profil actualizat",
         description: "Datele tale au fost actualizate cu succes.",
       });
     } catch (error) {
-      setState(prev => ({ 
-        ...prev, 
-        error: error instanceof Error ? error.message : 'Actualizare date eșuată', 
-        loading: false 
-      }));
+      toast({
+        title: "Actualizare eșuată",
+        description: error instanceof Error ? error.message : 'Actualizare date eșuată',
+        variant: "destructive"
+      });
       throw error;
     }
+  };
+
+  const refreshUserData = async () => {
+    await refetch();
   };
 
   return (
@@ -305,6 +349,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signOut,
         resetPassword,
         updateUserData,
+        refreshUserData,
       }}
     >
       {children}

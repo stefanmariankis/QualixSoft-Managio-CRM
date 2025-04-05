@@ -178,6 +178,8 @@ export interface Client {
   notes?: string | null;
   status: (typeof clientStatusOptions)[number];
   source: (typeof clientSourceOptions)[number];
+  industry?: string | null;
+  assigned_to?: number | null;
   created_by: number;
   contact_person?: string | null;
   contact_email?: string | null;
@@ -205,6 +207,8 @@ export interface InsertClient {
   notes?: string | null;
   status: (typeof clientStatusOptions)[number];
   source: (typeof clientSourceOptions)[number];
+  industry?: string | null;
+  assigned_to?: number | null;
   created_by: number;
   contact_person?: string | null;
   contact_email?: string | null;
@@ -222,8 +226,10 @@ export interface Project {
   description?: string | null;
   start_date: Date;
   due_date?: Date | null;
+  end_date?: Date | null;
   status: (typeof projectStatusOptions)[number];
   priority: (typeof projectPriorityOptions)[number];
+  category?: string | null;
   budget?: number | null;
   currency?: string | null;
   hourly_rate?: number | null;
@@ -243,8 +249,10 @@ export interface InsertProject {
   description?: string | null;
   start_date: Date;
   due_date?: Date | null;
+  end_date?: Date | null;
   status: (typeof projectStatusOptions)[number];
   priority: (typeof projectPriorityOptions)[number];
+  category?: string | null;
   budget?: number | null;
   currency?: string | null;
   hourly_rate?: number | null;
@@ -413,6 +421,8 @@ export const clientSchema = z.object({
   source: z.enum(clientSourceOptions as unknown as [string, ...string[]], {
     errorMap: () => ({ message: "Sursă invalidă" }),
   }),
+  industry: z.string().optional().nullable(),
+  assigned_to: z.number().optional().nullable(),
   contact_person: z.string().optional().nullable(),
   contact_email: z.string().email({ message: "Email de contact invalid" }).optional().nullable(),
   contact_phone: z.string().optional().nullable(),
@@ -429,12 +439,14 @@ export const projectSchema = z.object({
   description: z.string().optional().nullable(),
   start_date: z.date({ message: "Data de început este obligatorie" }),
   due_date: z.date().optional().nullable(),
+  end_date: z.date().optional().nullable(),
   status: z.enum(projectStatusOptions as unknown as [string, ...string[]], {
     errorMap: () => ({ message: "Status invalid" }),
   }),
   priority: z.enum(projectPriorityOptions as unknown as [string, ...string[]], {
     errorMap: () => ({ message: "Prioritate invalidă" }),
   }),
+  category: z.string().optional().nullable(),
   budget: z.number().nonnegative().optional().nullable(),
   currency: z.string().optional().nullable(),
   hourly_rate: z.number().nonnegative().optional().nullable(),

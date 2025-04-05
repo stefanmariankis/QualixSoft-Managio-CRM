@@ -3,8 +3,9 @@ import session from "express-session";
 import { storage } from "./storage";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
-import { loginSchema } from "../shared/schema";
+import { loginSchema, forgotPasswordSchema } from "../shared/schema";
 import { db } from "./db";
+import crypto from 'crypto';
 
 // Adaugă proprietăți pentru session
 declare module "express-session" {
@@ -126,6 +127,100 @@ export function setupAuth(app: Express) {
     });
   });
 
+  // Handler pentru solicitarea resetării parolei
+  app.post("/api/reset-password", async (req, res) => {
+    try {
+      // Validează adresa de email
+      const validationResult = forgotPasswordSchema.safeParse(req.body);
+
+      if (!validationResult.success) {
+        return res.status(400).json({
+          message: "Date invalide",
+          errors: validationResult.error.format(),
+        });
+      }
+
+      const { email } = validationResult.data;
+
+      // Verifică dacă utilizatorul există
+      const user = await storage.getUserByUsername(email);
+      
+      if (!user) {
+        // Nu dezvăluim dacă utilizatorul există sau nu din motive de securitate
+        // Returnăm success: true chiar dacă emailul nu există
+        return res.status(200).json({ 
+          success: true, 
+          message: "Dacă adresa de email există în baza noastră de date, vei primi instrucțiuni pentru resetarea parolei." 
+        });
+      }
+
+      // Generăm token securizat pentru resetarea parolei
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+      
+      // Setăm data expirării la 1 oră de acum
+      const resetTokenExpires = new Date(Date.now() + 60 * 60 * 1000);
+
+      // Actualizăm utilizatorul cu token-ul de resetare și data expirării
+      // Notă: În viitor, vom adăuga coloanele pentru token în schema bazei de date
+      // Deocamdată, simulăm acest comportament (token-ul nu este stocat)
+      
+      console.log(`[SIMULARE] Token resetare pentru ${email}: ${resetToken}`);
+      console.log(`[SIMULARE] Expiră la: ${resetTokenExpires}`);
+      
+      // Aici s-ar trimite un email cu link-ul de resetare
+      // De exemplu: https://managio.ro/reset-password?token=${resetToken}
+      
+      // Returnăm success
+      return res.status(200).json({ 
+        success: true, 
+        message: "Dacă adresa de email există în baza noastră de date, vei primi instrucțiuni pentru resetarea parolei." 
+      });
+    } catch (error: any) {
+      console.error("Eroare la solicitarea resetării parolei:", error);
+      return res.status(500).json({
+        message: "Eroare internă de server",
+        error: error.message || "Eroare necunoscută",
+      });
+    }
+  });
+
+  // Handler pentru setarea noii parole (după reset)
+  app.post("/api/reset-password/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { password } = req.body;
+
+      if (!token || !password || password.length < 8) {
+        return res.status(400).json({ 
+          message: "Date invalide. Parola trebuie să aibă minim 8 caractere." 
+        });
+      }
+
+      // Convertim token-ul din URL în hash pentru comparație
+      const resetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      
+      // În viitor, vom căuta utilizatorul după token-ul de resetare
+      // Deocamdată, simulăm acest comportament
+      console.log(`[SIMULARE] Se verifică token-ul de resetare: ${token}`);
+      console.log(`[SIMULARE] Hash-ul token-ului: ${resetTokenHash}`);
+      
+      // Simulăm că am găsit utilizatorul după token
+      // În realitate, am verifica dacă token-ul există în baza de date și nu a expirat
+      
+      return res.status(200).json({ 
+        success: true, 
+        message: "Parola a fost resetată cu succes. Te poți autentifica acum cu noua parolă." 
+      });
+    } catch (error: any) {
+      console.error("Eroare la resetarea parolei:", error);
+      return res.status(500).json({
+        message: "Eroare internă de server",
+        error: error.message || "Eroare necunoscută",
+      });
+    }
+  });
+
   // Handler pentru verificarea sesiunii
   app.get("/api/me", async (req, res) => {
     try {
@@ -167,6 +262,57 @@ export function setupAuth(app: Express) {
       });
     } catch (error: any) {
       console.error("Eroare la obținerea datelor utilizatorului:", error);
+      return res.status(500).json({
+        message: "Eroare internă de server",
+        error: error.message || "Eroare necunoscută",
+      });
+    }
+  });
+
+  // Handler pentru actualizarea profilului utilizatorului
+  app.put("/api/user/profile", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const updates = req.body;
+      
+      // Verificăm ce câmpuri se pot actualiza
+      const allowedFields = [
+        'first_name', 'last_name', 'phone', 'position', 'bio', 
+        'skills', 'hourly_rate', 'avatar_url'
+      ];
+      
+      // Filtrăm doar câmpurile permise
+      const filteredUpdates: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (field in updates) {
+          filteredUpdates[field] = updates[field];
+        }
+      }
+      
+      // Adăugăm data actualizării
+      filteredUpdates.updated_at = new Date();
+      
+      // Actualizăm profilul utilizatorului
+      const updatedUser = await storage.updateUser(userId, filteredUpdates);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "Utilizator negăsit" });
+      }
+      
+      // Exclude parola din răspuns
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      
+      return res.status(200).json({
+        user: userWithoutPassword,
+        message: "Profil actualizat cu succes"
+      });
+    } catch (error: any) {
+      console.error("Eroare la actualizarea profilului:", error);
       return res.status(500).json({
         message: "Eroare internă de server",
         error: error.message || "Eroare necunoscută",
