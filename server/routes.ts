@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import "express-session";
 import { storage } from "./storage";
@@ -10,6 +10,16 @@ import { setupAuth } from "./auth";
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configurăm autentificarea
   setupAuth(app);
+  
+  // Importăm și înregistrăm rutele API
+  // Folosim importurile dinamice pentru a evita eroarea "require is not defined"
+  const { default: clientsRouter } = await import('./api/clients');
+  const { default: projectsRouter } = await import('./api/projects');
+  const { default: tasksRouter } = await import('./api/tasks');
+  
+  app.use('/api/clients', clientsRouter);
+  app.use('/api/projects', projectsRouter);
+  app.use('/api/tasks', tasksRouter);
   // Rută de test
   app.get("/api/test", (req, res) => {
     return res.json({ success: true, message: "API funcționează corect" });

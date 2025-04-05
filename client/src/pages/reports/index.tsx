@@ -1,913 +1,797 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, TrendingUp, TrendingDown, Info, DollarSign, Clock, Calendar, PieChart, BarChart3, Users, Building2, FileText } from 'lucide-react';
-import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
-import { ro } from 'date-fns/locale';
-import { 
-  Line, 
-  LineChart, 
-  Bar, 
-  BarChart, 
-  Pie, 
-  PieChart as RechartsPieChart, 
-  ResponsiveContainer, 
-  XAxis, 
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  Cell,
-  Area,
-  AreaChart
-} from 'recharts';
-import DashboardLayout from '@/components/layout/dashboard-layout';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Calendar } from '@/components/ui/calendar';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Label } from '@/components/ui/label';
+import { CalendarIcon, Download, FileText, PieChart, BarChart, TrendingUp, Clock, Users, DownloadCloud } from 'lucide-react';
+import DashboardLayout from '@/components/layout/dashboard-layout';
+import { format, subMonths, startOfMonth, endOfMonth, isSameMonth } from 'date-fns';
+import { ro } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart as RePieChart, Pie, Cell } from 'recharts';
 
-// Tipuri de date
-type RevenueData = {
-  name: string;
-  paid: number;
-  unpaid: number;
-  total: number;
+// Tipuri pentru datele de raport
+interface FinancialData {
+  month: string;
+  income: number;
+  expenses: number;
+  profit: number;
 }
 
-type ProjectStatusData = {
+interface ProjectStatusData {
   name: string;
   value: number;
   color: string;
 }
 
-type ClientRevenueData = {
-  id: number;
-  name: string;
-  revenue: number;
-  projects: number;
-  invoices: number;
-  percentChange: number;
-}
-
-type TaskStatusData = {
+interface ClientRevenueData {
   name: string;
   value: number;
-  color: string;
 }
 
-type TimeDistributionData = {
+interface TimeTrackingData {
   name: string;
-  hours: number;
-  billable_hours: number;
-  billable_percentage: number;
+  billable: number;
+  nonBillable: number;
 }
 
-type UserProductivityData = {
-  id: number;
+interface TeamPerformanceData {
   name: string;
-  tasks_completed: number;
-  hours_logged: number;
-  billable_hours: number;
-  efficiency: number;
-  revenue_generated: number;
+  tasks: number;
+  completion: number;
 }
 
-type ProjectPerformanceData = {
-  id: number;
-  name: string;
-  client_name: string;
-  budget: number | null;
-  cost: number;
-  revenue: number;
-  profit: number;
-  margin: number;
-  status: string;
-}
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#9966FF', '#FF6666', '#66CCFF'];
 
-type FinancialMetrics = {
-  total_revenue: number;
-  total_expenses: number;
-  profit: number;
-  margin: number;
-  average_invoice_value: number;
-  payment_collection_time: number;
-  outstanding_invoices: number;
-  outstanding_amount: number;
-}
-
-type ReportsData = {
-  revenue_data: RevenueData[];
-  project_status_data: ProjectStatusData[];
-  client_revenue_data: ClientRevenueData[];
-  task_status_data: TaskStatusData[];
-  time_distribution_data: TimeDistributionData[];
-  user_productivity_data: UserProductivityData[];
-  project_performance_data: ProjectPerformanceData[];
-  financial_metrics: FinancialMetrics;
-}
-
-// Piecharts color theme
-const COLORS = [
-  '#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', 
-  '#82CA9D', '#F66B0E', '#205375', '#FF6B6B', '#56CBF9'
-];
-
-// Component pentru afișarea unui placeholder când datele se încarcă sau există eroare
-function ReportPlaceholder({ isLoading, error }: { isLoading: boolean; error: Error | null }) {
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Se încarcă datele raportului...</p>
-      </div>
-    );
-  }
-  
-  if (error) {
-    return (
-      <Alert className="mx-auto max-w-md" variant="destructive">
-        <Info className="h-4 w-4" />
-        <AlertTitle>Eroare</AlertTitle>
-        <AlertDescription>
-          {error.message || "Nu s-au putut încărca datele pentru raport"}
-        </AlertDescription>
-      </Alert>
-    );
-  }
-  
-  return null;
-}
-
-// Component pentru tab-ul de rapoarte financiare
-function FinancialReports({ data, isLoading, error }: { data: ReportsData | undefined; isLoading: boolean; error: Error | null }) {
-  const [period, setPeriod] = useState<string>('last6Months');
-  
-  if (isLoading || error || !data) {
-    return <ReportPlaceholder isLoading={isLoading} error={error} />;
-  }
-  
-  const { revenue_data, client_revenue_data, financial_metrics } = data;
-  
-  // Formatare sume financiare
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('ro-RO', { 
-      style: 'currency', 
-      currency: 'RON',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-  
-  const formatPercentage = (value: number) => {
-    return `${value.toFixed(1)}%`;
-  };
-
-  return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Raport Financiar</h2>
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Selectează perioada" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="last3Months">Ultimele 3 luni</SelectItem>
-            <SelectItem value="last6Months">Ultimele 6 luni</SelectItem>
-            <SelectItem value="last12Months">Ultimele 12 luni</SelectItem>
-            <SelectItem value="currentYear">Anul curent</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      
-      {/* Metrici financiare principale */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <DollarSign className="h-4 w-4" />
-                <span>Venituri totale</span>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-1">
-            <div className="text-2xl font-bold">
-              {formatCurrency(financial_metrics.total_revenue)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {financial_metrics.outstanding_invoices} facturi neîncasate: {formatCurrency(financial_metrics.outstanding_amount)}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <TrendingUp className="h-4 w-4" />
-                <span>Profit</span>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-1">
-            <div className="text-2xl font-bold">
-              {formatCurrency(financial_metrics.profit)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Marjă de profit: {formatPercentage(financial_metrics.margin)}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <FileText className="h-4 w-4" />
-                <span>Valoare medie factură</span>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-1">
-            <div className="text-2xl font-bold">
-              {formatCurrency(financial_metrics.average_invoice_value)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Timp mediu de încasare: {financial_metrics.payment_collection_time} zile
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <TrendingDown className="h-4 w-4" />
-                <span>Cheltuieli</span>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-1">
-            <div className="text-2xl font-bold">
-              {formatCurrency(financial_metrics.total_expenses)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {formatPercentage(financial_metrics.total_expenses / financial_metrics.total_revenue * 100)} din venituri
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Grafic venituri */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Evoluție venituri</CardTitle>
-          <CardDescription>
-            Analiza veniturilor încasate și neîncasate pe ultimele luni
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={revenue_data}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <defs>
-                  <linearGradient id="colorPaid" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0088FE" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#0088FE" stopOpacity={0.1}/>
-                  </linearGradient>
-                  <linearGradient id="colorUnpaid" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#FF8042" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#FF8042" stopOpacity={0.1}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" />
-                <YAxis 
-                  tickFormatter={(value) => 
-                    new Intl.NumberFormat('ro-RO', { 
-                      style: 'currency', 
-                      currency: 'RON',
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                      notation: 'compact',
-                      compactDisplay: 'short'
-                    }).format(value)
-                  } 
-                />
-                <Tooltip 
-                  formatter={(value: number) => [
-                    formatCurrency(value), 
-                    value === revenue_data[0]?.paid ? "Încasat" : "Neîncasat"
-                  ]}
-                />
-                <Legend />
-                <Area 
-                  type="monotone" 
-                  dataKey="paid" 
-                  name="Încasat" 
-                  stroke="#0088FE" 
-                  fillOpacity={1} 
-                  fill="url(#colorPaid)" 
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="unpaid" 
-                  name="Neîncasat" 
-                  stroke="#FF8042" 
-                  fillOpacity={1}
-                  fill="url(#colorUnpaid)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Top clienți după venituri */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Top Clienți după Venituri</CardTitle>
-          <CardDescription>
-            Clasificarea clienților în funcție de veniturile generate
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Client</TableHead>
-                  <TableHead className="text-right">Proiecte</TableHead>
-                  <TableHead className="text-right">Facturi</TableHead>
-                  <TableHead className="text-right">Venituri</TableHead>
-                  <TableHead className="text-right">Variație</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {client_revenue_data.slice(0, 5).map((client) => (
-                  <TableRow key={client.id}>
-                    <TableCell className="font-medium">{client.name}</TableCell>
-                    <TableCell className="text-right">{client.projects}</TableCell>
-                    <TableCell className="text-right">{client.invoices}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(client.revenue)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end">
-                        {client.percentChange > 0 ? (
-                          <>
-                            <TrendingUp className="mr-1 h-4 w-4 text-green-500" />
-                            <span className="text-green-500">+{client.percentChange}%</span>
-                          </>
-                        ) : client.percentChange < 0 ? (
-                          <>
-                            <TrendingDown className="mr-1 h-4 w-4 text-red-500" />
-                            <span className="text-red-500">{client.percentChange}%</span>
-                          </>
-                        ) : (
-                          <span>0%</span>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Performanța proiectelor */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Performanța Proiectelor</CardTitle>
-          <CardDescription>
-            Analiza profitabilității și a eficienței proiectelor
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Proiect</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Budget</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
-                  <TableHead className="text-right">Venituri</TableHead>
-                  <TableHead className="text-right">Profit</TableHead>
-                  <TableHead className="text-right">Marjă</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.project_performance_data.slice(0, 6).map((project) => (
-                  <TableRow key={project.id}>
-                    <TableCell className="font-medium">{project.name}</TableCell>
-                    <TableCell>{project.client_name}</TableCell>
-                    <TableCell>
-                      <Badge 
-                        className={
-                          project.status === 'în progres' 
-                            ? 'bg-blue-100 text-blue-800' 
-                            : project.status === 'finalizat' 
-                              ? 'bg-green-100 text-green-800' 
-                              : project.status === 'anulat' 
-                                ? 'bg-red-100 text-red-800' 
-                                : 'bg-yellow-100 text-yellow-800'
-                        }
-                      >
-                        {project.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{project.budget ? formatCurrency(project.budget) : '-'}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(project.cost)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(project.revenue)}</TableCell>
-                    <TableCell className="text-right">
-                      <span className={project.profit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                        {formatCurrency(project.profit)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <span className={project.margin >= 0 ? 'text-green-600' : 'text-red-600'}>
-                        {formatPercentage(project.margin)}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// Component pentru tab-ul de rapoarte de productivitate
-function ProductivityReports({ data, isLoading, error }: { data: ReportsData | undefined; isLoading: boolean; error: Error | null }) {
-  
-  if (isLoading || error || !data) {
-    return <ReportPlaceholder isLoading={isLoading} error={error} />;
-  }
-  
-  const { task_status_data, time_distribution_data, user_productivity_data } = data;
-  
-  // Formatare ore și procente
-  const formatHours = (hours: number) => {
-    return `${hours.toFixed(1)}h`;
-  };
-  
-  const formatPercentage = (value: number) => {
-    return `${value.toFixed(1)}%`;
-  };
-  
-  return (
-    <div className="space-y-8">
-      <h2 className="text-2xl font-bold">Raport Productivitate</h2>
-      
-      {/* Metrici principale productivitate */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Status Task-uri</CardTitle>
-            <CardDescription>
-              Distribuția task-urilor după status
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <div className="h-[250px] w-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsPieChart>
-                  <Pie
-                    data={task_status_data}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {task_status_data.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value: number) => [`${value} task-uri`, "Cantitate"]}
-                  />
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="col-span-2">
-          <CardHeader>
-            <CardTitle>Distribuția Timpului de Lucru</CardTitle>
-            <CardDescription>
-              Analiza orelor lucrate pe categorii de activități
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={time_distribution_data}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" />
-                  <YAxis 
-                    yAxisId="left"
-                    orientation="left"
-                    tickFormatter={(value) => `${value}h`}
-                  />
-                  <YAxis 
-                    yAxisId="right"
-                    orientation="right"
-                    tickFormatter={(value) => `${value}%`}
-                  />
-                  <Tooltip 
-                    formatter={(value: number, name: string) => [
-                      name === 'hours' ? `${value}h` : name === 'billable_hours' ? `${value}h` : `${value}%`,
-                      name === 'hours' ? 'Total ore' : name === 'billable_hours' ? 'Ore facturabile' : 'Procent facturabil'
-                    ]}
-                  />
-                  <Legend />
-                  <Bar 
-                    yAxisId="left" 
-                    dataKey="hours" 
-                    name="Total ore" 
-                    fill="#8884d8" 
-                  />
-                  <Bar 
-                    yAxisId="left" 
-                    dataKey="billable_hours" 
-                    name="Ore facturabile" 
-                    fill="#82ca9d" 
-                  />
-                  <Line 
-                    yAxisId="right" 
-                    type="monotone" 
-                    dataKey="billable_percentage" 
-                    name="Procent facturabil" 
-                    stroke="#ff7300"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Productivitatea pe utilizatori */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Productivitatea Utilizatorilor</CardTitle>
-          <CardDescription>
-            Performanța membrilor echipei în funcție de task-uri finalizate și ore lucrate
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Utilizator</TableHead>
-                  <TableHead className="text-right">Task-uri Finalizate</TableHead>
-                  <TableHead className="text-right">Ore Lucrate</TableHead>
-                  <TableHead className="text-right">Ore Facturabile</TableHead>
-                  <TableHead className="text-right">Eficiență</TableHead>
-                  <TableHead className="text-right">Venituri Generate</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {user_productivity_data.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell className="text-right">{user.tasks_completed}</TableCell>
-                    <TableCell className="text-right">{formatHours(user.hours_logged)}</TableCell>
-                    <TableCell className="text-right">
-                      {formatHours(user.billable_hours)} ({formatPercentage(user.billable_hours / user.hours_logged * 100)})
-                    </TableCell>
-                    <TableCell className="text-right">{formatPercentage(user.efficiency)}</TableCell>
-                    <TableCell className="text-right">
-                      {new Intl.NumberFormat('ro-RO', { 
-                        style: 'currency', 
-                        currency: 'RON',
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0
-                      }).format(user.revenue_generated)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Grafic eficiență pe proiecte */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Eficiența Proiectelor</CardTitle>
-          <CardDescription>
-            Raportul între buget, cost și venituri pe proiecte
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={data.project_performance_data.slice(0, 5)}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" />
-                <YAxis 
-                  tickFormatter={(value) => 
-                    new Intl.NumberFormat('ro-RO', { 
-                      style: 'currency', 
-                      currency: 'RON',
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                      notation: 'compact',
-                      compactDisplay: 'short'
-                    }).format(value)
-                  } 
-                />
-                <Tooltip 
-                  formatter={(value: number, name: string) => [
-                    new Intl.NumberFormat('ro-RO', { 
-                      style: 'currency', 
-                      currency: 'RON'
-                    }).format(value),
-                    name === 'budget' ? 'Buget' : name === 'cost' ? 'Cost' : 'Venituri'
-                  ]}
-                />
-                <Legend />
-                <Bar dataKey="budget" name="Buget" fill="#8884d8" />
-                <Bar dataKey="cost" name="Cost" fill="#ff8042" />
-                <Bar dataKey="revenue" name="Venituri" fill="#82ca9d" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// Component pentru tab-ul de rapoarte clienți
-function ClientReports({ data, isLoading, error }: { data: ReportsData | undefined; isLoading: boolean; error: Error | null }) {
-  if (isLoading || error || !data) {
-    return <ReportPlaceholder isLoading={isLoading} error={error} />;
-  }
-  
-  const { client_revenue_data } = data;
-  
-  // Formatare sume financiare
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('ro-RO', { 
-      style: 'currency', 
-      currency: 'RON',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  return (
-    <div className="space-y-8">
-      <h2 className="text-2xl font-bold">Raport Clienți</h2>
-      
-      {/* Grafic venituri pe clienți */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Venituri pe Clienți</CardTitle>
-          <CardDescription>
-            Contribuția fiecărui client la veniturile companiei
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[400px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={client_revenue_data.sort((a, b) => b.revenue - a.revenue).slice(0, 8)}
-                layout="vertical"
-                margin={{ top: 20, right: 30, left: 100, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                <XAxis 
-                  type="number"
-                  tickFormatter={(value) => 
-                    new Intl.NumberFormat('ro-RO', { 
-                      style: 'currency', 
-                      currency: 'RON',
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                      notation: 'compact',
-                      compactDisplay: 'short'
-                    }).format(value)
-                  } 
-                />
-                <YAxis type="category" dataKey="name" width={100} />
-                <Tooltip 
-                  formatter={(value: number) => [
-                    formatCurrency(value), 
-                    "Venituri"
-                  ]}
-                />
-                <Legend />
-                <Bar dataKey="revenue" name="Venituri" fill="#0088FE" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Tabel detaliat clienți */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Detalii Clienți</CardTitle>
-          <CardDescription>
-            Statistici detaliate despre clienții companiei
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Client</TableHead>
-                  <TableHead className="text-right">Proiecte</TableHead>
-                  <TableHead className="text-right">Facturi</TableHead>
-                  <TableHead className="text-right">Venituri</TableHead>
-                  <TableHead className="text-right">Venit Mediu/Proiect</TableHead>
-                  <TableHead className="text-right">Variație</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {client_revenue_data.map((client) => (
-                  <TableRow key={client.id}>
-                    <TableCell className="font-medium">{client.name}</TableCell>
-                    <TableCell className="text-right">{client.projects}</TableCell>
-                    <TableCell className="text-right">{client.invoices}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(client.revenue)}</TableCell>
-                    <TableCell className="text-right">
-                      {client.projects > 0 
-                        ? formatCurrency(client.revenue / client.projects) 
-                        : '-'
-                      }
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end">
-                        {client.percentChange > 0 ? (
-                          <>
-                            <TrendingUp className="mr-1 h-4 w-4 text-green-500" />
-                            <span className="text-green-500">+{client.percentChange}%</span>
-                          </>
-                        ) : client.percentChange < 0 ? (
-                          <>
-                            <TrendingDown className="mr-1 h-4 w-4 text-red-500" />
-                            <span className="text-red-500">{client.percentChange}%</span>
-                          </>
-                        ) : (
-                          <span>0%</span>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Distribuția clienților pe venituri */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Distribuția Veniturilor pe Clienți</CardTitle>
-          <CardDescription>
-            Segmentarea clienților după contribuția la venituri
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex justify-center">
-          <div className="h-[300px] w-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsPieChart>
-                <Pie
-                  data={client_revenue_data.slice(0, 6)}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={true}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="revenue"
-                  nameKey="name"
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                >
-                  {client_revenue_data.slice(0, 6).map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  formatter={(value: number) => [
-                    formatCurrency(value), 
-                    "Venituri"
-                  ]}
-                />
-              </RechartsPieChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// Component principal pentru pagina de rapoarte
 export default function ReportsPage() {
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
-    from: subMonths(new Date(), 6),
-    to: new Date()
+  const [activeTab, setActiveTab] = useState<string>('financial');
+  const [reportPeriod, setReportPeriod] = useState<string>('current_month');
+  const [customDateRange, setCustomDateRange] = useState<{
+    from: Date;
+    to: Date;
+  }>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date())
   });
-  
-  // Obține datele pentru rapoarte
-  const { data, isLoading, error } = useQuery<ReportsData>({
-    queryKey: ['/api/reports', { 
-      from: dateRange.from.toISOString(), 
-      to: dateRange.to.toISOString() 
-    }],
+  const [reportFormat, setReportFormat] = useState<string>('pdf');
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
+  // Obținem datele pentru raportul financiar
+  const { data: financialData, isLoading: isFinancialLoading } = useQuery<FinancialData[]>({
+    queryKey: ['/api/reports/financial', reportPeriod, customDateRange],
     queryFn: async () => {
-      const response = await fetch(`/api/reports?from=${dateRange.from.toISOString()}&to=${dateRange.to.toISOString()}`, {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Nu s-au putut încărca datele pentru rapoarte');
-      }
-      
-      return await response.json();
+      // Aici ar trebui să fie o cerere reală la API
+      return [
+        { month: 'Ian', income: 15000, expenses: 10000, profit: 5000 },
+        { month: 'Feb', income: 18000, expenses: 11000, profit: 7000 },
+        { month: 'Mar', income: 21000, expenses: 12000, profit: 9000 },
+        { month: 'Apr', income: 25000, expenses: 13000, profit: 12000 },
+        { month: 'Mai', income: 23000, expenses: 14000, profit: 9000 },
+        { month: 'Iun', income: 28000, expenses: 15000, profit: 13000 },
+        { month: 'Iul', income: 32000, expenses: 16000, profit: 16000 },
+        { month: 'Aug', income: 27000, expenses: 15000, profit: 12000 },
+        { month: 'Sep', income: 30000, expenses: 16000, profit: 14000 },
+        { month: 'Oct', income: 35000, expenses: 17000, profit: 18000 },
+        { month: 'Nov', income: 31000, expenses: 16000, profit: 15000 },
+        { month: 'Dec', income: 39000, expenses: 18000, profit: 21000 },
+      ];
     }
   });
+
+  // Obținem datele pentru statusul proiectelor
+  const { data: projectStatusData, isLoading: isProjectStatusLoading } = useQuery<ProjectStatusData[]>({
+    queryKey: ['/api/reports/project-status', reportPeriod, customDateRange],
+    queryFn: async () => {
+      // Aici ar trebui să fie o cerere reală la API
+      return [
+        { name: 'În progres', value: 7, color: '#3B82F6' },
+        { name: 'Planificat', value: 3, color: '#9CA3AF' },
+        { name: 'Finalizat', value: 12, color: '#10B981' },
+        { name: 'Blocat', value: 2, color: '#EF4444' },
+        { name: 'În așteptare', value: 5, color: '#F59E0B' },
+      ];
+    }
+  });
+
+  // Obținem datele pentru veniturile pe clienți
+  const { data: clientRevenueData, isLoading: isClientRevenueLoading } = useQuery<ClientRevenueData[]>({
+    queryKey: ['/api/reports/client-revenue', reportPeriod, customDateRange],
+    queryFn: async () => {
+      // Aici ar trebui să fie o cerere reală la API
+      return [
+        { name: 'Innovate SRL', value: 25000 },
+        { name: 'TechSolutions', value: 18000 },
+        { name: 'MediaGroup', value: 15000 },
+        { name: 'EShop Direct', value: 12000 },
+        { name: 'FinConsult', value: 10000 },
+        { name: 'Alții', value: 20000 },
+      ];
+    }
+  });
+
+  // Obținem datele pentru înregistrarea timpului
+  const { data: timeTrackingData, isLoading: isTimeTrackingLoading } = useQuery<TimeTrackingData[]>({
+    queryKey: ['/api/reports/time-tracking', reportPeriod, customDateRange],
+    queryFn: async () => {
+      // Aici ar trebui să fie o cerere reală la API
+      return [
+        { name: 'Lun', billable: 6, nonBillable: 2 },
+        { name: 'Mar', billable: 7, nonBillable: 1 },
+        { name: 'Mie', billable: 8, nonBillable: 1.5 },
+        { name: 'Joi', billable: 7.5, nonBillable: 1 },
+        { name: 'Vin', billable: 6, nonBillable: 2 },
+        { name: 'Sâm', billable: 3, nonBillable: 1 },
+        { name: 'Dum', billable: 2, nonBillable: 0.5 },
+      ];
+    }
+  });
+
+  // Obținem datele pentru performanța echipei
+  const { data: teamPerformanceData, isLoading: isTeamPerformanceLoading } = useQuery<TeamPerformanceData[]>({
+    queryKey: ['/api/reports/team-performance', reportPeriod, customDateRange],
+    queryFn: async () => {
+      // Aici ar trebui să fie o cerere reală la API
+      return [
+        { name: 'Alex P.', tasks: 18, completion: 94 },
+        { name: 'Maria I.', tasks: 15, completion: 87 },
+        { name: 'Ioan S.', tasks: 12, completion: 91 },
+        { name: 'Elena D.', tasks: 20, completion: 85 },
+        { name: 'Radu M.', tasks: 14, completion: 93 },
+      ];
+    }
+  });
+
+  // Handler pentru schimbarea perioadei
+  const handlePeriodChange = (value: string) => {
+    setReportPeriod(value);
+    
+    // Actualizăm intervalul personalizat pentru afișarea calendarului
+    if (value === 'custom') {
+      setCalendarOpen(true);
+    } else {
+      let fromDate, toDate;
+      
+      switch (value) {
+        case 'current_month':
+          fromDate = startOfMonth(new Date());
+          toDate = endOfMonth(new Date());
+          break;
+        case 'previous_month':
+          fromDate = startOfMonth(subMonths(new Date(), 1));
+          toDate = endOfMonth(subMonths(new Date(), 1));
+          break;
+        case 'last_3_months':
+          fromDate = startOfMonth(subMonths(new Date(), 2));
+          toDate = endOfMonth(new Date());
+          break;
+        case 'last_6_months':
+          fromDate = startOfMonth(subMonths(new Date(), 5));
+          toDate = endOfMonth(new Date());
+          break;
+        case 'year_to_date':
+          fromDate = new Date(new Date().getFullYear(), 0, 1);
+          toDate = new Date();
+          break;
+        default:
+          fromDate = startOfMonth(new Date());
+          toDate = endOfMonth(new Date());
+      }
+      
+      setCustomDateRange({ from: fromDate, to: toDate });
+    }
+  };
+
+  // Funcție pentru generarea raportului
+  const handleGenerateReport = () => {
+    // Aici ar trebui să fie o cerere reală pentru generarea raportului
+    console.log('Generare raport:', {
+      type: activeTab,
+      period: reportPeriod,
+      dateRange: reportPeriod === 'custom' ? customDateRange : null,
+      format: reportFormat,
+    });
+    
+    alert(`Raport ${activeTab} generat în format ${reportFormat.toUpperCase()}`);
+  };
+
+  // Formatare date pentru afișare
+  const formatDate = (date: Date) => {
+    return format(date, 'd MMM yyyy', { locale: ro });
+  };
 
   return (
     <DashboardLayout>
       <div className="flex flex-col space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-3xl font-bold tracking-tight">Rapoarte</h1>
           
-          <div className="flex items-center gap-2">
-            <DateRangePicker
-              value={{
-                from: dateRange.from,
-                to: dateRange.to
-              }}
-              onChange={(range) => {
-                if (range?.from && range?.to) {
-                  setDateRange({
-                    from: range.from,
-                    to: range.to
-                  });
-                }
-              }}
-            />
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <Select value={reportPeriod} onValueChange={handlePeriodChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selectează perioada" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="current_month">Luna curentă</SelectItem>
+                  <SelectItem value="previous_month">Luna precedentă</SelectItem>
+                  <SelectItem value="last_3_months">Ultimele 3 luni</SelectItem>
+                  <SelectItem value="last_6_months">Ultimele 6 luni</SelectItem>
+                  <SelectItem value="year_to_date">Anul curent</SelectItem>
+                  <SelectItem value="custom">Interval personalizat</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {reportPeriod === 'custom' && (
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="justify-start text-left font-normal"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customDateRange.from ? (
+                        customDateRange.to ? (
+                          <>
+                            {formatDate(customDateRange.from)} - {formatDate(customDateRange.to)}
+                          </>
+                        ) : (
+                          formatDate(customDateRange.from)
+                        )
+                      ) : (
+                        <span>Selectează datele</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={customDateRange.from}
+                      selected={{
+                        from: customDateRange.from,
+                        to: customDateRange.to,
+                      }}
+                      onSelect={(range) => {
+                        if (range?.from && range?.to) {
+                          setCustomDateRange({ from: range.from, to: range.to });
+                        }
+                      }}
+                      numberOfMonths={2}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+              
+              <Select value={reportFormat} onValueChange={setReportFormat}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selectează formatul" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pdf">PDF</SelectItem>
+                  <SelectItem value="excel">Excel</SelectItem>
+                  <SelectItem value="csv">CSV</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Button className="flex-shrink-0" onClick={handleGenerateReport}>
+              <DownloadCloud className="mr-2 h-4 w-4" /> Generează Raport
+            </Button>
           </div>
         </div>
         
-        <Tabs defaultValue="financial" className="space-y-6">
-          <TabsList className="grid grid-cols-3 w-[400px]">
-            <TabsTrigger value="financial">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Financiar
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="flex flex-wrap">
+            <TabsTrigger value="financial" className="flex items-center">
+              <TrendingUp className="mr-2 h-4 w-4" /> Financiar
             </TabsTrigger>
-            <TabsTrigger value="productivity">
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Productivitate
+            <TabsTrigger value="projects" className="flex items-center">
+              <PieChart className="mr-2 h-4 w-4" /> Proiecte
             </TabsTrigger>
-            <TabsTrigger value="clients">
-              <Building2 className="h-4 w-4 mr-2" />
-              Clienți
+            <TabsTrigger value="clients" className="flex items-center">
+              <BarChart className="mr-2 h-4 w-4" /> Clienți
+            </TabsTrigger>
+            <TabsTrigger value="time" className="flex items-center">
+              <Clock className="mr-2 h-4 w-4" /> Timp
+            </TabsTrigger>
+            <TabsTrigger value="team" className="flex items-center">
+              <Users className="mr-2 h-4 w-4" /> Echipă
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="financial">
-            <FinancialReports data={data} isLoading={isLoading} error={error instanceof Error ? error : null} />
+          {/* Raport financiar */}
+          <TabsContent value="financial" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Venituri totale</CardTitle>
+                  <CardDescription>Perioada selectată</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {isFinancialLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      `${financialData?.reduce((sum, item) => sum + item.income, 0).toLocaleString()} RON`
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Cheltuieli totale</CardTitle>
+                  <CardDescription>Perioada selectată</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {isFinancialLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      `${financialData?.reduce((sum, item) => sum + item.expenses, 0).toLocaleString()} RON`
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Profit total</CardTitle>
+                  <CardDescription>Perioada selectată</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {isFinancialLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      `${financialData?.reduce((sum, item) => sum + item.profit, 0).toLocaleString()} RON`
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Evoluție financiară</CardTitle>
+                <CardDescription>Venituri, cheltuieli și profit pe luni</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px]">
+                  {isFinancialLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ReBarChart
+                        data={financialData}
+                        margin={{
+                          top: 20,
+                          right: 30,
+                          left: 20,
+                          bottom: 5,
+                        }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip 
+                          formatter={(value: number) => `${value.toLocaleString()} RON`}
+                          contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.9)' }}
+                        />
+                        <Legend />
+                        <Bar dataKey="income" name="Venituri" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="expenses" name="Cheltuieli" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="profit" name="Profit" fill="#10B981" radius={[4, 4, 0, 0]} />
+                      </ReBarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
           
-          <TabsContent value="productivity">
-            <ProductivityReports data={data} isLoading={isLoading} error={error instanceof Error ? error : null} />
+          {/* Raport proiecte */}
+          <TabsContent value="projects" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Număr total proiecte</CardTitle>
+                  <CardDescription>Perioada selectată</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {isProjectStatusLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      projectStatusData?.reduce((sum, item) => sum + item.value, 0)
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Proiecte active</CardTitle>
+                  <CardDescription>În progres + Planificate</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {isProjectStatusLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      projectStatusData?.filter(p => p.name === 'În progres' || p.name === 'Planificat').reduce((sum, item) => sum + item.value, 0)
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Proiecte finalizate</CardTitle>
+                  <CardDescription>Perioada selectată</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {isProjectStatusLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      projectStatusData?.filter(p => p.name === 'Finalizat').reduce((sum, item) => sum + item.value, 0)
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribuție proiecte după status</CardTitle>
+                <CardDescription>Număr de proiecte în fiecare status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px]">
+                  {isProjectStatusLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RePieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                        <Pie
+                          data={projectStatusData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={true}
+                          outerRadius={150}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {projectStatusData?.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value: number) => value} />
+                      </RePieChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
           
-          <TabsContent value="clients">
-            <ClientReports data={data} isLoading={isLoading} error={error instanceof Error ? error : null} />
+          {/* Raport clienți */}
+          <TabsContent value="clients" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Număr total clienți</CardTitle>
+                  <CardDescription>Cu proiecte active</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {isClientRevenueLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      clientRevenueData?.length || 0
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Venit mediu per client</CardTitle>
+                  <CardDescription>Perioada selectată</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {isClientRevenueLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      `${Math.round(clientRevenueData?.reduce((sum, item) => sum + item.value, 0) / clientRevenueData?.length).toLocaleString()} RON`
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Top client</CardTitle>
+                  <CardDescription>Perioada selectată</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-bold">
+                    {isClientRevenueLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      clientRevenueData?.sort((a, b) => b.value - a.value)[0]?.name
+                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {isClientRevenueLoading ? (
+                      <div className="animate-pulse bg-muted h-4 w-24 rounded mt-1" />
+                    ) : (
+                      `${clientRevenueData?.sort((a, b) => b.value - a.value)[0]?.value.toLocaleString()} RON`
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribuție venituri pe clienți</CardTitle>
+                <CardDescription>Venituri totale pentru fiecare client</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px]">
+                  {isClientRevenueLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ReBarChart
+                        data={clientRevenueData}
+                        layout="vertical"
+                        margin={{
+                          top: 20,
+                          right: 30,
+                          left: 100,
+                          bottom: 5,
+                        }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" />
+                        <YAxis dataKey="name" type="category" />
+                        <Tooltip 
+                          formatter={(value: number) => `${value.toLocaleString()} RON`}
+                          contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.9)' }}
+                        />
+                        <Legend />
+                        <Bar 
+                          dataKey="value" 
+                          name="Venituri" 
+                          fill="#3B82F6" 
+                          radius={[0, 4, 4, 0]} 
+                        >
+                          {clientRevenueData?.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </ReBarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Raport timp */}
+          <TabsContent value="time" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Ore totale</CardTitle>
+                  <CardDescription>Perioada selectată</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {isTimeTrackingLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      timeTrackingData?.reduce((sum, item) => sum + item.billable + item.nonBillable, 0).toFixed(1)
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Ore facturabile</CardTitle>
+                  <CardDescription>Perioada selectată</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {isTimeTrackingLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      timeTrackingData?.reduce((sum, item) => sum + item.billable, 0).toFixed(1)
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Raport facturabil</CardTitle>
+                  <CardDescription>Procent ore facturabile</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {isTimeTrackingLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      `${Math.round(
+                        (timeTrackingData?.reduce((sum, item) => sum + item.billable, 0) /
+                        timeTrackingData?.reduce((sum, item) => sum + item.billable + item.nonBillable, 0)) * 100
+                      )}%`
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribuție timp</CardTitle>
+                <CardDescription>Ore facturabile vs. nefacturabile pe zile</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px]">
+                  {isTimeTrackingLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ReBarChart
+                        data={timeTrackingData}
+                        margin={{
+                          top: 20,
+                          right: 30,
+                          left: 20,
+                          bottom: 5,
+                        }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip 
+                          formatter={(value: number) => `${value} ore`}
+                          contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.9)' }}
+                        />
+                        <Legend />
+                        <Bar dataKey="billable" name="Ore facturabile" stackId="a" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="nonBillable" name="Ore nefacturabile" stackId="a" fill="#9CA3AF" radius={[4, 4, 0, 0]} />
+                      </ReBarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Raport echipă */}
+          <TabsContent value="team" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Număr total task-uri</CardTitle>
+                  <CardDescription>Perioada selectată</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {isTeamPerformanceLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      teamPerformanceData?.reduce((sum, item) => sum + item.tasks, 0)
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Rata medie de completare</CardTitle>
+                  <CardDescription>Procent task-uri finalizate</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {isTeamPerformanceLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      `${Math.round(
+                        teamPerformanceData?.reduce((sum, item) => sum + item.completion, 0) / teamPerformanceData?.length
+                      )}%`
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Membru top</CardTitle>
+                  <CardDescription>După rata de completare</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-bold">
+                    {isTeamPerformanceLoading ? (
+                      <div className="animate-pulse bg-muted h-8 w-32 rounded" />
+                    ) : (
+                      teamPerformanceData?.sort((a, b) => b.completion - a.completion)[0]?.name
+                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {isTeamPerformanceLoading ? (
+                      <div className="animate-pulse bg-muted h-4 w-24 rounded mt-1" />
+                    ) : (
+                      `${teamPerformanceData?.sort((a, b) => b.completion - a.completion)[0]?.completion}% completare`
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Performanța echipei</CardTitle>
+                <CardDescription>Task-uri și rata de completare per membru</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px]">
+                  {isTeamPerformanceLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ReBarChart
+                        data={teamPerformanceData}
+                        margin={{
+                          top: 20,
+                          right: 30,
+                          left: 20,
+                          bottom: 5,
+                        }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis yAxisId="left" orientation="left" />
+                        <YAxis yAxisId="right" orientation="right" domain={[0, 100]} />
+                        <Tooltip 
+                          formatter={(value: number, name: string) => [
+                            name === 'tasks' ? `${value} task-uri` : `${value}%`,
+                            name === 'tasks' ? 'Task-uri' : 'Rata completare'
+                          ]}
+                          contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.9)' }}
+                        />
+                        <Legend />
+                        <Bar yAxisId="left" dataKey="tasks" name="Task-uri" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                        <Bar yAxisId="right" dataKey="completion" name="Rata completare" fill="#10B981" radius={[4, 4, 0, 0]} />
+                      </ReBarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

@@ -1,36 +1,16 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'wouter';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { 
-  FileText, Loader2, Search, 
-  FilePlus, Copy, Edit, Trash2, 
-  MoreHorizontal, Download, CreditCard, 
-  FileCheck, File, AlertTriangle
-} from 'lucide-react';
+import { Search, FileText, Download, Copy, Edit, MoreHorizontal, File, PlusCircle, Eye } from 'lucide-react';
 import DashboardLayout from '@/components/layout/dashboard-layout';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 import { ro } from 'date-fns/locale';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,188 +19,185 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
 
-// Definirea tipurilor
-type TemplateType = 'invoice' | 'quote' | 'contract' | 'report' | 'email';
-
-type Template = {
+// Tipurile de date pentru template-uri
+interface Template {
   id: number;
   name: string;
-  description: string | null;
-  template_type: TemplateType;
-  content: string;
-  is_default: boolean;
-  organization_id: number;
-  created_by: number;
-  created_by_name: string;
-  created_at: string;
-  updated_at: string;
-};
+  description: string;
+  category: 'oferte' | 'contracte' | 'facturi' | 'rapoarte' | 'altele';
+  tags: string[];
+  isPredefined: boolean;
+  lastUsed?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  previewImageUrl?: string;
+}
 
-// Schemă de validare pentru creare și editare template
-const templateSchema = z.object({
-  name: z.string().min(3, { message: 'Numele trebuie să aibă cel puțin 3 caractere' }),
-  description: z.string().optional(),
-  template_type: z.enum(['invoice', 'quote', 'contract', 'report', 'email']),
-  content: z.string().min(10, { message: 'Conținutul trebuie să aibă cel puțin 10 caractere' }),
-  is_default: z.boolean().default(false),
-});
+const TEMPLATE_CATEGORIES = [
+  { id: 'oferte', name: 'Oferte', color: 'bg-blue-100 text-blue-800' },
+  { id: 'contracte', name: 'Contracte', color: 'bg-purple-100 text-purple-800' },
+  { id: 'facturi', name: 'Facturi', color: 'bg-green-100 text-green-800' },
+  { id: 'rapoarte', name: 'Rapoarte', color: 'bg-orange-100 text-orange-800' },
+  { id: 'altele', name: 'Altele', color: 'bg-gray-100 text-gray-800' },
+];
 
-type TemplateFormValues = z.infer<typeof templateSchema>;
+// Template-uri predefinite
+const PREDEFINED_TEMPLATES: Template[] = [
+  {
+    id: 1,
+    name: 'Ofertă standard servicii',
+    description: 'Template standard pentru oferte de servicii cu detalii despre preț, termeni și condiții, și perioada de valabilitate.',
+    category: 'oferte',
+    tags: ['servicii', 'standard', 'profesional'],
+    isPredefined: true,
+    createdAt: new Date(2023, 0, 15),
+    updatedAt: new Date(2023, 0, 15),
+    previewImageUrl: '/templates/offer-template-preview.png',
+  },
+  {
+    id: 2,
+    name: 'Contract prestări servicii',
+    description: 'Contract de prestări servicii conform legislației române, cu clauze standard și termeni de plată.',
+    category: 'contracte',
+    tags: ['servicii', 'legal', 'standard'],
+    isPredefined: true,
+    createdAt: new Date(2023, 0, 16),
+    updatedAt: new Date(2023, 1, 10),
+    previewImageUrl: '/templates/contract-template-preview.png',
+  },
+  {
+    id: 3,
+    name: 'Factură fiscală',
+    description: 'Template factură fiscală conform normelor ANAF, cu toate câmpurile obligatorii și calcul automat TVA.',
+    category: 'facturi',
+    tags: ['fiscal', 'TVA', 'ANAF'],
+    isPredefined: true,
+    createdAt: new Date(2023, 0, 17),
+    updatedAt: new Date(2023, 0, 17),
+    previewImageUrl: '/templates/invoice-template-preview.png',
+  },
+  {
+    id: 4,
+    name: 'Contract de confidențialitate (NDA)',
+    description: 'Contract de confidențialitate pentru protejarea informațiilor sensibile partajate între părți.',
+    category: 'contracte',
+    tags: ['confidențialitate', 'legal', 'protecție'],
+    isPredefined: true,
+    createdAt: new Date(2023, 0, 20),
+    updatedAt: new Date(2023, 0, 20),
+    previewImageUrl: '/templates/nda-template-preview.png',
+  },
+  {
+    id: 5,
+    name: 'Raport lunar progres',
+    description: 'Template pentru raportul lunar de progres cu metrici cheie și status pentru proiecte în derulare.',
+    category: 'rapoarte',
+    tags: ['progres', 'lunar', 'metrici'],
+    isPredefined: true,
+    createdAt: new Date(2023, 0, 25),
+    updatedAt: new Date(2023, 0, 25),
+    previewImageUrl: '/templates/report-template-preview.png',
+  },
+  {
+    id: 6,
+    name: 'Ofertă detaliată proiect',
+    description: 'Template ofertă detaliată pentru proiecte complexe, cu defalcare pe etape, livrabile și costuri.',
+    category: 'oferte',
+    tags: ['proiect', 'detaliat', 'etape'],
+    isPredefined: true,
+    createdAt: new Date(2023, 1, 5),
+    updatedAt: new Date(2023, 1, 5),
+    previewImageUrl: '/templates/detailed-offer-preview.png',
+  },
+  {
+    id: 7,
+    name: 'Factură proformă',
+    description: 'Template pentru facturi proformă cu termeni de plată și instrucțiuni pentru client.',
+    category: 'facturi',
+    tags: ['proformă', 'avans', 'plată'],
+    isPredefined: true,
+    createdAt: new Date(2023, 1, 10),
+    updatedAt: new Date(2023, 1, 10),
+    previewImageUrl: '/templates/proforma-template-preview.png',
+  },
+  {
+    id: 8,
+    name: 'Contract de mentenanță',
+    description: 'Contract pentru servicii de mentenanță continuă, cu SLA și termeni de suport.',
+    category: 'contracte',
+    tags: ['mentenanță', 'suport', 'SLA'],
+    isPredefined: true,
+    createdAt: new Date(2023, 1, 15),
+    updatedAt: new Date(2023, 1, 15),
+    previewImageUrl: '/templates/maintenance-contract-preview.png',
+  },
+  {
+    id: 9,
+    name: 'Raport financiar',
+    description: 'Template pentru rapoarte financiare cu venituri, cheltuieli și profitabilitate pe proiecte și clienți.',
+    category: 'rapoarte',
+    tags: ['financiar', 'profit', 'analiza'],
+    isPredefined: true,
+    createdAt: new Date(2023, 1, 20),
+    updatedAt: new Date(2023, 1, 20),
+    previewImageUrl: '/templates/financial-report-preview.png',
+  },
+  {
+    id: 10,
+    name: 'Scrisoare de recomandare',
+    description: 'Template pentru scrisori de recomandare pentru clienți sau colaboratori.',
+    category: 'altele',
+    tags: ['recomandare', 'referință', 'professional'],
+    isPredefined: true,
+    createdAt: new Date(2023, 1, 25),
+    updatedAt: new Date(2023, 1, 25),
+    previewImageUrl: '/templates/recommendation-letter-preview.png',
+  },
+];
 
-// Component pentru pagina de template-uri
+// Template-uri personalizate (ar fi salvate în baza de date în aplicația reală)
+const CUSTOM_TEMPLATES: Template[] = [
+  {
+    id: 101,
+    name: 'Ofertă website e-commerce',
+    description: 'Ofertă personalizată pentru dezvoltarea unui website e-commerce cu funcționalități specifice.',
+    category: 'oferte',
+    tags: ['website', 'e-commerce', 'personalizat'],
+    isPredefined: false,
+    lastUsed: new Date(2023, 2, 5),
+    createdAt: new Date(2023, 2, 1),
+    updatedAt: new Date(2023, 2, 5),
+  },
+  {
+    id: 102,
+    name: 'Contract dezvoltare aplicație',
+    description: 'Contract personalizat pentru dezvoltarea unei aplicații mobile cu termeni specifici.',
+    category: 'contracte',
+    tags: ['aplicație', 'mobile', 'dezvoltare'],
+    isPredefined: false,
+    lastUsed: new Date(2023, 2, 10),
+    createdAt: new Date(2023, 2, 7),
+    updatedAt: new Date(2023, 2, 10),
+  },
+];
+
+// Combinăm toate template-urile
+const ALL_TEMPLATES = [...PREDEFINED_TEMPLATES, ...CUSTOM_TEMPLATES];
+
 export default function TemplatesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<string>('all');
-  const [newTemplateDialogOpen, setNewTemplateDialogOpen] = useState(false);
-  const [editTemplateDialogOpen, setEditTemplateDialogOpen] = useState(false);
+  const [viewTemplateDialogOpen, setViewTemplateDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [viewContentDialogOpen, setViewContentDialogOpen] = useState(false);
   
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  // Formulare pentru creare și editare
-  const newTemplateForm = useForm<TemplateFormValues>({
-    resolver: zodResolver(templateSchema),
-    defaultValues: {
-      name: '',
-      description: '',
-      template_type: 'invoice',
-      content: '',
-      is_default: false,
-    },
-  });
-
-  const editTemplateForm = useForm<TemplateFormValues>({
-    resolver: zodResolver(templateSchema),
-    defaultValues: {
-      name: '',
-      description: '',
-      template_type: 'invoice',
-      content: '',
-      is_default: false,
-    },
-  });
-
-  // Obține lista de template-uri
-  const { data: templates, isLoading, error } = useQuery<Template[]>({
-    queryKey: ['/api/templates'],
-    queryFn: async () => {
-      const response = await fetch('/api/templates', {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Nu s-au putut încărca template-urile');
-      }
-      
-      return await response.json();
-    }
-  });
-
-  // Mutație pentru crearea unui template nou
-  const createTemplateMutation = useMutation({
-    mutationFn: async (data: TemplateFormValues) => {
-      const response = await apiRequest('POST', '/api/templates', data);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Template creat",
-        description: "Template-ul a fost creat cu succes",
-      });
-      setNewTemplateDialogOpen(false);
-      newTemplateForm.reset();
-      queryClient.invalidateQueries({ queryKey: ['/api/templates'] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Eroare",
-        description: error.message || "Nu s-a putut crea template-ul",
-        variant: "destructive",
-      });
-    }
-  });
-
-  // Mutație pentru editarea unui template
-  const updateTemplateMutation = useMutation({
-    mutationFn: async (data: TemplateFormValues & { id: number }) => {
-      const { id, ...templateData } = data;
-      const response = await apiRequest('PATCH', `/api/templates/${id}`, templateData);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Template actualizat",
-        description: "Template-ul a fost actualizat cu succes",
-      });
-      setEditTemplateDialogOpen(false);
-      setSelectedTemplate(null);
-      editTemplateForm.reset();
-      queryClient.invalidateQueries({ queryKey: ['/api/templates'] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Eroare",
-        description: error.message || "Nu s-a putut actualiza template-ul",
-        variant: "destructive",
-      });
-    }
-  });
-
-  // Mutație pentru ștergerea unui template
-  const deleteTemplateMutation = useMutation({
-    mutationFn: async (templateId: number) => {
-      const response = await apiRequest('DELETE', `/api/templates/${templateId}`);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Template șters",
-        description: "Template-ul a fost șters cu succes",
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/templates'] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Eroare",
-        description: error.message || "Nu s-a putut șterge template-ul",
-        variant: "destructive",
-      });
-    }
-  });
-
-  // Mutație pentru setarea unui template ca implicit
-  const setDefaultTemplateMutation = useMutation({
-    mutationFn: async (data: { templateId: number; templateType: TemplateType }) => {
-      const response = await apiRequest('PATCH', `/api/templates/${data.templateId}/set-default`, { 
-        template_type: data.templateType 
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Template actualizat",
-        description: "Template-ul a fost setat ca implicit",
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/templates'] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Eroare",
-        description: error.message || "Nu s-a putut seta template-ul ca implicit",
-        variant: "destructive",
-      });
-    }
-  });
-
-  // Filtrarea template-urilor în funcție de tab-ul activ și termenul de căutare
-  const filteredTemplates = templates?.filter(template => {
+  // Filtrăm template-urile
+  const filteredTemplates = ALL_TEMPLATES.filter(template => {
     // Filtrare după tab
-    if (activeTab !== 'all' && template.template_type !== activeTab) {
+    if (activeTab !== 'all' && template.category !== activeTab) {
       return false;
     }
     
@@ -229,116 +206,69 @@ export default function TemplatesPage() {
       const searchLower = searchTerm.toLowerCase();
       return (
         template.name.toLowerCase().includes(searchLower) ||
-        (template.description && template.description.toLowerCase().includes(searchLower))
+        template.description.toLowerCase().includes(searchLower) ||
+        template.tags.some(tag => tag.toLowerCase().includes(searchLower))
       );
     }
     
     return true;
-  }) || [];
+  });
 
-  // Tratează crearea unui template nou
-  const handleCreateTemplate = (values: TemplateFormValues) => {
-    createTemplateMutation.mutate(values);
+  // Obține numele pentru o categorie
+  const getCategoryName = (categoryId: string) => {
+    const category = TEMPLATE_CATEGORIES.find(c => c.id === categoryId);
+    return category ? category.name : categoryId;
   };
 
-  // Tratează editarea unui template
-  const handleEditTemplate = (values: TemplateFormValues) => {
-    if (!selectedTemplate) return;
-    
-    updateTemplateMutation.mutate({
-      id: selectedTemplate.id,
-      ...values
+  // Obține culoarea pentru o categorie
+  const getCategoryColor = (categoryId: string) => {
+    const category = TEMPLATE_CATEGORIES.find(c => c.id === categoryId);
+    return category ? category.color : 'bg-gray-100 text-gray-800';
+  };
+
+  // Formatează data pentru afișare
+  const formatDate = (date: Date) => {
+    return format(date, 'd MMM yyyy', { locale: ro });
+  };
+
+  // Deschide dialogul de previzualizare template
+  const openViewTemplateDialog = (template: Template) => {
+    setSelectedTemplate(template);
+    setViewTemplateDialogOpen(true);
+  };
+
+  // Handler pentru descărcarea unui template
+  const handleDownloadTemplate = (template: Template) => {
+    toast({
+      title: 'Descărcare template',
+      description: `Template-ul "${template.name}" a fost descărcat cu succes.`,
     });
   };
 
-  // Deschide dialogul de editare și populează formularul
-  const openEditTemplateDialog = (template: Template) => {
-    setSelectedTemplate(template);
-    
-    editTemplateForm.reset({
-      name: template.name,
-      description: template.description || '',
-      template_type: template.template_type,
-      content: template.content,
-      is_default: template.is_default,
+  // Handler pentru duplicarea unui template
+  const handleDuplicateTemplate = (template: Template) => {
+    toast({
+      title: 'Template duplicat',
+      description: `Template-ul "${template.name}" a fost duplicat. Puteți găsi copia în lista de template-uri personalizate.`,
     });
-    
-    setEditTemplateDialogOpen(true);
   };
 
-  // Deschide dialogul de vizualizare conținut
-  const openViewContentDialog = (template: Template) => {
-    setSelectedTemplate(template);
-    setViewContentDialogOpen(true);
-  };
-
-  // Tratează ștergerea unui template
-  const handleDeleteTemplate = (templateId: number) => {
-    if (window.confirm('Sigur doriți să ștergeți acest template?')) {
-      deleteTemplateMutation.mutate(templateId);
-    }
-  };
-
-  // Tratează setarea unui template ca implicit
-  const handleSetDefaultTemplate = (templateId: number, templateType: TemplateType) => {
-    setDefaultTemplateMutation.mutate({ templateId, templateType });
-  };
-
-  // Obține iconul pentru tipul de template
-  const getTemplateTypeIcon = (type: TemplateType) => {
-    switch (type) {
-      case 'invoice':
-        return <CreditCard className="h-5 w-5 text-blue-500" />;
-      case 'quote':
-        return <FileText className="h-5 w-5 text-green-500" />;
-      case 'contract':
-        return <FileCheck className="h-5 w-5 text-purple-500" />;
-      case 'report':
-        return <File className="h-5 w-5 text-orange-500" />;
-      case 'email':
-        return <FileText className="h-5 w-5 text-yellow-500" />;
-      default:
-        return <FileText className="h-5 w-5 text-gray-500" />;
-    }
-  };
-
-  // Obține numele tipului de template
-  const getTemplateTypeName = (type: TemplateType) => {
-    switch (type) {
-      case 'invoice':
-        return 'Factură';
-      case 'quote':
-        return 'Ofertă';
-      case 'contract':
-        return 'Contract';
-      case 'report':
-        return 'Raport';
-      case 'email':
-        return 'Email';
-      default:
-        return type;
-    }
+  // Handler pentru folosirea unui template
+  const handleUseTemplate = (template: Template) => {
+    toast({
+      title: 'Template selectat',
+      description: `Template-ul "${template.name}" a fost selectat pentru utilizare.`,
+    });
   };
 
   // Render card pentru un template
   const renderTemplateCard = (template: Template) => (
-    <Card key={template.id} className="h-full">
+    <Card key={template.id} className="h-full flex flex-col">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
-          <div className="flex items-center gap-2">
-            {getTemplateTypeIcon(template.template_type)}
-            <div>
-              <CardTitle className="text-base">{template.name}</CardTitle>
-              <CardDescription className="text-xs">
-                {getTemplateTypeName(template.template_type)}
-                {template.is_default && (
-                  <Badge variant="secondary" className="ml-2">
-                    Implicit
-                  </Badge>
-                )}
-              </CardDescription>
-            </div>
-          </div>
+          <Badge className={`${getCategoryColor(template.category)}`}>
+            {getCategoryName(template.category)}
+          </Badge>
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -349,52 +279,70 @@ export default function TemplatesPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Acțiuni</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => openViewContentDialog(template)}>
-                <FileText className="mr-2 h-4 w-4" />
-                <span>Vizualizează</span>
+              <DropdownMenuItem onClick={() => openViewTemplateDialog(template)}>
+                <Eye className="mr-2 h-4 w-4" />
+                <span>Previzualizare</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => openEditTemplateDialog(template)}>
-                <Edit className="mr-2 h-4 w-4" />
-                <span>Editează</span>
+              <DropdownMenuItem onClick={() => handleUseTemplate(template)}>
+                <File className="mr-2 h-4 w-4" />
+                <span>Utilizează</span>
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDuplicateTemplate(template)}>
                 <Copy className="mr-2 h-4 w-4" />
                 <span>Duplică</span>
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDownloadTemplate(template)}>
                 <Download className="mr-2 h-4 w-4" />
                 <span>Descarcă</span>
               </DropdownMenuItem>
-              {!template.is_default && (
-                <DropdownMenuItem 
-                  onClick={() => handleSetDefaultTemplate(template.id, template.template_type)}
-                >
-                  <FileCheck className="mr-2 h-4 w-4" />
-                  <span>Setează ca implicit</span>
-                </DropdownMenuItem>
+              {!template.isPredefined && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>
+                    <Edit className="mr-2 h-4 w-4" />
+                    <span>Editează</span>
+                  </DropdownMenuItem>
+                </>
               )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={() => handleDeleteTemplate(template.id)}
-                className="text-red-600"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                <span>Șterge</span>
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        
+        <CardTitle className="text-lg mt-2 cursor-pointer hover:text-primary" onClick={() => openViewTemplateDialog(template)}>
+          {template.name}
+        </CardTitle>
+        
+        <CardDescription>
+          {template.isPredefined ? 'Template predefinit' : 'Template personalizat'}
+          {template.lastUsed && ` • Folosit ultima dată: ${formatDate(template.lastUsed)}`}
+        </CardDescription>
       </CardHeader>
-      <CardContent className="pb-2">
-        {template.description ? (
-          <p className="text-sm text-muted-foreground line-clamp-2">{template.description}</p>
-        ) : (
-          <p className="text-sm text-muted-foreground italic">Fără descriere</p>
-        )}
+      
+      <CardContent className="py-2 flex-grow">
+        <p className="text-sm text-muted-foreground mb-4 line-clamp-3">{template.description}</p>
+        
+        <div className="flex flex-wrap gap-1 mt-auto">
+          {template.tags.map(tag => (
+            <Badge key={tag} variant="outline" className="text-xs">
+              {tag}
+            </Badge>
+          ))}
+        </div>
       </CardContent>
-      <CardFooter className="flex justify-between pt-2 text-xs text-muted-foreground">
-        <span>Creat de {template.created_by_name}</span>
-        <span>{format(new Date(template.updated_at), 'd MMM yyyy', { locale: ro })}</span>
+      
+      <CardFooter className="pt-2 flex justify-between border-t">
+        <div className="text-xs text-muted-foreground">
+          Creat: {formatDate(template.createdAt)}
+        </div>
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="text-xs"
+          onClick={() => handleUseTemplate(template)}
+        >
+          Utilizează
+        </Button>
       </CardFooter>
     </Card>
   );
@@ -403,7 +351,7 @@ export default function TemplatesPage() {
     <DashboardLayout>
       <div className="flex flex-col space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-3xl font-bold tracking-tight">Template-uri Documente</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Template-uri</h1>
           
           <div className="flex gap-4">
             <div className="relative w-full sm:w-64">
@@ -417,374 +365,164 @@ export default function TemplatesPage() {
               />
             </div>
             
-            <Dialog open={newTemplateDialogOpen} onOpenChange={setNewTemplateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <FilePlus className="mr-2 h-4 w-4" /> Adaugă Template
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-3xl max-h-[90vh]">
-                <DialogHeader>
-                  <DialogTitle>Adaugă Template Nou</DialogTitle>
-                  <DialogDescription>
-                    Creați un nou template pentru documente.
-                  </DialogDescription>
-                </DialogHeader>
-                <Form {...newTemplateForm}>
-                  <form onSubmit={newTemplateForm.handleSubmit(handleCreateTemplate)} className="space-y-6">
-                    <ScrollArea className="max-h-[60vh] pr-4">
-                      <div className="space-y-4">
-                        <FormField
-                          control={newTemplateForm.control}
-                          name="name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nume</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Ex: Factură standard" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={newTemplateForm.control}
-                          name="description"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Descriere</FormLabel>
-                              <FormControl>
-                                <Textarea 
-                                  placeholder="O scurtă descriere a template-ului" 
-                                  {...field} 
-                                  className="min-h-[80px]"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={newTemplateForm.control}
-                          name="template_type"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Tip Template</FormLabel>
-                              <Select 
-                                onValueChange={field.onChange} 
-                                defaultValue={field.value}
-                              >
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Selectează tipul template-ului" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="invoice">Factură</SelectItem>
-                                  <SelectItem value="quote">Ofertă</SelectItem>
-                                  <SelectItem value="contract">Contract</SelectItem>
-                                  <SelectItem value="report">Raport</SelectItem>
-                                  <SelectItem value="email">Email</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={newTemplateForm.control}
-                          name="content"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Conținut</FormLabel>
-                              <FormControl>
-                                <Textarea 
-                                  placeholder="Introduceți conținutul template-ului aici..."
-                                  {...field}
-                                  className="min-h-[200px] font-mono text-sm"
-                                />
-                              </FormControl>
-                              <FormDescription>
-                                Puteți utiliza variabile în format <code>{"{{nume_variabila}}"}</code> care vor fi înlocuite la generarea documentului. 
-                                Exemplu: <code>{"{{client.name}}, {{invoice.number}}"}</code>
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={newTemplateForm.control}
-                          name="is_default"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                              <FormControl>
-                                <input
-                                  type="checkbox"
-                                  checked={field.value}
-                                  onChange={field.onChange}
-                                  className="h-4 w-4 rounded border-gray-300"
-                                />
-                              </FormControl>
-                              <div className="space-y-1 leading-none">
-                                <FormLabel>Setează ca template implicit</FormLabel>
-                                <FormDescription>
-                                  Acest template va fi utilizat implicit pentru generarea documentelor de acest tip.
-                                </FormDescription>
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </ScrollArea>
-                    
-                    <DialogFooter>
-                      <Button 
-                        type="submit" 
-                        disabled={createTemplateMutation.isPending}
-                      >
-                        {createTemplateMutation.isPending && (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        )}
-                        Creează Template
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-            
-            {/* Dialog pentru editare template */}
-            <Dialog open={editTemplateDialogOpen} onOpenChange={setEditTemplateDialogOpen}>
-              <DialogContent className="max-w-3xl max-h-[90vh]">
-                <DialogHeader>
-                  <DialogTitle>Editare Template</DialogTitle>
-                  <DialogDescription>
-                    Modificați template-ul selectat.
-                  </DialogDescription>
-                </DialogHeader>
-                <Form {...editTemplateForm}>
-                  <form onSubmit={editTemplateForm.handleSubmit(handleEditTemplate)} className="space-y-6">
-                    <ScrollArea className="max-h-[60vh] pr-4">
-                      <div className="space-y-4">
-                        <FormField
-                          control={editTemplateForm.control}
-                          name="name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nume</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Ex: Factură standard" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={editTemplateForm.control}
-                          name="description"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Descriere</FormLabel>
-                              <FormControl>
-                                <Textarea 
-                                  placeholder="O scurtă descriere a template-ului" 
-                                  {...field} 
-                                  className="min-h-[80px]"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={editTemplateForm.control}
-                          name="template_type"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Tip Template</FormLabel>
-                              <Select 
-                                onValueChange={field.onChange} 
-                                defaultValue={field.value}
-                              >
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Selectează tipul template-ului" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="invoice">Factură</SelectItem>
-                                  <SelectItem value="quote">Ofertă</SelectItem>
-                                  <SelectItem value="contract">Contract</SelectItem>
-                                  <SelectItem value="report">Raport</SelectItem>
-                                  <SelectItem value="email">Email</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={editTemplateForm.control}
-                          name="content"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Conținut</FormLabel>
-                              <FormControl>
-                                <Textarea 
-                                  placeholder="Introduceți conținutul template-ului aici..."
-                                  {...field}
-                                  className="min-h-[200px] font-mono text-sm"
-                                />
-                              </FormControl>
-                              <FormDescription>
-                                Puteți utiliza variabile în format <code>{"{{nume_variabila}}"}</code> care vor fi înlocuite la generarea documentului. 
-                                Exemplu: <code>{"{{client.name}}, {{invoice.number}}"}</code>
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={editTemplateForm.control}
-                          name="is_default"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                              <FormControl>
-                                <input
-                                  type="checkbox"
-                                  checked={field.value}
-                                  onChange={field.onChange}
-                                  className="h-4 w-4 rounded border-gray-300"
-                                />
-                              </FormControl>
-                              <div className="space-y-1 leading-none">
-                                <FormLabel>Setează ca template implicit</FormLabel>
-                                <FormDescription>
-                                  Acest template va fi utilizat implicit pentru generarea documentelor de acest tip.
-                                </FormDescription>
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </ScrollArea>
-                    
-                    <DialogFooter>
-                      <Button 
-                        type="submit" 
-                        disabled={updateTemplateMutation.isPending}
-                      >
-                        {updateTemplateMutation.isPending && (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        )}
-                        Salvează Modificările
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-            
-            {/* Dialog pentru vizualizare conținut */}
-            <Dialog open={viewContentDialogOpen} onOpenChange={setViewContentDialogOpen}>
-              <DialogContent className="max-w-3xl max-h-[90vh]">
-                <DialogHeader>
-                  <DialogTitle>
-                    {selectedTemplate?.name}
-                    <Badge className="ml-2" variant="outline">
-                      {selectedTemplate?.template_type && getTemplateTypeName(selectedTemplate.template_type)}
-                    </Badge>
-                  </DialogTitle>
-                  <DialogDescription>
-                    {selectedTemplate?.description || 'Fără descriere'}
-                  </DialogDescription>
-                </DialogHeader>
-                <ScrollArea className="max-h-[60vh]">
-                  <div className="p-4 border rounded-md bg-slate-50 font-mono text-sm whitespace-pre-wrap">
-                    {selectedTemplate?.content}
-                  </div>
-                </ScrollArea>
-                <DialogFooter>
-                  <Button onClick={() => setViewContentDialogOpen(false)} variant="outline">
-                    Închide
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      if (selectedTemplate) {
-                        setViewContentDialogOpen(false);
-                        openEditTemplateDialog(selectedTemplate);
-                      }
-                    }}
-                  >
-                    <Edit className="mr-2 h-4 w-4" />
-                    Editează
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <Button>
+              <PlusCircle className="mr-2 h-4 w-4" /> Adaugă Template
+            </Button>
           </div>
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList>
+          <TabsList className="flex flex-wrap">
             <TabsTrigger value="all">Toate</TabsTrigger>
-            <TabsTrigger value="invoice">Facturi</TabsTrigger>
-            <TabsTrigger value="quote">Oferte</TabsTrigger>
-            <TabsTrigger value="contract">Contracte</TabsTrigger>
-            <TabsTrigger value="report">Rapoarte</TabsTrigger>
-            <TabsTrigger value="email">Email-uri</TabsTrigger>
+            {TEMPLATE_CATEGORIES.map(category => (
+              <TabsTrigger key={category.id} value={category.id}>{category.name}</TabsTrigger>
+            ))}
           </TabsList>
           
-          <TabsContent value={activeTab} className="mt-4">
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="mt-4 text-muted-foreground">Se încarcă template-urile...</p>
+          <TabsContent value={activeTab} className="space-y-6">
+            {/* Secțiunea de template-uri predefinite (dacă sunt filtrate) */}
+            {activeTab === 'all' && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold tracking-tight">Template-uri predefinite</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredTemplates
+                    .filter(template => template.isPredefined)
+                    .map(renderTemplateCard)}
+                </div>
               </div>
-            ) : error ? (
-              <Card>
-                <CardContent className="py-6">
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Eroare</AlertTitle>
-                    <AlertDescription>
-                      {error instanceof Error ? error.message : "Nu s-au putut încărca template-urile"}
-                    </AlertDescription>
-                  </Alert>
-                </CardContent>
-              </Card>
-            ) : filteredTemplates.length === 0 ? (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <div className="flex flex-col items-center justify-center py-8">
-                    <FileText className="h-12 w-12 text-muted-foreground" />
-                    <h3 className="mt-4 text-lg font-medium">Nu există template-uri</h3>
-                    <p className="mt-2 text-sm text-muted-foreground max-w-sm">
-                      {searchTerm 
-                        ? 'Nu s-au găsit template-uri care să corespundă căutării.' 
-                        : 'Nu aveți template-uri create încă. Creați primul dvs. template cu butonul "Adaugă Template".'}
-                    </p>
-                    <Button className="mt-4" onClick={() => setNewTemplateDialogOpen(true)}>
-                      <FilePlus className="mr-2 h-4 w-4" /> Adaugă Template
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
+            )}
+            
+            {/* Secțiunea de template-uri personalizate (dacă sunt filtrate) */}
+            {activeTab === 'all' && filteredTemplates.some(template => !template.isPredefined) && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold tracking-tight">Template-uri personalizate</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredTemplates
+                    .filter(template => !template.isPredefined)
+                    .map(renderTemplateCard)}
+                </div>
+              </div>
+            )}
+            
+            {/* Când este selectată o categorie specifică */}
+            {activeTab !== 'all' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredTemplates.map(renderTemplateCard)}
               </div>
             )}
+            
+            {/* Când nu există rezultate */}
+            {filteredTemplates.length === 0 && (
+              <div className="text-center py-12">
+                <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-medium">Niciun template găsit</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {searchTerm 
+                    ? `Nu am găsit niciun template care să corespundă căutării "${searchTerm}".` 
+                    : 'Nu există template-uri în această categorie.'}
+                </p>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
+        
+        {/* Dialog de previzualizare template */}
+        <Dialog open={viewTemplateDialogOpen} onOpenChange={setViewTemplateDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>{selectedTemplate?.name}</DialogTitle>
+              <DialogDescription>
+                {selectedTemplate?.description}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="flex flex-col md:flex-row gap-6">
+              <div className="flex-1">
+                <div className="text-sm font-medium mb-2">Detalii template</div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Categorie:</span>
+                    <Badge className={`${selectedTemplate && getCategoryColor(selectedTemplate.category)}`}>
+                      {selectedTemplate && getCategoryName(selectedTemplate.category)}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tip:</span>
+                    <span>{selectedTemplate?.isPredefined ? 'Predefinit' : 'Personalizat'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Creat la:</span>
+                    <span>{selectedTemplate && formatDate(selectedTemplate.createdAt)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Actualizat la:</span>
+                    <span>{selectedTemplate && formatDate(selectedTemplate.updatedAt)}</span>
+                  </div>
+                  {selectedTemplate?.lastUsed && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Folosit ultima dată:</span>
+                      <span>{formatDate(selectedTemplate.lastUsed)}</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="text-sm font-medium mt-4 mb-2">Etichete</div>
+                <div className="flex flex-wrap gap-1">
+                  {selectedTemplate?.tags.map(tag => (
+                    <Badge key={tag} variant="outline" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="flex-[2]">
+                <div className="text-sm font-medium mb-2">Previzualizare</div>
+                <div className="border rounded-md overflow-hidden">
+                  {selectedTemplate?.previewImageUrl ? (
+                    <img 
+                      src={selectedTemplate.previewImageUrl} 
+                      alt={`Preview for ${selectedTemplate.name}`}
+                      className="w-full h-auto object-contain"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-64 bg-muted">
+                      <p className="text-muted-foreground">Previzualizare indisponibilă</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter className="flex justify-between">
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleDownloadTemplate(selectedTemplate!)}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Descarcă
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleDuplicateTemplate(selectedTemplate!)}
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Duplică
+                </Button>
+              </div>
+              
+              <Button 
+                onClick={() => {
+                  handleUseTemplate(selectedTemplate!);
+                  setViewTemplateDialogOpen(false);
+                }}
+              >
+                Utilizează Template
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
