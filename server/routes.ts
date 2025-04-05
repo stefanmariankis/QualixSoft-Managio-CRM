@@ -37,7 +37,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           { 
             name: name, 
             slug: slug,
-            organization_type: type,
+            type: type,
             is_active: true,
             subscription_plan: 'trial',
             trial_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 zile
