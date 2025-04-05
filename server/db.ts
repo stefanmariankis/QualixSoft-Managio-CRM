@@ -1,15 +1,27 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
 import * as schema from "@shared/schema";
-
-neonConfig.webSocketConstructor = ws;
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
+    "Trebuie setată variabila de mediu DATABASE_URL"
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+// Creează o conexiune PostgreSQL
+export const queryClient = postgres(process.env.DATABASE_URL);
+
+// Inițializează Drizzle cu conexiunea PostgreSQL
+export const db = drizzle(queryClient);
+
+// O funcție utilă pentru a testa conexiunea
+export async function testConnection() {
+  try {
+    await queryClient`SELECT 1`;
+    console.log('Conexiune reușită la baza de date PostgreSQL!');
+    return true;
+  } catch (error) {
+    console.error('Eroare la conectarea la baza de date:', error);
+    return false;
+  }
+}

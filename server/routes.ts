@@ -1,9 +1,149 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { createSupabaseClient } from "./supabase";
+import { storage } from "./storage";
+import { organizations, insertOrganizationSchema, InsertOrganization, loginSchema, registrationSchema } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import { db } from "./db";
+import bcrypt from "bcryptjs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  const supabase = createSupabaseClient();
+  
+  // Ruta pentru înregistrare utilizator
+  app.post("/api/register", async (req, res) => {
+    try {
+      // Validează datele de înregistrare
+      const validationResult = registrationSchema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Date invalide", 
+          errors: validationResult.error.format() 
+        });
+      }
+      
+      const { 
+        email, 
+        password, 
+        firstName, 
+        lastName, 
+        organizationType, 
+        companyName 
+      } = validationResult.data;
+      
+      // Verifică dacă utilizatorul există deja
+      const existingUser = await storage.getUserByUsername(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Adresa de email este deja înregistrată" });
+      }
+      
+      // Generează un slug unic pentru organizație
+      const slug = companyName
+        .toLowerCase()
+        .replace(/[^\w\s]/gi, '')
+        .replace(/\s+/g, '-')
+        + '-' + Date.now().toString().slice(-4);
+      
+      // Creează organizația mai întâi - type se mapează la organization_type în baza de date
+      const organization: InsertOrganization = {
+        name: companyName,
+        slug: slug,
+        type: organizationType, // coloana se numește type în typescript, dar organization_type în postgres
+        subscriptionPlan: 'trial', 
+        isActive: true,
+        trialExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 zile
+      };
+      
+      // În PostgreSQL putem folosi returning() pentru a obține organizația după inserare
+      const newOrgs = await db.insert(organizations).values(organization).returning();
+      const newOrg = newOrgs[0];
+      
+      if (!newOrg) {
+        throw new Error("Nu s-a putut crea organizația");
+      }
+      
+      // Hash parola
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Creează utilizatorul
+      const user = await storage.createUser({
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        role: "ceo",
+        organizationId: newOrg.id
+      });
+      
+      // Exclude parola din răspuns
+      const { password: _, ...userWithoutPassword } = user;
+      
+      return res.status(201).json({
+        user: userWithoutPassword,
+        organization: newOrg
+      });
+      
+    } catch (error: any) {
+      console.error("Eroare la înregistrarea utilizatorului:", error);
+      return res.status(500).json({ 
+        message: "Nu s-a putut înregistra utilizatorul", 
+        error: error.message || 'Eroare necunoscută'
+      });
+    }
+  });
+  
+  // Ruta pentru autentificare
+  app.post("/api/login", async (req, res) => {
+    try {
+      // Validează datele de login
+      const validationResult = loginSchema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Date invalide", 
+          errors: validationResult.error.format() 
+        });
+      }
+      
+      const { email, password } = validationResult.data;
+      
+      // Caută utilizatorul după email
+      const user = await storage.getUserByUsername(email);
+      
+      if (!user) {
+        return res.status(401).json({ message: "Email sau parolă incorecte" });
+      }
+      
+      // Verifică parola
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: "Email sau parolă incorecte" });
+      }
+      
+      // Obține informațiile organizației
+      const [organization] = user.organizationId 
+        ? await db.select().from(organizations).where(eq(organizations.id, user.organizationId))
+        : [];
+      
+      // Exclude parola din răspuns
+      const { password: _, ...userWithoutPassword } = user;
+      
+      // Aici ar trebui să setați sesiunea sau să generați un token JWT
+      // Pentru simplitate, trimitem doar datele utilizatorului și organizației
+      
+      return res.status(200).json({
+        user: userWithoutPassword,
+        organization
+      });
+      
+    } catch (error: any) {
+      console.error("Eroare la autentificare:", error);
+      return res.status(500).json({ 
+        message: "Eroare internă de server", 
+        error: error.message || 'Eroare necunoscută'
+      });
+    }
+  });
 
   // Ruta pentru crearea organizației
   app.post("/api/organizations", async (req, res) => {
@@ -30,35 +170,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .replace(/\s+/g, '-')      // Înlocuiește spațiile cu cratime
         + '-' + Date.now().toString().slice(-4);  // Adaugă timestamp pentru unicitate
       
-      // Inserează organizația în Supabase
-      const { data, error } = await supabase
-        .from("organizations")
-        .insert([
-          { 
-            name: name, 
-            slug: slug,
-            type: type,
-            is_active: true,
-            subscription_plan: 'trial',
-            trial_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 zile
-          }
-        ])
-        .select()
-        .single();
-
-      if (error) {
-        console.error("Eroare la crearea organizației:", error);
-        return res.status(500).json({ 
-          message: "Nu s-a putut crea organizația", 
-          error: error.message 
-        });
+      // Inserează organizația în baza de date
+      const organization: InsertOrganization = {
+        name,
+        slug,
+        type, // coloana se numește type în TypeScript, dar organization_type în baza de date
+        subscriptionPlan: 'trial',
+        isActive: true,
+        trialExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 zile
+      };
+      
+      // În PostgreSQL putem folosi returning() pentru a obține organizația după inserare
+      const newOrgs = await db.insert(organizations).values(organization).returning();
+      const newOrg = newOrgs[0];
+      
+      if (!newOrg) {
+        throw new Error("Nu s-a putut crea organizația");
       }
-
-      return res.status(201).json(data);
-    } catch (error) {
+      
+      return res.status(201).json(newOrg);
+    } catch (error: any) {
       console.error("Eroare server:", error);
       return res.status(500).json({ 
-        message: "Eroare internă de server" 
+        message: "Eroare internă de server",
+        error: error.message || 'Eroare necunoscută'
       });
     }
   });
@@ -66,24 +201,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Ruta pentru a obține datele utilizatorului
   app.get("/api/me", async (req, res) => {
     try {
-      // Se presupune că veți avea un middleware pentru sesiune
-      // care va pune token-ul JWT în req
-      const token = req.headers.authorization?.split("Bearer ")[1];
-
-      if (!token) {
+      // Aici ar trebui să verifici sesiunea sau token-ul JWT
+      // Pentru simplitate, am comenta acest cod
+      
+      // În implementarea reală, veți avea acces la ID-ul utilizatorului din sesiune
+      // const userId = req.session.userId;
+      const userId = req.headers['user-id']; // temporar pentru testare
+      
+      if (!userId) {
         return res.status(401).json({ message: "Neautorizat" });
       }
-
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-
-      if (error || !user) {
-        return res.status(401).json({ message: "Sesiune invalidă" });
+      
+      const user = await storage.getUser(Number(userId));
+      
+      if (!user) {
+        return res.status(404).json({ message: "Utilizator negăsit" });
       }
-
-      return res.json({ user });
-    } catch (error) {
+      
+      // Obține informațiile organizației
+      const [organization] = user.organizationId 
+        ? await db.select().from(organizations).where(eq(organizations.id, user.organizationId))
+        : [];
+      
+      // Exclude parola din răspuns
+      const { password: _, ...userWithoutPassword } = user;
+      
+      return res.json({
+        user: userWithoutPassword,
+        organization
+      });
+      
+    } catch (error: any) {
       console.error("Eroare la obținerea datelor utilizatorului:", error);
-      return res.status(500).json({ message: "Eroare internă de server" });
+      return res.status(500).json({ 
+        message: "Eroare internă de server",
+        error: error.message || 'Eroare necunoscută'
+      });
     }
   });
 

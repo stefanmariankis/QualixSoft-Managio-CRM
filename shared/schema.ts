@@ -1,19 +1,24 @@
-import { pgTable, text, serial, integer, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, varchar, serial, integer, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Enums from Supabase database
-export const organizationTypeEnum = pgEnum('organization_type', ['freelancer', 'agency', 'company']);
-export const userRoleEnum = pgEnum('user_role', ['super_admin', 'ceo', 'manager', 'director', 'employee', 'client']);
-export const subscriptionPlanEnum = pgEnum('subscription_plan', ['trial', 'basic', 'pro', 'pro_yearly']);
+// Enums pentru PostgreSQL 
+// În PostgreSQL folosim pgEnum în loc de mysqlEnum
+export const organizationTypes = ['freelancer', 'agency', 'company'] as const;
+export const userRoles = ['super_admin', 'ceo', 'manager', 'director', 'employee', 'client'] as const;
+export const subscriptionPlans = ['trial', 'basic', 'pro', 'pro_yearly'] as const;
+
+export const orgTypeEnum = pgEnum('organization_type', organizationTypes);
+export const userRoleEnum = pgEnum('user_role', userRoles);
+export const subscriptionPlanEnum = pgEnum('subscription_plan', subscriptionPlans);
 
 // Users table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  password: text("password").notNull(),
-  firstName: text("first_name"),
-  lastName: text("last_name"),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  password: varchar("password", { length: 255 }).notNull(),
+  firstName: varchar("first_name", { length: 100 }),
+  lastName: varchar("last_name", { length: 100 }),
   role: userRoleEnum("role").default("ceo"),
   organizationId: integer("organization_id"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -29,10 +34,10 @@ export const insertUserSchema = createInsertSchema(users).omit({
 // Organizations table
 export const organizations = pgTable("organizations", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-  logo: text("logo"),
-  type: organizationTypeEnum("type").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  logo: varchar("logo", { length: 255 }),
+  type: orgTypeEnum("organization_type").notNull(),
   subscriptionPlan: subscriptionPlanEnum("subscription_plan").notNull().default("trial"),
   trialExpiresAt: timestamp("trial_expires_at"),
   subscriptionStartedAt: timestamp("subscription_started_at"),
