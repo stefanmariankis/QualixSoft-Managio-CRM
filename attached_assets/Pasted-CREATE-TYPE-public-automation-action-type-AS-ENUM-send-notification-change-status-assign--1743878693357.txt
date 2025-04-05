@@ -1,0 +1,891 @@
+CREATE TYPE "public"."automation_action_type" AS ENUM('send_notification', 'change_status', 'assign_user', 'send_email', 'create_task', 'add_tag');--> statement-breakpoint
+CREATE TYPE "public"."automation_execution_status" AS ENUM('success', 'failed', 'pending');--> statement-breakpoint
+CREATE TYPE "public"."automation_trigger_type" AS ENUM('task_status_change', 'deadline_approaching', 'invoice_overdue', 'time_threshold_reached', 'new_comment', 'file_upload');--> statement-breakpoint
+CREATE TYPE "public"."checklist_visibility" AS ENUM('internal_only', 'visible_to_client');--> statement-breakpoint
+CREATE TYPE "public"."email_event_type" AS ENUM('sent', 'delivered', 'opened', 'clicked', 'bounced');--> statement-breakpoint
+CREATE TYPE "public"."email_recipient_type" AS ENUM('to', 'cc', 'bcc');--> statement-breakpoint
+CREATE TYPE "public"."email_status" AS ENUM('draft', 'scheduled', 'sent', 'failed', 'delivered', 'opened');--> statement-breakpoint
+CREATE TYPE "public"."evaluation_visibility" AS ENUM('manager', 'ceo_only', 'self_visible', 'private', 'team');--> statement-breakpoint
+CREATE TYPE "public"."file_access_level" AS ENUM('all', 'managers_only', 'ceo_only', 'client_and_team');--> statement-breakpoint
+CREATE TYPE "public"."invoice_status" AS ENUM('draft', 'sent', 'paid', 'overdue');--> statement-breakpoint
+CREATE TYPE "public"."notification_type" AS ENUM('comment', 'task_update', 'reminder', 'invoice', 'system');--> statement-breakpoint
+CREATE TYPE "public"."organization_type" AS ENUM('freelancer', 'agency', 'company');--> statement-breakpoint
+CREATE TYPE "public"."project_status" AS ENUM('planned', 'active', 'completed', 'blocked', 'on_hold');--> statement-breakpoint
+CREATE TYPE "public"."project_type" AS ENUM('one_time', 'retainer', 'hourly');--> statement-breakpoint
+CREATE TYPE "public"."project_visibility" AS ENUM('all', 'team_only', 'managers_only');--> statement-breakpoint
+CREATE TYPE "public"."reminder_frequency" AS ENUM('daily', 'weekly', 'monthly');--> statement-breakpoint
+CREATE TYPE "public"."report_type" AS ENUM('project_progress', 'financial', 'employee_performance', 'client_history', 'time_tracking', 'invoice_details', 'custom');--> statement-breakpoint
+CREATE TYPE "public"."schedule_frequency" AS ENUM('daily', 'weekly', 'monthly', 'quarterly');--> statement-breakpoint
+CREATE TYPE "public"."subscription_plan" AS ENUM('trial', 'basic', 'pro', 'pro_yearly');--> statement-breakpoint
+CREATE TYPE "public"."task_priority" AS ENUM('low', 'medium', 'high', 'urgent');--> statement-breakpoint
+CREATE TYPE "public"."task_status" AS ENUM('todo', 'in_progress', 'review', 'done', 'blocked');--> statement-breakpoint
+CREATE TYPE "public"."task_visibility" AS ENUM('all', 'assignee_only', 'managers_only');--> statement-breakpoint
+CREATE TYPE "public"."time_log_source" AS ENUM('manual', 'tracker');--> statement-breakpoint
+CREATE TYPE "public"."user_role" AS ENUM('super_admin', 'ceo', 'manager', 'director', 'employee', 'client');--> statement-breakpoint
+CREATE TABLE "activity_log" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"action" text NOT NULL,
+	"entity_type" text NOT NULL,
+	"entity_id" integer,
+	"metadata" jsonb,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "automation_actions" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"automation_id" integer NOT NULL,
+	"action_type" "automation_action_type" NOT NULL,
+	"action_config" jsonb NOT NULL,
+	"order_index" integer DEFAULT 0,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "automation_logs" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"automation_id" integer NOT NULL,
+	"trigger_id" integer,
+	"entity_type" text NOT NULL,
+	"entity_id" integer NOT NULL,
+	"execution_status" "automation_execution_status" NOT NULL,
+	"error_message" text,
+	"executed_at" timestamp NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "automation_triggers" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"automation_id" integer NOT NULL,
+	"trigger_type" "automation_trigger_type" NOT NULL,
+	"entity_type" text NOT NULL,
+	"conditions" jsonb NOT NULL,
+	"order_index" integer DEFAULT 0,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "automations" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer NOT NULL,
+	"name" text NOT NULL,
+	"description" text,
+	"is_active" boolean DEFAULT true,
+	"created_by" integer,
+	"updated_by" integer,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "calendar_events" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer NOT NULL,
+	"user_id" integer NOT NULL,
+	"title" text NOT NULL,
+	"description" text,
+	"start_time" timestamp NOT NULL,
+	"end_time" timestamp NOT NULL,
+	"location" text,
+	"is_all_day" boolean DEFAULT false,
+	"google_event_id" text,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "client_history_metrics" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer NOT NULL,
+	"client_id" integer NOT NULL,
+	"period_start" date NOT NULL,
+	"period_end" date NOT NULL,
+	"projects_count" integer DEFAULT 0,
+	"active_projects_count" integer DEFAULT 0,
+	"completed_projects_count" integer DEFAULT 0,
+	"total_revenue" real DEFAULT 0,
+	"average_project_value" real DEFAULT 0,
+	"total_hours_spent" real DEFAULT 0,
+	"invoices_count" integer DEFAULT 0,
+	"invoices_paid_count" integer DEFAULT 0,
+	"average_payment_days" integer DEFAULT 0,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "client_insights" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"client_id" integer NOT NULL,
+	"organization_id" integer NOT NULL,
+	"metric_type" text NOT NULL,
+	"score" real NOT NULL,
+	"calculation_period" text NOT NULL,
+	"metadata" jsonb,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "client_notes" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"client_id" integer NOT NULL,
+	"organization_id" integer NOT NULL,
+	"user_id" integer NOT NULL,
+	"title" text NOT NULL,
+	"content" text NOT NULL,
+	"note_type" text NOT NULL,
+	"visibility" text DEFAULT 'all',
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "client_portal_activity_logs" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"client_portal_user_id" integer NOT NULL,
+	"activity_type" text NOT NULL,
+	"entity_type" text,
+	"entity_id" integer,
+	"details" text,
+	"ip_address" text,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "client_portal_feedbacks" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"client_portal_user_id" integer NOT NULL,
+	"organization_id" integer NOT NULL,
+	"project_id" integer,
+	"rating" integer NOT NULL,
+	"comment" text,
+	"feedback_type" text NOT NULL,
+	"is_public" boolean DEFAULT false,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "client_portal_notifications" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"client_portal_id" integer NOT NULL,
+	"client_portal_user_id" integer,
+	"title" text NOT NULL,
+	"message" text NOT NULL,
+	"notification_type" text NOT NULL,
+	"is_read" boolean DEFAULT false,
+	"entity_type" text,
+	"entity_id" integer,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "client_portal_sessions" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"client_portal_user_id" integer NOT NULL,
+	"session_token" text NOT NULL,
+	"ip_address" text,
+	"user_agent" text,
+	"login_time" timestamp NOT NULL,
+	"last_activity" timestamp NOT NULL,
+	"expires_at" timestamp NOT NULL,
+	"is_active" boolean DEFAULT true
+);
+--> statement-breakpoint
+CREATE TABLE "client_portal_users" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"client_portal_id" integer NOT NULL,
+	"email" text NOT NULL,
+	"full_name" text NOT NULL,
+	"password_hash" text NOT NULL,
+	"role" text DEFAULT 'viewer',
+	"is_active" boolean DEFAULT true,
+	"last_login" timestamp,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "client_portals" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"client_id" integer NOT NULL,
+	"organization_id" integer NOT NULL,
+	"access_key" text NOT NULL,
+	"is_active" boolean DEFAULT false,
+	"access_level" text DEFAULT 'standard',
+	"custom_settings" jsonb,
+	"last_login" timestamp,
+	"created_by" integer,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now(),
+	CONSTRAINT "client_portals_access_key_unique" UNIQUE("access_key")
+);
+--> statement-breakpoint
+CREATE TABLE "clients" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer NOT NULL,
+	"company_name" text NOT NULL,
+	"contact_person" text,
+	"email" text,
+	"phone" text,
+	"registration_number" text,
+	"address" text,
+	"timezone" text DEFAULT 'Europe/Bucharest',
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "comments" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"entity_type" text NOT NULL,
+	"entity_id" integer NOT NULL,
+	"user_id" integer NOT NULL,
+	"content" text NOT NULL,
+	"is_internal" boolean DEFAULT false,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "contract_milestones" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"contract_id" integer NOT NULL,
+	"title" text NOT NULL,
+	"description" text,
+	"due_date" date,
+	"value" real,
+	"status" text NOT NULL,
+	"completed_at" timestamp,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "contracts" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer NOT NULL,
+	"client_id" integer NOT NULL,
+	"project_id" integer,
+	"title" text NOT NULL,
+	"contract_number" text,
+	"start_date" date NOT NULL,
+	"end_date" date,
+	"value" real,
+	"currency" text DEFAULT 'RON',
+	"status" text NOT NULL,
+	"contract_type" text NOT NULL,
+	"file_url" text,
+	"renewal_reminder_days" integer,
+	"auto_renewal" boolean DEFAULT false,
+	"terms" text,
+	"created_by" integer,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "departments" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"organization_id" integer NOT NULL,
+	"manager_id" integer,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "email_attachments" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"email_id" integer NOT NULL,
+	"file_id" integer,
+	"file_name" text NOT NULL,
+	"file_path" text,
+	"file_size" integer,
+	"mime_type" text,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "email_recipients" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"email_id" integer NOT NULL,
+	"recipient_type" "email_recipient_type" NOT NULL,
+	"recipient_email" text NOT NULL,
+	"recipient_name" text,
+	"user_id" integer,
+	"client_id" integer,
+	"status" text DEFAULT 'pending',
+	"opened_at" timestamp,
+	"opened_count" integer DEFAULT 0,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "email_templates" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer,
+	"name" text NOT NULL,
+	"description" text,
+	"subject" text NOT NULL,
+	"body" text NOT NULL,
+	"template_type" text NOT NULL,
+	"placeholders" jsonb,
+	"is_html" boolean DEFAULT true,
+	"created_by" integer,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "email_tracking" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"email_id" integer NOT NULL,
+	"recipient_id" integer,
+	"event_type" "email_event_type" NOT NULL,
+	"event_time" timestamp NOT NULL,
+	"ip_address" text,
+	"user_agent" text,
+	"link_clicked" text,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "emails" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer NOT NULL,
+	"sender_id" integer,
+	"sender_email" text NOT NULL,
+	"reply_to" text,
+	"subject" text NOT NULL,
+	"body" text NOT NULL,
+	"is_html" boolean DEFAULT true,
+	"email_template_id" integer,
+	"related_entity_type" text,
+	"related_entity_id" integer,
+	"status" "email_status" DEFAULT 'draft',
+	"scheduled_for" timestamp,
+	"sent_at" timestamp,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "employee_performance_metrics" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer NOT NULL,
+	"user_id" integer NOT NULL,
+	"period_start" date NOT NULL,
+	"period_end" date NOT NULL,
+	"tasks_assigned" integer DEFAULT 0,
+	"tasks_completed" integer DEFAULT 0,
+	"tasks_completed_on_time" integer DEFAULT 0,
+	"completion_rate" real DEFAULT 0,
+	"on_time_rate" real DEFAULT 0,
+	"total_hours_logged" real DEFAULT 0,
+	"billable_hours" real DEFAULT 0,
+	"billable_ratio" real DEFAULT 0,
+	"avg_task_completion_time" real DEFAULT 0,
+	"projects_contributed" integer DEFAULT 0,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "evaluations" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"evaluated_user_id" integer NOT NULL,
+	"evaluator_id" integer NOT NULL,
+	"organization_id" integer NOT NULL,
+	"score" integer,
+	"criteria" jsonb,
+	"comments" text,
+	"visibility" "evaluation_visibility" DEFAULT 'private',
+	"is_submitted" boolean DEFAULT false,
+	"date" date NOT NULL,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "files" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"uploaded_by" integer NOT NULL,
+	"organization_id" integer NOT NULL,
+	"project_id" integer,
+	"task_id" integer,
+	"file_name" text NOT NULL,
+	"file_url" text NOT NULL,
+	"file_type" text,
+	"file_size" integer,
+	"description" text,
+	"access_level" "file_access_level" DEFAULT 'all',
+	"expires_at" timestamp,
+	"google_drive_id" text,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "financial_metrics" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer NOT NULL,
+	"project_id" integer,
+	"client_id" integer,
+	"period_start" date NOT NULL,
+	"period_end" date NOT NULL,
+	"total_revenue" real DEFAULT 0,
+	"total_expenses" real DEFAULT 0,
+	"profit" real DEFAULT 0,
+	"invoiced_amount" real DEFAULT 0,
+	"paid_amount" real DEFAULT 0,
+	"outstanding_amount" real DEFAULT 0,
+	"billable_hours" real DEFAULT 0,
+	"non_billable_hours" real DEFAULT 0,
+	"billable_rate_avg" real DEFAULT 0,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "invoice_items" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"invoice_id" integer NOT NULL,
+	"description" text NOT NULL,
+	"quantity" real NOT NULL,
+	"unit_price" real NOT NULL,
+	"total_price" real NOT NULL,
+	"order_index" integer DEFAULT 0
+);
+--> statement-breakpoint
+CREATE TABLE "invoices" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer NOT NULL,
+	"client_id" integer NOT NULL,
+	"project_id" integer,
+	"number" text NOT NULL,
+	"issue_date" date NOT NULL,
+	"due_date" date NOT NULL,
+	"total_amount" real NOT NULL,
+	"currency" text DEFAULT 'RON' NOT NULL,
+	"pdf_url" text,
+	"sent_at" timestamp,
+	"paid_at" timestamp,
+	"status" "invoice_status" DEFAULT 'draft' NOT NULL,
+	"tax_percent" real DEFAULT 0,
+	"tax_amount" real DEFAULT 0,
+	"discount_percent" real DEFAULT 0,
+	"discount_amount" real DEFAULT 0,
+	"notes" text,
+	"terms" text,
+	"stripe_payment_intent_id" text,
+	"created_by" integer,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "notifications" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"recipient_id" integer NOT NULL,
+	"title" text NOT NULL,
+	"content" text NOT NULL,
+	"type" "notification_type" NOT NULL,
+	"is_read" boolean DEFAULT false,
+	"entity_type" text,
+	"entity_id" integer,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "organizations" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"slug" text NOT NULL,
+	"logo" text,
+	"type" "organization_type" NOT NULL,
+	"subscription_plan" "subscription_plan" DEFAULT 'trial' NOT NULL,
+	"trial_expires_at" timestamp,
+	"subscription_started_at" timestamp,
+	"subscription_expires_at" timestamp,
+	"is_active" boolean DEFAULT true,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now(),
+	CONSTRAINT "organizations_slug_unique" UNIQUE("slug")
+);
+--> statement-breakpoint
+CREATE TABLE "payments" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"invoice_id" integer NOT NULL,
+	"amount_paid" real NOT NULL,
+	"date_paid" timestamp NOT NULL,
+	"method" text NOT NULL,
+	"stripe_payment_id" text,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "platform_metrics" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"metric_name" text NOT NULL,
+	"value_numeric" real,
+	"metadata" jsonb,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "project_members" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"project_id" integer NOT NULL,
+	"user_id" integer NOT NULL,
+	"role_in_project" text,
+	"is_favorite" boolean DEFAULT false,
+	"added_by" integer,
+	"joined_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "project_progress_metrics" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer NOT NULL,
+	"project_id" integer NOT NULL,
+	"date" date NOT NULL,
+	"planned_tasks_count" integer DEFAULT 0,
+	"completed_tasks_count" integer DEFAULT 0,
+	"planned_hours" real DEFAULT 0,
+	"actual_hours" real DEFAULT 0,
+	"budget_planned" real DEFAULT 0,
+	"budget_spent" real DEFAULT 0,
+	"milestone_count" integer DEFAULT 0,
+	"completed_milestone_count" integer DEFAULT 0,
+	"blockers_count" integer DEFAULT 0,
+	"calculated_progress" real DEFAULT 0,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "project_tags" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"project_id" integer NOT NULL,
+	"tag_id" integer NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "projects" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer NOT NULL,
+	"client_id" integer,
+	"name" text NOT NULL,
+	"description" text,
+	"status" "project_status" DEFAULT 'planned' NOT NULL,
+	"value_total" real,
+	"value_currency" text DEFAULT 'RON',
+	"progress_percent" integer DEFAULT 0,
+	"project_code" text,
+	"type" "project_type" DEFAULT 'one_time',
+	"visibility" "project_visibility" DEFAULT 'all',
+	"internal_notes" text,
+	"start_date" date,
+	"end_date" date,
+	"estimated_hours" real,
+	"actual_hours" real DEFAULT 0,
+	"budget_spent" real DEFAULT 0,
+	"is_template" boolean DEFAULT false,
+	"parent_project_id" integer,
+	"tags" jsonb,
+	"created_by" integer,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "reminders" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"title" text NOT NULL,
+	"remind_at" timestamp NOT NULL,
+	"type" text NOT NULL,
+	"is_recurring" boolean DEFAULT false,
+	"frequency" "reminder_frequency",
+	"last_sent_at" timestamp,
+	"is_sent" boolean DEFAULT false,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "report_email_schedules" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"report_id" integer NOT NULL,
+	"email_template_id" integer,
+	"schedule_frequency" "schedule_frequency" NOT NULL,
+	"schedule_day" integer,
+	"schedule_time" time NOT NULL,
+	"recipient_list" jsonb NOT NULL,
+	"is_active" boolean DEFAULT true,
+	"last_sent_at" timestamp,
+	"created_by" integer,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "report_executions" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"report_id" integer NOT NULL,
+	"execution_type" text NOT NULL,
+	"status" text NOT NULL,
+	"start_time" timestamp NOT NULL,
+	"end_time" timestamp,
+	"result_data" text,
+	"error_message" text,
+	"triggered_by" integer,
+	"sent_to" jsonb,
+	"execution_parameters" jsonb,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "report_files" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"report_execution_id" integer NOT NULL,
+	"file_name" text NOT NULL,
+	"file_path" text NOT NULL,
+	"file_type" text NOT NULL,
+	"file_size" integer,
+	"is_archived" boolean DEFAULT false,
+	"download_count" integer DEFAULT 0,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "report_templates" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer,
+	"name" text NOT NULL,
+	"description" text,
+	"report_type" "report_type" NOT NULL,
+	"template_config" jsonb NOT NULL,
+	"is_system" boolean DEFAULT false,
+	"preview_image_url" text,
+	"created_by" integer,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "reports" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer NOT NULL,
+	"name" text NOT NULL,
+	"description" text,
+	"report_type" "report_type" NOT NULL,
+	"template_id" integer,
+	"filters" jsonb,
+	"columns" jsonb,
+	"sorting" jsonb,
+	"visibility" text DEFAULT 'all',
+	"created_by" integer,
+	"is_scheduled" boolean DEFAULT false,
+	"schedule_frequency" "schedule_frequency",
+	"schedule_day" integer,
+	"recipients" jsonb,
+	"last_run_at" timestamp,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "tags" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"organization_id" integer NOT NULL,
+	"name" text NOT NULL,
+	"color" text NOT NULL,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "task_assignees" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"task_id" integer NOT NULL,
+	"user_id" integer NOT NULL,
+	"is_primary" boolean DEFAULT false,
+	"assigned_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "task_checklists" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"task_id" integer NOT NULL,
+	"title" text NOT NULL,
+	"is_completed" boolean DEFAULT false,
+	"completed_at" timestamp,
+	"completed_by" integer,
+	"is_required" boolean DEFAULT false,
+	"visibility" "checklist_visibility" DEFAULT 'internal_only',
+	"order_index" integer DEFAULT 0,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "task_tags" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"task_id" integer NOT NULL,
+	"tag_id" integer NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "tasks" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"project_id" integer,
+	"organization_id" integer NOT NULL,
+	"title" text NOT NULL,
+	"description" text,
+	"status" "task_status" DEFAULT 'todo' NOT NULL,
+	"priority" "task_priority" DEFAULT 'medium',
+	"start_date" date,
+	"due_date" date,
+	"estimated_hours" real,
+	"actual_hours" real DEFAULT 0,
+	"order_index" integer DEFAULT 0,
+	"visibility" "task_visibility" DEFAULT 'all',
+	"parent_task_id" integer,
+	"recurring_config" jsonb,
+	"attachments_count" integer DEFAULT 0,
+	"comments_count" integer DEFAULT 0,
+	"created_by" integer,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "time_logs" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"project_id" integer,
+	"task_id" integer,
+	"organization_id" integer NOT NULL,
+	"start_time" timestamp NOT NULL,
+	"end_time" timestamp,
+	"duration_minutes" integer,
+	"description" text,
+	"source" time_log_source DEFAULT 'manual',
+	"is_active" boolean DEFAULT true,
+	"is_approved" boolean DEFAULT false,
+	"billing_status" text DEFAULT 'billable',
+	"invoice_id" integer,
+	"hourly_rate" real,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "user_preferences" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"theme" text DEFAULT 'light',
+	"language" text DEFAULT 'ro',
+	"dashboard_layout" jsonb,
+	"notification_settings" jsonb,
+	"email_settings" jsonb,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "user_profiles" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"full_name" text NOT NULL,
+	"avatar_url" text,
+	"phone" text,
+	"position" text,
+	"skills" jsonb,
+	"bio" text,
+	"preferred_language" text DEFAULT 'ro',
+	"hourly_rate" real,
+	"role" "user_role" DEFAULT 'employee' NOT NULL,
+	"organization_id" integer,
+	"department_id" integer,
+	"stripe_customer_id" text,
+	"stripe_subscription_id" text,
+	"is_active" boolean DEFAULT true,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now(),
+	CONSTRAINT "user_profiles_user_id_unique" UNIQUE("user_id")
+);
+--> statement-breakpoint
+CREATE TABLE "users" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"username" text NOT NULL,
+	"email" text NOT NULL,
+	"password_hash" text NOT NULL,
+	"is_email_verified" boolean DEFAULT false,
+	"reset_token" text,
+	"last_login" timestamp,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now(),
+	CONSTRAINT "users_username_unique" UNIQUE("username"),
+	CONSTRAINT "users_email_unique" UNIQUE("email")
+);
+--> statement-breakpoint
+ALTER TABLE "activity_log" ADD CONSTRAINT "activity_log_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "automation_actions" ADD CONSTRAINT "automation_actions_automation_id_automations_id_fk" FOREIGN KEY ("automation_id") REFERENCES "public"."automations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "automation_logs" ADD CONSTRAINT "automation_logs_automation_id_automations_id_fk" FOREIGN KEY ("automation_id") REFERENCES "public"."automations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "automation_logs" ADD CONSTRAINT "automation_logs_trigger_id_automation_triggers_id_fk" FOREIGN KEY ("trigger_id") REFERENCES "public"."automation_triggers"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "automation_triggers" ADD CONSTRAINT "automation_triggers_automation_id_automations_id_fk" FOREIGN KEY ("automation_id") REFERENCES "public"."automations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "automations" ADD CONSTRAINT "automations_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "automations" ADD CONSTRAINT "automations_created_by_user_profiles_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "automations" ADD CONSTRAINT "automations_updated_by_user_profiles_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "calendar_events" ADD CONSTRAINT "calendar_events_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "calendar_events" ADD CONSTRAINT "calendar_events_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_history_metrics" ADD CONSTRAINT "client_history_metrics_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_history_metrics" ADD CONSTRAINT "client_history_metrics_client_id_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."clients"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_insights" ADD CONSTRAINT "client_insights_client_id_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."clients"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_insights" ADD CONSTRAINT "client_insights_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_notes" ADD CONSTRAINT "client_notes_client_id_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."clients"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_notes" ADD CONSTRAINT "client_notes_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_notes" ADD CONSTRAINT "client_notes_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_portal_activity_logs" ADD CONSTRAINT "client_portal_activity_logs_client_portal_user_id_client_portal_users_id_fk" FOREIGN KEY ("client_portal_user_id") REFERENCES "public"."client_portal_users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_portal_feedbacks" ADD CONSTRAINT "client_portal_feedbacks_client_portal_user_id_client_portal_users_id_fk" FOREIGN KEY ("client_portal_user_id") REFERENCES "public"."client_portal_users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_portal_feedbacks" ADD CONSTRAINT "client_portal_feedbacks_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_portal_feedbacks" ADD CONSTRAINT "client_portal_feedbacks_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_portal_notifications" ADD CONSTRAINT "client_portal_notifications_client_portal_id_client_portals_id_fk" FOREIGN KEY ("client_portal_id") REFERENCES "public"."client_portals"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_portal_notifications" ADD CONSTRAINT "client_portal_notifications_client_portal_user_id_client_portal_users_id_fk" FOREIGN KEY ("client_portal_user_id") REFERENCES "public"."client_portal_users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_portal_sessions" ADD CONSTRAINT "client_portal_sessions_client_portal_user_id_client_portal_users_id_fk" FOREIGN KEY ("client_portal_user_id") REFERENCES "public"."client_portal_users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_portal_users" ADD CONSTRAINT "client_portal_users_client_portal_id_client_portals_id_fk" FOREIGN KEY ("client_portal_id") REFERENCES "public"."client_portals"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_portals" ADD CONSTRAINT "client_portals_client_id_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."clients"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_portals" ADD CONSTRAINT "client_portals_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "client_portals" ADD CONSTRAINT "client_portals_created_by_user_profiles_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "clients" ADD CONSTRAINT "clients_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "comments" ADD CONSTRAINT "comments_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "contract_milestones" ADD CONSTRAINT "contract_milestones_contract_id_contracts_id_fk" FOREIGN KEY ("contract_id") REFERENCES "public"."contracts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "contracts" ADD CONSTRAINT "contracts_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "contracts" ADD CONSTRAINT "contracts_client_id_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."clients"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "contracts" ADD CONSTRAINT "contracts_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "contracts" ADD CONSTRAINT "contracts_created_by_user_profiles_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "departments" ADD CONSTRAINT "departments_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "departments" ADD CONSTRAINT "departments_manager_id_user_profiles_id_fk" FOREIGN KEY ("manager_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_attachments" ADD CONSTRAINT "email_attachments_email_id_emails_id_fk" FOREIGN KEY ("email_id") REFERENCES "public"."emails"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_attachments" ADD CONSTRAINT "email_attachments_file_id_files_id_fk" FOREIGN KEY ("file_id") REFERENCES "public"."files"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_recipients" ADD CONSTRAINT "email_recipients_email_id_emails_id_fk" FOREIGN KEY ("email_id") REFERENCES "public"."emails"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_recipients" ADD CONSTRAINT "email_recipients_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_recipients" ADD CONSTRAINT "email_recipients_client_id_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."clients"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_templates" ADD CONSTRAINT "email_templates_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_templates" ADD CONSTRAINT "email_templates_created_by_user_profiles_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_tracking" ADD CONSTRAINT "email_tracking_email_id_emails_id_fk" FOREIGN KEY ("email_id") REFERENCES "public"."emails"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "email_tracking" ADD CONSTRAINT "email_tracking_recipient_id_email_recipients_id_fk" FOREIGN KEY ("recipient_id") REFERENCES "public"."email_recipients"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "emails" ADD CONSTRAINT "emails_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "emails" ADD CONSTRAINT "emails_sender_id_user_profiles_id_fk" FOREIGN KEY ("sender_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "emails" ADD CONSTRAINT "emails_email_template_id_email_templates_id_fk" FOREIGN KEY ("email_template_id") REFERENCES "public"."email_templates"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "employee_performance_metrics" ADD CONSTRAINT "employee_performance_metrics_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "employee_performance_metrics" ADD CONSTRAINT "employee_performance_metrics_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "evaluations" ADD CONSTRAINT "evaluations_evaluated_user_id_user_profiles_id_fk" FOREIGN KEY ("evaluated_user_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "evaluations" ADD CONSTRAINT "evaluations_evaluator_id_user_profiles_id_fk" FOREIGN KEY ("evaluator_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "evaluations" ADD CONSTRAINT "evaluations_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "files" ADD CONSTRAINT "files_uploaded_by_user_profiles_id_fk" FOREIGN KEY ("uploaded_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "files" ADD CONSTRAINT "files_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "files" ADD CONSTRAINT "files_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "files" ADD CONSTRAINT "files_task_id_tasks_id_fk" FOREIGN KEY ("task_id") REFERENCES "public"."tasks"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "financial_metrics" ADD CONSTRAINT "financial_metrics_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "financial_metrics" ADD CONSTRAINT "financial_metrics_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "financial_metrics" ADD CONSTRAINT "financial_metrics_client_id_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."clients"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "invoice_items" ADD CONSTRAINT "invoice_items_invoice_id_invoices_id_fk" FOREIGN KEY ("invoice_id") REFERENCES "public"."invoices"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_client_id_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."clients"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_created_by_user_profiles_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_recipient_id_user_profiles_id_fk" FOREIGN KEY ("recipient_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "payments" ADD CONSTRAINT "payments_invoice_id_invoices_id_fk" FOREIGN KEY ("invoice_id") REFERENCES "public"."invoices"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "project_members" ADD CONSTRAINT "project_members_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "project_members" ADD CONSTRAINT "project_members_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "project_members" ADD CONSTRAINT "project_members_added_by_user_profiles_id_fk" FOREIGN KEY ("added_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "project_progress_metrics" ADD CONSTRAINT "project_progress_metrics_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "project_progress_metrics" ADD CONSTRAINT "project_progress_metrics_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "project_tags" ADD CONSTRAINT "project_tags_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "project_tags" ADD CONSTRAINT "project_tags_tag_id_tags_id_fk" FOREIGN KEY ("tag_id") REFERENCES "public"."tags"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "projects" ADD CONSTRAINT "projects_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "projects" ADD CONSTRAINT "projects_client_id_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."clients"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "projects" ADD CONSTRAINT "projects_parent_project_id_projects_id_fk" FOREIGN KEY ("parent_project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "projects" ADD CONSTRAINT "projects_created_by_user_profiles_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "reminders" ADD CONSTRAINT "reminders_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "report_email_schedules" ADD CONSTRAINT "report_email_schedules_report_id_reports_id_fk" FOREIGN KEY ("report_id") REFERENCES "public"."reports"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "report_email_schedules" ADD CONSTRAINT "report_email_schedules_email_template_id_email_templates_id_fk" FOREIGN KEY ("email_template_id") REFERENCES "public"."email_templates"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "report_email_schedules" ADD CONSTRAINT "report_email_schedules_created_by_user_profiles_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "report_executions" ADD CONSTRAINT "report_executions_report_id_reports_id_fk" FOREIGN KEY ("report_id") REFERENCES "public"."reports"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "report_executions" ADD CONSTRAINT "report_executions_triggered_by_user_profiles_id_fk" FOREIGN KEY ("triggered_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "report_files" ADD CONSTRAINT "report_files_report_execution_id_report_executions_id_fk" FOREIGN KEY ("report_execution_id") REFERENCES "public"."report_executions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "report_templates" ADD CONSTRAINT "report_templates_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "report_templates" ADD CONSTRAINT "report_templates_created_by_user_profiles_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "reports" ADD CONSTRAINT "reports_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "reports" ADD CONSTRAINT "reports_template_id_report_templates_id_fk" FOREIGN KEY ("template_id") REFERENCES "public"."report_templates"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "reports" ADD CONSTRAINT "reports_created_by_user_profiles_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tags" ADD CONSTRAINT "tags_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_assignees" ADD CONSTRAINT "task_assignees_task_id_tasks_id_fk" FOREIGN KEY ("task_id") REFERENCES "public"."tasks"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_assignees" ADD CONSTRAINT "task_assignees_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_checklists" ADD CONSTRAINT "task_checklists_task_id_tasks_id_fk" FOREIGN KEY ("task_id") REFERENCES "public"."tasks"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_checklists" ADD CONSTRAINT "task_checklists_completed_by_user_profiles_id_fk" FOREIGN KEY ("completed_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_tags" ADD CONSTRAINT "task_tags_task_id_tasks_id_fk" FOREIGN KEY ("task_id") REFERENCES "public"."tasks"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "task_tags" ADD CONSTRAINT "task_tags_tag_id_tags_id_fk" FOREIGN KEY ("tag_id") REFERENCES "public"."tags"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_parent_task_id_tasks_id_fk" FOREIGN KEY ("parent_task_id") REFERENCES "public"."tasks"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_created_by_user_profiles_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "time_logs" ADD CONSTRAINT "time_logs_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "time_logs" ADD CONSTRAINT "time_logs_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "time_logs" ADD CONSTRAINT "time_logs_task_id_tasks_id_fk" FOREIGN KEY ("task_id") REFERENCES "public"."tasks"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "time_logs" ADD CONSTRAINT "time_logs_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "time_logs" ADD CONSTRAINT "time_logs_invoice_id_invoices_id_fk" FOREIGN KEY ("invoice_id") REFERENCES "public"."invoices"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_preferences" ADD CONSTRAINT "user_preferences_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_profiles" ADD CONSTRAINT "user_profiles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_profiles" ADD CONSTRAINT "user_profiles_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_profiles" ADD CONSTRAINT "user_profiles_department_id_departments_id_fk" FOREIGN KEY ("department_id") REFERENCES "public"."departments"("id") ON DELETE no action ON UPDATE no action;
