@@ -7,6 +7,65 @@ import { Project, InsertActivityLog } from '@shared/schema';
 
 const router = Router();
 
+// Funcție ajutătoare pentru definirea culorilor pentru statusuri
+function getStatusColor(status: string): string {
+  switch (status.toLowerCase()) {
+    case 'planned':
+    case 'planificat':
+      return '#9CA3AF'; // gray
+    case 'active':
+    case 'activ':
+    case 'în progres':
+      return '#3B82F6'; // blue
+    case 'completed':
+    case 'finalizat':
+      return '#10B981'; // green
+    case 'blocked':
+    case 'blocat':
+      return '#EF4444'; // red
+    case 'on_hold':
+    case 'în așteptare':
+      return '#F59E0B'; // amber
+    default:
+      return '#6B7280'; // gray-500
+  }
+}
+
+// Obține statistici pentru proiecte după status
+// NOTĂ: Rutele specifice trebuie să fie ÎNAINTEA rutelor cu parametri
+router.get('/status/summary', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: 'Neautorizat' });
+    }
+    
+    const organizationId = req.user!.organization_id;
+    const orgProjects = await storage.getProjectsByOrganization(organizationId);
+    
+    // Grupează proiectele după status și numără
+    const statusCounts: { [key: string]: number } = {};
+    orgProjects.forEach(project => {
+      if (!statusCounts[project.status]) {
+        statusCounts[project.status] = 0;
+      }
+      statusCounts[project.status]++;
+    });
+    
+    // Transformă în formatul cerut pentru frontend
+    const result = Object.entries(statusCounts).map(([name, value]) => ({
+      name,
+      value,
+      color: getStatusColor(name)
+    }));
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Eroare la obținerea statisticilor pentru proiecte:', error);
+    res.status(500).json({ message: 'Eroare la obținerea statisticilor pentru proiecte' });
+  }
+});
+
 // Obține lista de proiecte
 router.get('/', requireAuth, async (req: Request, res: Response) => {
   try {
@@ -218,63 +277,5 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Eroare la ștergerea proiectului' });
   }
 });
-
-// Obține statistici pentru proiecte după status
-router.get('/status/summary', requireAuth, async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ message: 'Neautorizat' });
-    }
-    
-    const organizationId = req.user!.organization_id;
-    const orgProjects = await storage.getProjectsByOrganization(organizationId);
-    
-    // Grupează proiectele după status și numără
-    const statusCounts: { [key: string]: number } = {};
-    orgProjects.forEach(project => {
-      if (!statusCounts[project.status]) {
-        statusCounts[project.status] = 0;
-      }
-      statusCounts[project.status]++;
-    });
-    
-    // Transformă în formatul cerut pentru frontend
-    const result = Object.entries(statusCounts).map(([name, value]) => ({
-      name,
-      value,
-      color: getStatusColor(name)
-    }));
-    
-    res.json(result);
-  } catch (error) {
-    console.error('Eroare la obținerea statisticilor pentru proiecte:', error);
-    res.status(500).json({ message: 'Eroare la obținerea statisticilor pentru proiecte' });
-  }
-});
-
-// Funcție ajutătoare pentru definirea culorilor pentru statusuri
-function getStatusColor(status: string): string {
-  switch (status.toLowerCase()) {
-    case 'planned':
-    case 'planificat':
-      return '#9CA3AF'; // gray
-    case 'active':
-    case 'activ':
-    case 'în progres':
-      return '#3B82F6'; // blue
-    case 'completed':
-    case 'finalizat':
-      return '#10B981'; // green
-    case 'blocked':
-    case 'blocat':
-      return '#EF4444'; // red
-    case 'on_hold':
-    case 'în așteptare':
-      return '#F59E0B'; // amber
-    default:
-      return '#6B7280'; // gray-500
-  }
-}
 
 export default router;
