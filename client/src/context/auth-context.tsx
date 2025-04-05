@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import supabase from "@/lib/supabase";
-import { AuthState, SupabaseUser } from "@/types";
+import { AuthState, User, Organization } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 
 interface AuthContextType extends AuthState {
@@ -16,6 +15,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AuthState>({
     user: null,
+    organization: null,
     loading: true,
     error: null,
   });
@@ -25,23 +25,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Verifică sesiunea curentă
     const checkSession = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession();
+        setState(prev => ({ ...prev, loading: true }));
         
-        if (error) {
-          setState(prev => ({ ...prev, error: error.message, loading: false }));
+        // Folosim API-ul nostru pentru a verifica sesiunea
+        let response;
+        try {
+          response = await fetch('/api/me', {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include', // Importante pentru a trimite cookie-urile
+          });
+        } catch (fetchError) {
+          console.error('Eroare de conexiune:', fetchError);
+          setState(prev => ({ ...prev, loading: false }));
           return;
         }
-
-        if (data?.session) {
-          const { data: userData } = await supabase.auth.getUser();
-          setState({
-            user: userData?.user as SupabaseUser || null,
-            loading: false,
-            error: null,
-          });
-        } else {
-          setState(prev => ({ ...prev, loading: false }));
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            // Utilizatorul nu este autentificat, ceea ce este normal
+            setState(prev => ({ ...prev, loading: false }));
+            return;
+          }
+          
+          // Altă eroare
+          let errorMessage = 'Eroare la verificarea sesiunii';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorMessage;
+          } catch (e) {}
+          
+          setState(prev => ({ 
+            ...prev, 
+            error: errorMessage, 
+            loading: false 
+          }));
+          return;
         }
+        
+        // Avem un utilizator logat
+        const data = await response.json();
+        setState({
+          user: data.user,
+          organization: data.organization,
+          loading: false,
+          error: null,
+        });
       } catch (error) {
         setState(prev => ({ 
           ...prev, 
@@ -52,41 +81,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     checkSession();
-
-    // Ascultă pentru schimbări în autentificare
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          setState({
-            user: session.user as SupabaseUser,
-            loading: false,
-            error: null,
-          });
-        } else {
-          setState(prev => ({ ...prev, user: null, loading: false }));
-        }
-      }
-    );
-
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
+      
+      let response;
+      try {
+        response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+          credentials: 'include',
+        });
+      } catch (fetchError) {
+        throw new Error("Conexiune eșuată la server");
+      }
+      
+      if (!response.ok) {
+        let errorMessage = 'Autentificare eșuată';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {}
+        throw new Error(errorMessage);
+      }
+      
+      const data = await response.json();
+      
       setState({
-        user: data.user as SupabaseUser,
+        user: data.user,
+        organization: data.organization,
         loading: false,
         error: null,
+      });
+      
+      // Afișăm un mesaj de succes
+      toast({
+        title: "Autentificare reușită",
+        description: `Bine ai revenit, ${data.user.first_name || 'utilizator'}!`,
       });
     } catch (error) {
       setState(prev => ({ 
@@ -102,43 +136,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      console.log('Încercare înregistrare cu:', { email, userData });
+      // Înregistrare directă utilizator cu toate datele
+      let registerResponse;
+      try {
+        registerResponse = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            password,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            organizationType: userData.organizationType,
+            companyName: userData.companyName,
+            termsAccepted: userData.termsAccepted
+          }),
+          credentials: 'include',
+        });
+      } catch (fetchError) {
+        throw new Error("Conexiune eșuată la server");
+      }
       
-      // Transformăm userData într-un format compatibil Supabase
-      const metadata = {
-        first_name: userData.firstName,
-        last_name: userData.lastName,
-        organization_id: userData.organizationId,
-        role: userData.role,
-      };
+      if (!registerResponse.ok) {
+        let errorMessage = 'Înregistrare eșuată';
+        try {
+          const errorData = await registerResponse.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {}
+        throw new Error(errorMessage);
+      }
       
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: metadata,
-        },
-      });
-
-      console.log('Răspuns Supabase:', { data, error });
-
-      if (error) throw error;
-
-      // Afișăm un mesaj de succes chiar dacă utilizatorul ar putea necesita confirmare email
+      const data = await registerResponse.json();
+      
+      // Afișăm un mesaj de succes
       toast({
         title: "Cont creat cu succes",
-        description: "Te-ai înregistrat cu succes. Verifică email-ul pentru confirmarea contului.",
+        description: "Te-ai înregistrat cu succes.",
       });
-
-      if (data.user) {
-        setState({
-          user: data.user as SupabaseUser,
-          loading: false,
-          error: null,
-        });
-      } else {
-        setState(prev => ({ ...prev, loading: false }));
-      }
+      
+      setState({
+        user: data.user,
+        organization: data.organization,
+        loading: false,
+        error: null,
+      });
     } catch (error) {
       console.error('Eroare înregistrare:', error);
       setState(prev => ({ 
@@ -153,8 +194,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     try {
       setState(prev => ({ ...prev, loading: true }));
-      await supabase.auth.signOut();
-      setState({ user: null, loading: false, error: null });
+      
+      let response;
+      try {
+        response = await fetch('/api/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+      } catch (fetchError) {
+        throw new Error("Conexiune eșuată la server");
+      }
+      
+      if (!response.ok) {
+        let errorMessage = 'Deconectare eșuată';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {}
+        throw new Error(errorMessage);
+      }
+      
+      setState({ 
+        user: null, 
+        organization: null,
+        loading: false, 
+        error: null 
+      });
+      
+      // Afișăm un mesaj de succes
+      toast({
+        title: "Deconectat",
+        description: "Te-ai deconectat cu succes.",
+      });
     } catch (error) {
       setState(prev => ({ 
         ...prev, 
@@ -168,11 +240,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
-      });
+      // Notă: În viitor, vom implementa un endpoint /api/reset-password
+      // Deocamdată, doar simulăm funcționalitatea
       
-      if (error) throw error;
+      // Simulăm un delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       setState(prev => ({ ...prev, loading: false }));
       toast({
@@ -193,19 +265,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setState(prev => ({ ...prev, loading: true }));
       
-      const { error } = await supabase.auth.updateUser({
-        data
-      });
+      // Notă: În viitor, vom implementa un endpoint /api/user pentru actualizarea datelor
+      // Deocamdată, doar simulăm funcționalitatea
       
-      if (error) throw error;
+      // Simulăm un delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Actualizează starea utilizatorului
-      const { data: userData } = await supabase.auth.getUser();
-      setState({
-        user: userData?.user as SupabaseUser || null,
+      // Actualizăm starea utilizatorului local
+      setState(prev => ({
+        ...prev,
+        user: prev.user ? {
+          ...prev.user,
+          ...data
+        } : null,
         loading: false,
         error: null,
-      });
+      }));
       
       toast({
         title: "Profil actualizat",

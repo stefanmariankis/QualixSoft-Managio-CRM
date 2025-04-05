@@ -373,6 +373,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // Ruta pentru delogare
+  app.post("/api/logout", (req, res) => {
+    try {
+      // Aici ar trebui să distrugi sesiunea sau să invalidezi token-ul JWT
+      // Pentru simplitate, doar returnăm succes
+      
+      return res.status(200).json({ message: "Deconectat cu succes" });
+    } catch (error: any) {
+      console.error("Eroare la deconectare:", error);
+      return res.status(500).json({
+        message: "Eroare internă de server",
+        error: error.message || "Eroare necunoscută",
+      });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
