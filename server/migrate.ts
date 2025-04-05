@@ -1,9 +1,22 @@
-import { supabase, pgClient } from './db';
+import { db, migrationDb, tableExists, enumExists } from './db';
 
 async function createEnums() {
   try {
     console.log('Crearea enum-urilor...');
-    await pgClient`
+    
+    // Verificăm dacă enum-urile există deja
+    const organizationTypeExists = await enumExists('organization_type');
+    const userRoleExists = await enumExists('user_role');
+    const subscriptionPlanExists = await enumExists('subscription_plan');
+    
+    console.log('Status enum-uri:', {
+      organizationTypeExists,
+      userRoleExists,
+      subscriptionPlanExists
+    });
+    
+    // Cream enum-urile utilizând codul PL/pgSQL
+    await migrationDb`
       DO $$ 
       BEGIN 
           IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'organization_type') THEN
@@ -19,6 +32,7 @@ async function createEnums() {
           END IF;
       END $$;
     `;
+    
     console.log('Enum-urile au fost create cu succes!');
   } catch (error) {
     console.error('Eroare la crearea enum-urilor:', error);
@@ -28,22 +42,21 @@ async function createEnums() {
 
 async function createTables() {
   try {
-    console.log('Crearea tabelelor...');
+    console.log('Verificarea și crearea tabelelor...');
     
-    // Verificăm mai întâi dacă tabelele există deja
-    const { data: tables, error } = await supabase
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public')
-      .in('table_name', ['organizations', 'users']);
+    // Verificăm dacă tabelele există folosind noua funcție din db.ts
+    const organizationsExists = await tableExists('organizations');
+    const usersExists = await tableExists('users');
     
-    const existingTables = new Set(tables?.map(t => t.table_name) || []);
-    console.log('Tabele existente:', existingTables);
+    console.log('Status tabele:', {
+      organizationsExists,
+      usersExists
+    });
     
     // Creăm tabelul organizations dacă nu există
-    if (!existingTables.has('organizations')) {
+    if (!organizationsExists) {
       console.log('Crearea tabelului organizations...');
-      await pgClient`
+      await migrationDb`
         CREATE TABLE IF NOT EXISTS organizations (
           id SERIAL PRIMARY KEY,
           name VARCHAR(255) NOT NULL,
@@ -62,12 +75,21 @@ async function createTables() {
       console.log('Tabelul organizations a fost creat cu succes!');
     } else {
       console.log('Tabelul organizations există deja.');
+      
+      // Verificăm schema tabelului existent
+      const columnsOrg = await migrationDb`
+        SELECT column_name, data_type, udt_name
+        FROM information_schema.columns
+        WHERE table_name = 'organizations'
+        ORDER BY ordinal_position;
+      `;
+      console.log('Structura tabelului organizations:', columnsOrg);
     }
     
     // Creăm tabelul users dacă nu există
-    if (!existingTables.has('users')) {
+    if (!usersExists) {
       console.log('Crearea tabelului users...');
-      await pgClient`
+      await migrationDb`
         CREATE TABLE IF NOT EXISTS users (
           id SERIAL PRIMARY KEY,
           email VARCHAR(255) NOT NULL UNIQUE,
@@ -83,6 +105,15 @@ async function createTables() {
       console.log('Tabelul users a fost creat cu succes!');
     } else {
       console.log('Tabelul users există deja.');
+      
+      // Verificăm schema tabelului existent
+      const columnsUsers = await migrationDb`
+        SELECT column_name, data_type, udt_name
+        FROM information_schema.columns
+        WHERE table_name = 'users'
+        ORDER BY ordinal_position;
+      `;
+      console.log('Structura tabelului users:', columnsUsers);
     }
     
     console.log('Toate tabelele au fost create sau verificate cu succes!');
@@ -108,9 +139,10 @@ async function migrate() {
     console.error('Eroare la migrare:', error);
     process.exit(1);
   } finally {
-    if (pgClient) {
-      await pgClient.end();
-    }
+    // Închiderea conexiunilor
+    await db.end();
+    await migrationDb.end();
+    console.log('Conexiunile au fost închise.');
   }
 }
 

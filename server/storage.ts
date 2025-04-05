@@ -1,4 +1,4 @@
-import { supabase, pgClient } from "./db";
+import { db } from "./db";
 import { User, InsertUser } from "../shared/schema";
 
 export interface IStorage {
@@ -10,18 +10,18 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
     try {
-      // Folosim Supabase direct
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', id)
-        .single();
-        
-      if (error) {
-        throw error;
+      // Folosim clientul PostgreSQL direct
+      const result = await db`
+        SELECT * FROM users
+        WHERE id = ${id}
+        LIMIT 1
+      `;
+      
+      if (result.length === 0) {
+        return undefined;
       }
       
-      return data as User;
+      return result[0] as User;
     } catch (error) {
       console.error("Eroare la obținerea utilizatorului după ID:", error);
       return undefined;
@@ -30,18 +30,18 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
-      // Folosim Supabase direct - username este de fapt email în implementarea noastră
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', username)
-        .single();
-        
-      if (error && error.code !== 'PGRST116') { // Codul pentru "no rows returned"
-        throw error;
+      // Folosim clientul PostgreSQL direct - username este de fapt email în implementarea noastră
+      const result = await db`
+        SELECT * FROM users
+        WHERE email = ${username}
+        LIMIT 1
+      `;
+      
+      if (result.length === 0) {
+        return undefined;
       }
       
-      return data as User;
+      return result[0] as User;
     } catch (error) {
       console.error("Eroare la obținerea utilizatorului după email:", error);
       return undefined;
@@ -60,22 +60,17 @@ export class DatabaseStorage implements IStorage {
         organization_id: insertUser.organizationId ?? null
       };
       
-      // Folosim Supabase direct
-      const { data, error } = await supabase
-        .from('users')
-        .insert(userData)
-        .select()
-        .single();
+      // Inserăm utilizatorul folosind clientul PostgreSQL direct
+      const result = await db`
+        INSERT INTO users ${db(userData)}
+        RETURNING *
+      `;
       
-      if (error) {
-        throw error;
-      }
-      
-      if (!data) {
+      if (result.length === 0) {
         throw new Error("Utilizatorul a fost creat dar nu a putut fi recuperat");
       }
       
-      return data as User;
+      return result[0] as User;
     } catch (error: any) {
       console.error("Eroare la crearea utilizatorului:", error);
       throw new Error(`Nu s-a putut crea utilizatorul: ${error.message || 'Eroare necunoscută'}`);

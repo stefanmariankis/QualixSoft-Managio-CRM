@@ -1,58 +1,69 @@
-import { createClient } from '@supabase/supabase-js';
 import postgres from 'postgres';
 
-// Obținem variabilele de mediu pentru configurare
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY || '';
+// Obținem variabila de mediu pentru conexiune
 const connectionString = process.env.DATABASE_URL || '';
 
-// Inițializăm clientul Supabase cu opțiuni pentru resetarea cache-ului de schemă
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: false
-  },
-  global: {
-    headers: {
-      'Prefer': 'count=exact',
-      'X-Schema-Cache-Control': 'no-cache',
-      'X-Client-Info': 'supabase-js-0-0-0' // Forțează resetarea cache-ului
-    }
-  },
-  db: {
-    schema: 'public'
-  }
+// Inițializăm clientul postgres pentru acces direct la baza de date
+export const db = postgres(connectionString, {
+  max: 10, // număr maxim de conexiuni în pool
+  idle_timeout: 30, // timpul de inactivitate în secunde
+  connect_timeout: 10, // timeout în secunde pentru conectare
 });
 
-// Inițializăm și un client postgres pentru query-uri directe SQL dacă este necesar
-export const pgClient = postgres(connectionString, {
-  max: 5, // număr maxim de conexiuni în pool
-  idle_timeout: 20 // timpul de inactivitate în secunde
+// Creem un client specializat pentru migrări cu timp de expirare mai lung
+export const migrationDb = postgres(connectionString, {
+  max: 1,
+  idle_timeout: 60,
+  connect_timeout: 30,
+  // postgres-js nu acceptă direct un query_timeout ca proprietate
+  // așa că îl omitem și, dacă este necesar, îl gestionăm cu promises
 });
 
 // Definim o funcție pentru a testa conexiunea la baza de date
 export async function testConnection() {
   try {
-    // Testăm conexiunea la Supabase
-    const { data, error } = await supabase.from('users').select('count(*)');
-    
-    if (error) {
-      throw error;
-    }
-    
-    console.log('Conexiune reușită la Supabase PostgreSQL!');
+    // Testăm conexiunea directă PostgreSQL
+    const result = await db`SELECT 1 as test`;
+    console.log('Conexiune reușită la PostgreSQL!', result);
     return true;
   } catch (error) {
-    console.error('Eroare la conectarea la baza de date Supabase:', error);
-    
-    try {
-      // Încercăm și conexiunea directă PostgreSQL
-      const result = await pgClient`SELECT 1 as test`;
-      console.log('Conexiune reușită la PostgreSQL direct!', result);
-      return true;
-    } catch (pgError) {
-      console.error('Eroare la conectarea directă la PostgreSQL:', pgError);
-      return false;
-    }
+    console.error('Eroare la conectarea la baza de date PostgreSQL:', error);
+    return false;
   }
 }
+
+// Funcție pentru a verifica existența unei tabele
+export async function tableExists(tableName: string): Promise<boolean> {
+  try {
+    const result = await db`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public'
+        AND table_name = ${tableName}
+      ) as exists;
+    `;
+    return result[0]?.exists === true;
+  } catch (error) {
+    console.error(`Eroare la verificarea existenței tabelei ${tableName}:`, error);
+    return false;
+  }
+}
+
+// Funcție pentru a verifica existența unui enum
+export async function enumExists(enumName: string): Promise<boolean> {
+  try {
+    const result = await db`
+      SELECT EXISTS (
+        SELECT FROM pg_type 
+        WHERE typname = ${enumName}
+      ) as exists;
+    `;
+    return result[0]?.exists === true;
+  } catch (error) {
+    console.error(`Eroare la verificarea existenței enum-ului ${enumName}:`, error);
+    return false;
+  }
+}
+
+// Exportăm și o referință veche pentru compatibilitate cu codul existent
+export const pgClient = db;
