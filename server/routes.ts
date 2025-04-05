@@ -8,6 +8,31 @@ import { registrationSchema } from "../shared/schema";
 import { setupAuth } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Middleware de autorizare pentru a verifica dacă utilizatorul este autentificat și are organizație
+  const requireAuth = async (req: any, res: Response, next: NextFunction) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+      
+      // Adăugăm utilizatorul și organizația la request pentru a fi folosite mai târziu
+      req.user = user;
+      
+      next();
+    } catch (error: any) {
+      console.error("Eroare la autorizare:", error);
+      return res.status(500).json({
+        message: "Eroare internă de server",
+        error: error.message || "Eroare necunoscută",
+      });
+    }
+  };
+  
   // Configurăm autentificarea
   setupAuth(app);
   
@@ -17,11 +42,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { default: projectsRouter } = await import('./api/projects');
   const { default: tasksRouter } = await import('./api/tasks');
   const { default: reportsRouter } = await import('./api/reports');
+  const { 
+    getAutomations, 
+    getAutomationById, 
+    createAutomation, 
+    updateAutomation, 
+    deleteAutomation 
+  } = await import('./api/automations');
   
   app.use('/api/clients', clientsRouter);
   app.use('/api/projects', projectsRouter);
   app.use('/api/tasks', tasksRouter);
   app.use('/api/reports', reportsRouter);
+  
+  // Rute pentru automatizări
+  app.get('/api/automations', requireAuth, getAutomations);
+  app.get('/api/automations/:id', requireAuth, getAutomationById);
+  app.post('/api/automations', requireAuth, createAutomation);
+  app.patch('/api/automations/:id', requireAuth, updateAutomation);
+  app.delete('/api/automations/:id', requireAuth, deleteAutomation);
   // Rută de test
   app.get("/api/test", (req, res) => {
     return res.json({ success: true, message: "API funcționează corect" });
@@ -269,31 +308,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Rutele /api/me și /api/logout sunt gestionate de /server/auth.ts
 
   // --- Routes pentru entități ---
-
-  // Middleware de autorizare pentru a verifica dacă utilizatorul este autentificat și are organizație
-  const requireAuth = async (req: any, res: Response, next: NextFunction) => {
-    try {
-      if (!req.session.userId) {
-        return res.status(401).json({ message: "Neautorizat" });
-      }
-
-      const user = await storage.getUser(req.session.userId);
-      if (!user || !user.organization_id) {
-        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
-      }
-      
-      // Adăugăm utilizatorul și organizația la request pentru a fi folosite mai târziu
-      req.user = user;
-      
-      next();
-    } catch (error: any) {
-      console.error("Eroare la autorizare:", error);
-      return res.status(500).json({
-        message: "Eroare internă de server",
-        error: error.message || "Eroare necunoscută",
-      });
-    }
-  };
 
   // Client Routes
   app.get("/api/clients", async (req, res) => {

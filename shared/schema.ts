@@ -404,6 +404,94 @@ export const automationTriggerTypes = [
   "file_upload"
 ] as const;
 
+// Tipuri pentru Automation
+export interface Automation {
+  id: number;
+  organization_id: number;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  created_by: number;
+  updated_by: number | null;
+  created_at: Date;
+  updated_at: Date;
+  trigger_types: (typeof automationTriggerTypes)[number][];
+  action_types: (typeof automationActionTypes)[number][];
+  execution_count: number;
+  last_execution_status: (typeof automationExecutionStatuses)[number] | null;
+  last_execution_time: Date | null;
+}
+
+export interface InsertAutomation {
+  organization_id: number;
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+  created_by: number;
+  trigger_types: (typeof automationTriggerTypes)[number][];
+  action_types: (typeof automationActionTypes)[number][];
+}
+
+// Tipuri pentru AutomationTrigger
+export interface AutomationTrigger {
+  id: number;
+  automation_id: number;
+  trigger_type: (typeof automationTriggerTypes)[number];
+  entity_type: string;
+  conditions: any;
+  order_index: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface InsertAutomationTrigger {
+  automation_id: number;
+  trigger_type: (typeof automationTriggerTypes)[number];
+  entity_type: string;
+  conditions: any;
+  order_index: number;
+}
+
+// Tipuri pentru AutomationAction
+export interface AutomationAction {
+  id: number;
+  automation_id: number;
+  action_type: (typeof automationActionTypes)[number];
+  action_config: any;
+  order_index: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface InsertAutomationAction {
+  automation_id: number;
+  action_type: (typeof automationActionTypes)[number];
+  action_config: any;
+  order_index: number;
+}
+
+// Tipuri pentru AutomationLog
+export interface AutomationLog {
+  id: number;
+  automation_id: number;
+  trigger_id: number | null;
+  entity_type: string;
+  entity_id: number;
+  execution_status: (typeof automationExecutionStatuses)[number];
+  error_message: string | null;
+  executed_at: Date;
+  created_at: Date;
+}
+
+export interface InsertAutomationLog {
+  automation_id: number;
+  trigger_id?: number | null;
+  entity_type: string;
+  entity_id: number;
+  execution_status: (typeof automationExecutionStatuses)[number];
+  error_message?: string | null;
+}
+
 // Tipuri pentru ActivityLog
 export interface ActivityLog {
   id: number;
@@ -543,3 +631,18 @@ export const timeLogSchema = z.object({
 });
 
 export type TimeLogFormData = z.infer<typeof timeLogSchema>;
+
+// Schema validare automatizări
+export const automationSchema = z.object({
+  name: z.string().min(1, { message: "Numele este obligatoriu" }),
+  description: z.string().optional().nullable(),
+  is_active: z.boolean().default(true),
+  trigger_type: z.enum(automationTriggerTypes as unknown as [string, ...string[]], {
+    errorMap: () => ({ message: "Tip declanșator invalid" }),
+  }),
+  action_type: z.enum(automationActionTypes as unknown as [string, ...string[]], {
+    errorMap: () => ({ message: "Tip acțiune invalid" }),
+  }),
+});
+
+export type AutomationFormData = z.infer<typeof automationSchema>;

@@ -46,6 +46,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { href: "/projects", label: "Proiecte", icon: FolderKanban },
     { href: "/tasks", label: "Sarcini", icon: FileText },
     { href: "/invoices", label: "Facturi", icon: Receipt },
+    { href: "/automations", label: "Automatizări", icon: Gauge },
     { href: "/templates", label: "Template-uri", icon: FileText },
     { href: "/reports", label: "Rapoarte", icon: Gauge },
     { href: "/calendar", label: "Calendar", icon: Calendar },

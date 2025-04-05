@@ -17,8 +17,11 @@ const Dashboard = lazy(() => import("@/pages/dashboard"));
 const ClientsPage = lazy(() => import("@/pages/clients/index"));
 const ClientDetailsPage = lazy(() => import("@/pages/clients/[id]"));
 const ProjectsPage = lazy(() => import("@/pages/projects/index"));
+const ProjectDetailsPage = lazy(() => import("@/pages/projects/[id]"));
 const TasksPage = lazy(() => import("@/pages/tasks/index"));
+const TaskDetailsPage = lazy(() => import("@/pages/tasks/[id]"));
 const InvoicesPage = lazy(() => import("@/pages/invoices/index"));
+const InvoiceDetailsPage = lazy(() => import("@/pages/invoices/[id]"));
 const CalendarPage = lazy(() => import("@/pages/calendar/index"));
 
 // Module care vor fi implementate în viitor
@@ -26,6 +29,7 @@ const CalendarPage = lazy(() => import("@/pages/calendar/index"));
 const TemplatesPage = lazy(() => import("@/pages/templates/index"));
 const ReportsPage = lazy(() => import("@/pages/reports/index"));
 const SettingsPage = lazy(() => import("@/pages/settings/index"));
+const AutomationPage = lazy(() => import("@/pages/automations/index"));
 
 // Pagini statice de rezervă în caz de erori
 // const TemplatesPage = () => <div>Pagina templates va fi disponibilă în curând</div>;
@@ -87,12 +91,28 @@ function Router() {
           <ProjectsPage />
         </ProtectedRoute>
         
+        <ProtectedRoute path="/projects/:id">
+          <ProjectDetailsPage />
+        </ProtectedRoute>
+        
         <ProtectedRoute path="/tasks">
           <TasksPage />
         </ProtectedRoute>
         
+        <ProtectedRoute path="/tasks/:id">
+          <TaskDetailsPage />
+        </ProtectedRoute>
+        
         <ProtectedRoute path="/invoices">
           <InvoicesPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/invoices/:id">
+          <InvoiceDetailsPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/automations">
+          <AutomationPage />
         </ProtectedRoute>
         
         <ProtectedRoute path="/templates">

@@ -7,7 +7,11 @@ import {
   Task, InsertTask,
   Invoice, InsertInvoice,
   TimeLog, InsertTimeLog,
-  ActivityLog, InsertActivityLog
+  ActivityLog, InsertActivityLog,
+  Automation, InsertAutomation,
+  AutomationTrigger, InsertAutomationTrigger,
+  AutomationAction, InsertAutomationAction,
+  AutomationLog, InsertAutomationLog
 } from "../shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -73,6 +77,33 @@ export interface IStorage {
   getActivityLogsByUser(userId: number, limit?: number): Promise<ActivityLog[]>;
   getActivityLogsByEntity(entityType: string, entityId: number, limit?: number): Promise<ActivityLog[]>;
   createActivityLog(activityLog: InsertActivityLog): Promise<ActivityLog>;
+  
+  // Automation operations
+  getAutomation(id: number): Promise<Automation | undefined>;
+  getAutomationsByOrganization(organizationId: number): Promise<Automation[]>;
+  createAutomation(automation: InsertAutomation): Promise<Automation>;
+  updateAutomation(id: number, automationData: Partial<Automation>): Promise<Automation | undefined>;
+  deleteAutomation(id: number): Promise<boolean>;
+  
+  // AutomationTrigger operations
+  getAutomationTrigger(id: number): Promise<AutomationTrigger | undefined>;
+  getAutomationTriggersByAutomationId(automationId: number): Promise<AutomationTrigger[]>;
+  createAutomationTrigger(trigger: InsertAutomationTrigger): Promise<AutomationTrigger>;
+  updateAutomationTrigger(id: number, triggerData: Partial<AutomationTrigger>): Promise<AutomationTrigger | undefined>;
+  deleteAutomationTrigger(id: number): Promise<boolean>;
+  
+  // AutomationAction operations
+  getAutomationAction(id: number): Promise<AutomationAction | undefined>;
+  getAutomationActionsByAutomationId(automationId: number): Promise<AutomationAction[]>;
+  createAutomationAction(action: InsertAutomationAction): Promise<AutomationAction>;
+  updateAutomationAction(id: number, actionData: Partial<AutomationAction>): Promise<AutomationAction | undefined>;
+  deleteAutomationAction(id: number): Promise<boolean>;
+  
+  // AutomationLog operations
+  getAutomationLog(id: number): Promise<AutomationLog | undefined>;
+  getAutomationLogsByAutomationId(automationId: number, limit?: number): Promise<AutomationLog[]>;
+  getAutomationLogsByOrganization(organizationId: number, limit?: number): Promise<AutomationLog[]>;
+  createAutomationLog(log: InsertAutomationLog): Promise<AutomationLog>;
   
   // Session store
   sessionStore: session.Store;
@@ -1459,6 +1490,656 @@ export class MemStorage implements IStorage {
     
     this.activityLogs.set(id, newActivityLog);
     return newActivityLog;
+  }
+  
+  // Automation operations
+  async getAutomation(id: number): Promise<Automation | undefined> {
+    try {
+      const result = await db`
+        SELECT * FROM automations
+        WHERE id = ${id}
+        LIMIT 1
+      `;
+      
+      if (result.length === 0) {
+        return undefined;
+      }
+      
+      // Procesăm rezultatul pentru a converti câmpurile JSON
+      const automation = result[0] as any;
+      
+      // Convertim câmpurile JSON
+      if (automation.trigger_types && typeof automation.trigger_types === 'string') {
+        try {
+          automation.trigger_types = JSON.parse(automation.trigger_types);
+        } catch (e) {
+          console.error('Eroare la parsarea JSON pentru trigger_types:', e);
+          automation.trigger_types = [];
+        }
+      }
+      
+      if (automation.action_types && typeof automation.action_types === 'string') {
+        try {
+          automation.action_types = JSON.parse(automation.action_types);
+        } catch (e) {
+          console.error('Eroare la parsarea JSON pentru action_types:', e);
+          automation.action_types = [];
+        }
+      }
+      
+      return automation as Automation;
+    } catch (error) {
+      console.error("Eroare la obținerea automatizării:", error);
+      return undefined;
+    }
+  }
+  
+  async getAutomationsByOrganization(organizationId: number): Promise<Automation[]> {
+    try {
+      const result = await db`
+        SELECT * FROM automations
+        WHERE organization_id = ${organizationId}
+        ORDER BY name
+      `;
+      
+      // Procesăm rezultatele pentru a converti câmpurile JSON
+      return result.map(automation => {
+        if (automation.trigger_types && typeof automation.trigger_types === 'string') {
+          try {
+            automation.trigger_types = JSON.parse(automation.trigger_types);
+          } catch (e) {
+            console.error('Eroare la parsarea JSON pentru trigger_types:', e);
+            automation.trigger_types = [];
+          }
+        }
+        
+        if (automation.action_types && typeof automation.action_types === 'string') {
+          try {
+            automation.action_types = JSON.parse(automation.action_types);
+          } catch (e) {
+            console.error('Eroare la parsarea JSON pentru action_types:', e);
+            automation.action_types = [];
+          }
+        }
+        
+        return automation as Automation;
+      });
+    } catch (error) {
+      console.error("Eroare la obținerea automatizărilor organizației:", error);
+      return [];
+    }
+  }
+  
+  async createAutomation(automation: InsertAutomation): Promise<Automation> {
+    try {
+      const now = new Date();
+      const automationData = {
+        organization_id: automation.organization_id,
+        name: automation.name,
+        description: automation.description,
+        is_active: automation.is_active ?? true,
+        created_by: automation.created_by,
+        updated_by: automation.created_by,
+        trigger_types: JSON.stringify(automation.trigger_types),
+        action_types: JSON.stringify(automation.action_types),
+        execution_count: 0,
+        last_execution_status: null,
+        last_execution_time: null,
+        created_at: now,
+        updated_at: now
+      };
+      
+      const result = await db`
+        INSERT INTO automations ${db(automationData)}
+        RETURNING *
+      `;
+      
+      if (result.length === 0) {
+        throw new Error("Automatizarea a fost creată dar nu a putut fi recuperată");
+      }
+      
+      // Procesăm rezultatul pentru a converti câmpurile JSON
+      const createdAutomation = result[0] as any;
+      
+      // Convertim câmpurile JSON
+      if (createdAutomation.trigger_types && typeof createdAutomation.trigger_types === 'string') {
+        try {
+          createdAutomation.trigger_types = JSON.parse(createdAutomation.trigger_types);
+        } catch (e) {
+          console.error('Eroare la parsarea JSON pentru trigger_types:', e);
+          createdAutomation.trigger_types = [];
+        }
+      }
+      
+      if (createdAutomation.action_types && typeof createdAutomation.action_types === 'string') {
+        try {
+          createdAutomation.action_types = JSON.parse(createdAutomation.action_types);
+        } catch (e) {
+          console.error('Eroare la parsarea JSON pentru action_types:', e);
+          createdAutomation.action_types = [];
+        }
+      }
+      
+      return createdAutomation as Automation;
+    } catch (error: any) {
+      console.error("Eroare la crearea automatizării:", error);
+      throw new Error(`Nu s-a putut crea automatizarea: ${error.message || 'Eroare necunoscută'}`);
+    }
+  }
+  
+  async updateAutomation(id: number, automationData: Partial<Automation>): Promise<Automation | undefined> {
+    try {
+      if (Object.keys(automationData).length === 0) {
+        return await this.getAutomation(id);
+      }
+      
+      // Procesăm datele pentru a converti câmpurile array în JSON
+      const dataToUpdate: any = {
+        ...automationData,
+        updated_at: new Date()
+      };
+      
+      // Convertim câmpurile array în JSON pentru stocare
+      if (dataToUpdate.trigger_types) {
+        dataToUpdate.trigger_types = JSON.stringify(dataToUpdate.trigger_types);
+      }
+      
+      if (dataToUpdate.action_types) {
+        dataToUpdate.action_types = JSON.stringify(dataToUpdate.action_types);
+      }
+      
+      const result = await db`
+        UPDATE automations
+        SET ${db(dataToUpdate)}
+        WHERE id = ${id}
+        RETURNING *
+      `;
+      
+      if (result.length === 0) {
+        return undefined;
+      }
+      
+      // Procesăm rezultatul pentru a converti câmpurile JSON
+      const updatedAutomation = result[0] as any;
+      
+      // Convertim câmpurile JSON înapoi în array-uri
+      if (updatedAutomation.trigger_types && typeof updatedAutomation.trigger_types === 'string') {
+        try {
+          updatedAutomation.trigger_types = JSON.parse(updatedAutomation.trigger_types);
+        } catch (e) {
+          console.error('Eroare la parsarea JSON pentru trigger_types:', e);
+          updatedAutomation.trigger_types = [];
+        }
+      }
+      
+      if (updatedAutomation.action_types && typeof updatedAutomation.action_types === 'string') {
+        try {
+          updatedAutomation.action_types = JSON.parse(updatedAutomation.action_types);
+        } catch (e) {
+          console.error('Eroare la parsarea JSON pentru action_types:', e);
+          updatedAutomation.action_types = [];
+        }
+      }
+      
+      return updatedAutomation as Automation;
+    } catch (error) {
+      console.error("Eroare la actualizarea automatizării:", error);
+      return undefined;
+    }
+  }
+  
+  async deleteAutomation(id: number): Promise<boolean> {
+    try {
+      // Ștergem mai întâi acțiunile și trigger-ele asociate
+      await db`DELETE FROM automation_actions WHERE automation_id = ${id}`;
+      await db`DELETE FROM automation_triggers WHERE automation_id = ${id}`;
+      
+      // Apoi ștergem automatizarea
+      const result = await db`
+        DELETE FROM automations
+        WHERE id = ${id}
+        RETURNING id
+      `;
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la ștergerea automatizării:", error);
+      return false;
+    }
+  }
+  
+  // AutomationTrigger operations
+  async getAutomationTrigger(id: number): Promise<AutomationTrigger | undefined> {
+    try {
+      const result = await db`
+        SELECT * FROM automation_triggers
+        WHERE id = ${id}
+        LIMIT 1
+      `;
+      
+      if (result.length === 0) {
+        return undefined;
+      }
+      
+      // Procesăm rezultatul pentru a converti câmpurile JSON
+      const trigger = result[0] as any;
+      
+      // Convertim câmpul conditions din JSON
+      if (trigger.conditions && typeof trigger.conditions === 'string') {
+        try {
+          trigger.conditions = JSON.parse(trigger.conditions);
+        } catch (e) {
+          console.error('Eroare la parsarea JSON pentru conditions:', e);
+          trigger.conditions = {};
+        }
+      }
+      
+      return trigger as AutomationTrigger;
+    } catch (error) {
+      console.error("Eroare la obținerea trigger-ului automatizării:", error);
+      return undefined;
+    }
+  }
+  
+  async getAutomationTriggersByAutomationId(automationId: number): Promise<AutomationTrigger[]> {
+    try {
+      const result = await db`
+        SELECT * FROM automation_triggers
+        WHERE automation_id = ${automationId}
+        ORDER BY order_index
+      `;
+      
+      // Procesăm rezultatele pentru a converti câmpurile JSON
+      return result.map(trigger => {
+        if (trigger.conditions && typeof trigger.conditions === 'string') {
+          try {
+            trigger.conditions = JSON.parse(trigger.conditions);
+          } catch (e) {
+            console.error('Eroare la parsarea JSON pentru conditions:', e);
+            trigger.conditions = {};
+          }
+        }
+        return trigger as AutomationTrigger;
+      });
+    } catch (error) {
+      console.error("Eroare la obținerea trigger-elor automatizării:", error);
+      return [];
+    }
+  }
+  
+  async createAutomationTrigger(trigger: InsertAutomationTrigger): Promise<AutomationTrigger> {
+    try {
+      const now = new Date();
+      const triggerData = {
+        automation_id: trigger.automation_id,
+        trigger_type: trigger.trigger_type,
+        entity_type: trigger.entity_type,
+        conditions: JSON.stringify(trigger.conditions),
+        order_index: trigger.order_index,
+        created_at: now,
+        updated_at: now
+      };
+      
+      const result = await db`
+        INSERT INTO automation_triggers ${db(triggerData)}
+        RETURNING *
+      `;
+      
+      if (result.length === 0) {
+        throw new Error("Trigger-ul a fost creat dar nu a putut fi recuperat");
+      }
+      
+      // Procesăm rezultatul pentru a converti câmpurile JSON
+      const createdTrigger = result[0] as any;
+      
+      // Convertim câmpul conditions din JSON
+      if (createdTrigger.conditions && typeof createdTrigger.conditions === 'string') {
+        try {
+          createdTrigger.conditions = JSON.parse(createdTrigger.conditions);
+        } catch (e) {
+          console.error('Eroare la parsarea JSON pentru conditions:', e);
+          createdTrigger.conditions = {};
+        }
+      }
+      
+      return createdTrigger as AutomationTrigger;
+    } catch (error: any) {
+      console.error("Eroare la crearea trigger-ului automatizării:", error);
+      throw new Error(`Nu s-a putut crea trigger-ul automatizării: ${error.message || 'Eroare necunoscută'}`);
+    }
+  }
+  
+  async updateAutomationTrigger(id: number, triggerData: Partial<AutomationTrigger>): Promise<AutomationTrigger | undefined> {
+    try {
+      if (Object.keys(triggerData).length === 0) {
+        return await this.getAutomationTrigger(id);
+      }
+      
+      // Procesăm datele pentru a converti câmpurile JSON
+      const dataToUpdate: any = {
+        ...triggerData,
+        updated_at: new Date()
+      };
+      
+      // Convertim câmpul conditions în JSON pentru stocare
+      if (dataToUpdate.conditions) {
+        dataToUpdate.conditions = JSON.stringify(dataToUpdate.conditions);
+      }
+      
+      const result = await db`
+        UPDATE automation_triggers
+        SET ${db(dataToUpdate)}
+        WHERE id = ${id}
+        RETURNING *
+      `;
+      
+      if (result.length === 0) {
+        return undefined;
+      }
+      
+      // Procesăm rezultatul pentru a converti câmpurile JSON
+      const updatedTrigger = result[0] as any;
+      
+      // Convertim câmpul conditions din JSON
+      if (updatedTrigger.conditions && typeof updatedTrigger.conditions === 'string') {
+        try {
+          updatedTrigger.conditions = JSON.parse(updatedTrigger.conditions);
+        } catch (e) {
+          console.error('Eroare la parsarea JSON pentru conditions:', e);
+          updatedTrigger.conditions = {};
+        }
+      }
+      
+      return updatedTrigger as AutomationTrigger;
+    } catch (error) {
+      console.error("Eroare la actualizarea trigger-ului automatizării:", error);
+      return undefined;
+    }
+  }
+  
+  async deleteAutomationTrigger(id: number): Promise<boolean> {
+    try {
+      const result = await db`
+        DELETE FROM automation_triggers
+        WHERE id = ${id}
+        RETURNING id
+      `;
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la ștergerea trigger-ului automatizării:", error);
+      return false;
+    }
+  }
+  
+  // AutomationAction operations
+  async getAutomationAction(id: number): Promise<AutomationAction | undefined> {
+    try {
+      const result = await db`
+        SELECT * FROM automation_actions
+        WHERE id = ${id}
+        LIMIT 1
+      `;
+      
+      if (result.length === 0) {
+        return undefined;
+      }
+      
+      // Procesăm rezultatul pentru a converti câmpurile JSON
+      const action = result[0] as any;
+      
+      // Convertim câmpul action_config din JSON
+      if (action.action_config && typeof action.action_config === 'string') {
+        try {
+          action.action_config = JSON.parse(action.action_config);
+        } catch (e) {
+          console.error('Eroare la parsarea JSON pentru action_config:', e);
+          action.action_config = {};
+        }
+      }
+      
+      return action as AutomationAction;
+    } catch (error) {
+      console.error("Eroare la obținerea acțiunii automatizării:", error);
+      return undefined;
+    }
+  }
+  
+  async getAutomationActionsByAutomationId(automationId: number): Promise<AutomationAction[]> {
+    try {
+      const result = await db`
+        SELECT * FROM automation_actions
+        WHERE automation_id = ${automationId}
+        ORDER BY order_index
+      `;
+      
+      // Procesăm rezultatele pentru a converti câmpurile JSON
+      return result.map(action => {
+        if (action.action_config && typeof action.action_config === 'string') {
+          try {
+            action.action_config = JSON.parse(action.action_config);
+          } catch (e) {
+            console.error('Eroare la parsarea JSON pentru action_config:', e);
+            action.action_config = {};
+          }
+        }
+        return action as AutomationAction;
+      });
+    } catch (error) {
+      console.error("Eroare la obținerea acțiunilor automatizării:", error);
+      return [];
+    }
+  }
+  
+  async createAutomationAction(action: InsertAutomationAction): Promise<AutomationAction> {
+    try {
+      const now = new Date();
+      const actionData = {
+        automation_id: action.automation_id,
+        action_type: action.action_type,
+        action_config: JSON.stringify(action.action_config),
+        order_index: action.order_index,
+        created_at: now,
+        updated_at: now
+      };
+      
+      const result = await db`
+        INSERT INTO automation_actions ${db(actionData)}
+        RETURNING *
+      `;
+      
+      if (result.length === 0) {
+        throw new Error("Acțiunea a fost creată dar nu a putut fi recuperată");
+      }
+      
+      // Procesăm rezultatul pentru a converti câmpurile JSON
+      const createdAction = result[0] as any;
+      
+      // Convertim câmpul action_config din JSON
+      if (createdAction.action_config && typeof createdAction.action_config === 'string') {
+        try {
+          createdAction.action_config = JSON.parse(createdAction.action_config);
+        } catch (e) {
+          console.error('Eroare la parsarea JSON pentru action_config:', e);
+          createdAction.action_config = {};
+        }
+      }
+      
+      return createdAction as AutomationAction;
+    } catch (error: any) {
+      console.error("Eroare la crearea acțiunii automatizării:", error);
+      throw new Error(`Nu s-a putut crea acțiunea automatizării: ${error.message || 'Eroare necunoscută'}`);
+    }
+  }
+  
+  async updateAutomationAction(id: number, actionData: Partial<AutomationAction>): Promise<AutomationAction | undefined> {
+    try {
+      if (Object.keys(actionData).length === 0) {
+        return await this.getAutomationAction(id);
+      }
+      
+      // Procesăm datele pentru a converti câmpurile JSON
+      const dataToUpdate: any = {
+        ...actionData,
+        updated_at: new Date()
+      };
+      
+      // Convertim câmpul action_config în JSON pentru stocare
+      if (dataToUpdate.action_config) {
+        dataToUpdate.action_config = JSON.stringify(dataToUpdate.action_config);
+      }
+      
+      const result = await db`
+        UPDATE automation_actions
+        SET ${db(dataToUpdate)}
+        WHERE id = ${id}
+        RETURNING *
+      `;
+      
+      if (result.length === 0) {
+        return undefined;
+      }
+      
+      // Procesăm rezultatul pentru a converti câmpurile JSON
+      const updatedAction = result[0] as any;
+      
+      // Convertim câmpul action_config din JSON
+      if (updatedAction.action_config && typeof updatedAction.action_config === 'string') {
+        try {
+          updatedAction.action_config = JSON.parse(updatedAction.action_config);
+        } catch (e) {
+          console.error('Eroare la parsarea JSON pentru action_config:', e);
+          updatedAction.action_config = {};
+        }
+      }
+      
+      return updatedAction as AutomationAction;
+    } catch (error) {
+      console.error("Eroare la actualizarea acțiunii automatizării:", error);
+      return undefined;
+    }
+  }
+  
+  async deleteAutomationAction(id: number): Promise<boolean> {
+    try {
+      const result = await db`
+        DELETE FROM automation_actions
+        WHERE id = ${id}
+        RETURNING id
+      `;
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la ștergerea acțiunii automatizării:", error);
+      return false;
+    }
+  }
+  
+  // AutomationLog operations
+  async getAutomationLog(id: number): Promise<AutomationLog | undefined> {
+    try {
+      const result = await db`
+        SELECT * FROM automation_logs
+        WHERE id = ${id}
+        LIMIT 1
+      `;
+      
+      if (result.length === 0) {
+        return undefined;
+      }
+      
+      return result[0] as AutomationLog;
+    } catch (error) {
+      console.error("Eroare la obținerea logului automatizării:", error);
+      return undefined;
+    }
+  }
+  
+  async getAutomationLogsByAutomationId(automationId: number, limit?: number): Promise<AutomationLog[]> {
+    try {
+      let query = db`
+        SELECT * FROM automation_logs
+        WHERE automation_id = ${automationId}
+        ORDER BY executed_at DESC
+      `;
+      
+      if (limit) {
+        query = db`
+          SELECT * FROM automation_logs
+          WHERE automation_id = ${automationId}
+          ORDER BY executed_at DESC
+          LIMIT ${limit}
+        `;
+      }
+      
+      const result = await query;
+      
+      return result as unknown as AutomationLog[];
+    } catch (error) {
+      console.error("Eroare la obținerea logurilor automatizării:", error);
+      return [];
+    }
+  }
+  
+  async getAutomationLogsByOrganization(organizationId: number, limit?: number): Promise<AutomationLog[]> {
+    try {
+      // Join cu tabela de automatizări pentru a obține logurile asociate organizației
+      let query = db`
+        SELECT al.* 
+        FROM automation_logs al
+        JOIN automations a ON al.automation_id = a.id
+        WHERE a.organization_id = ${organizationId}
+        ORDER BY al.executed_at DESC
+      `;
+      
+      if (limit) {
+        query = db`
+          SELECT al.* 
+          FROM automation_logs al
+          JOIN automations a ON al.automation_id = a.id
+          WHERE a.organization_id = ${organizationId}
+          ORDER BY al.executed_at DESC
+          LIMIT ${limit}
+        `;
+      }
+      
+      const result = await query;
+      
+      return result as unknown as AutomationLog[];
+    } catch (error) {
+      console.error("Eroare la obținerea logurilor automatizărilor organizației:", error);
+      return [];
+    }
+  }
+  
+  async createAutomationLog(log: InsertAutomationLog): Promise<AutomationLog> {
+    try {
+      const now = new Date();
+      const logData = {
+        automation_id: log.automation_id,
+        trigger_id: log.trigger_id || null,
+        entity_type: log.entity_type,
+        entity_id: log.entity_id,
+        execution_status: log.execution_status,
+        error_message: log.error_message || null,
+        executed_at: now,
+        created_at: now
+      };
+      
+      const result = await db`
+        INSERT INTO automation_logs ${db(logData)}
+        RETURNING *
+      `;
+      
+      if (result.length === 0) {
+        throw new Error("Logul automatizării a fost creat dar nu a putut fi recuperat");
+      }
+      
+      return result[0] as AutomationLog;
+    } catch (error: any) {
+      console.error("Eroare la crearea logului automatizării:", error);
+      throw new Error(`Nu s-a putut crea logul automatizării: ${error.message || 'Eroare necunoscută'}`);
+    }
   }
 }
 
