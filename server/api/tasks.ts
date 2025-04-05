@@ -63,7 +63,7 @@ router.get('/upcoming', requireAuth, async (req: Request, res: Response) => {
     
     const upcomingTasks = allTasks
       .filter(task => {
-        if (!task.due_date || task.status === 'finalizat') return false;
+        if (!task.due_date || task.status === 'completed') return false;
         const dueDate = new Date(task.due_date);
         return dueDate >= today && dueDate <= nextWeek;
       })

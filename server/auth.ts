@@ -321,10 +321,28 @@ export function setupAuth(app: Express) {
   });
 }
 
-// Middleware pentru a verifica autentificarea
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+// Middleware pentru a verifica autentificarea și a încărca datele utilizatorului
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Neautorizat" });
   }
-  next();
+  
+  try {
+    // Încarcă utilizatorul și îl atașează la obiectul request
+    const user = await storage.getUser(req.session.userId);
+    
+    if (!user) {
+      // Utilizatorul a fost șters între timp
+      req.session.destroy(() => {});
+      return res.status(401).json({ message: "Utilizator negăsit" });
+    }
+    
+    // Adaugă utilizatorul la request pentru a fi folosit în rutele API
+    (req as any).user = user;
+    
+    next();
+  } catch (error) {
+    console.error("Eroare la încărcarea utilizatorului:", error);
+    return res.status(500).json({ message: "Eroare internă de server" });
+  }
 }
