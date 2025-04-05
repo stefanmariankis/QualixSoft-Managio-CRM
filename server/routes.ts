@@ -256,6 +256,197 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Rutele /api/me și /api/logout sunt gestionate de /server/auth.ts
 
+  // --- Routes pentru entități ---
+
+  // Client Routes
+  app.get("/api/clients", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+
+      const clients = await storage.getClientsByOrganization(user.organization_id);
+      return res.status(200).json(clients);
+    } catch (error: any) {
+      console.error("Eroare la obținerea clienților:", error);
+      return res.status(500).json({
+        message: "Eroare internă de server",
+        error: error.message || "Eroare necunoscută",
+      });
+    }
+  });
+
+  app.get("/api/clients/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+
+      const clientId = parseInt(req.params.id);
+      if (isNaN(clientId)) {
+        return res.status(400).json({ message: "ID client invalid" });
+      }
+
+      const client = await storage.getClient(clientId);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client negăsit" });
+      }
+
+      // Verificăm dacă clientul aparține organizației utilizatorului
+      if (client.organization_id !== user.organization_id) {
+        return res.status(403).json({ message: "Nu aveți acces la acest client" });
+      }
+
+      // Obținem proiectele asociate clientului
+      const projects = await storage.getProjectsByClient(clientId);
+
+      // Returnăm datele complete
+      return res.status(200).json({
+        client,
+        projects,
+        // În viitor, putem adăuga și alte date relevante, cum ar fi:
+        // invoices: await storage.getInvoicesByClient(clientId),
+        // contacts: await storage.getContactsByClient(clientId),
+        // activities: await storage.getActivitiesByClient(clientId)
+      });
+    } catch (error: any) {
+      console.error("Eroare la obținerea detaliilor clientului:", error);
+      return res.status(500).json({
+        message: "Eroare internă de server",
+        error: error.message || "Eroare necunoscută",
+      });
+    }
+  });
+
+  app.post("/api/clients", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+
+      // Adăugăm automat organization_id și created_by
+      const clientData = {
+        ...req.body,
+        organization_id: user.organization_id,
+        created_by: user.id
+      };
+
+      const newClient = await storage.createClient(clientData);
+      return res.status(201).json(newClient);
+    } catch (error: any) {
+      console.error("Eroare la crearea clientului:", error);
+      return res.status(500).json({
+        message: "Eroare internă de server",
+        error: error.message || "Eroare necunoscută",
+      });
+    }
+  });
+
+  app.put("/api/clients/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+
+      const clientId = parseInt(req.params.id);
+      if (isNaN(clientId)) {
+        return res.status(400).json({ message: "ID client invalid" });
+      }
+
+      // Verificăm dacă clientul există și aparține organizației utilizatorului
+      const existingClient = await storage.getClient(clientId);
+      if (!existingClient) {
+        return res.status(404).json({ message: "Client negăsit" });
+      }
+
+      if (existingClient.organization_id !== user.organization_id) {
+        return res.status(403).json({ message: "Nu aveți acces la acest client" });
+      }
+
+      // Actualizăm datele clientului
+      const updatedClient = await storage.updateClient(clientId, req.body);
+      return res.status(200).json(updatedClient);
+    } catch (error: any) {
+      console.error("Eroare la actualizarea clientului:", error);
+      return res.status(500).json({
+        message: "Eroare internă de server",
+        error: error.message || "Eroare necunoscută",
+      });
+    }
+  });
+
+  app.delete("/api/clients/:id", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+
+      const clientId = parseInt(req.params.id);
+      if (isNaN(clientId)) {
+        return res.status(400).json({ message: "ID client invalid" });
+      }
+
+      // Verificăm dacă clientul există și aparține organizației utilizatorului
+      const existingClient = await storage.getClient(clientId);
+      if (!existingClient) {
+        return res.status(404).json({ message: "Client negăsit" });
+      }
+
+      if (existingClient.organization_id !== user.organization_id) {
+        return res.status(403).json({ message: "Nu aveți acces la acest client" });
+      }
+
+      // Verificăm dacă există proiecte asociate sau alte dependențe
+      const projects = await storage.getProjectsByClient(clientId);
+      if (projects.length > 0) {
+        return res.status(400).json({ 
+          message: "Nu se poate șterge clientul deoarece are proiecte asociate",
+          projects: projects.length
+        });
+      }
+
+      // Ștergem clientul
+      const deleted = await storage.deleteClient(clientId);
+      if (!deleted) {
+        return res.status(500).json({ message: "Ștergerea clientului a eșuat" });
+      }
+
+      return res.status(200).json({ message: "Client șters cu succes" });
+    } catch (error: any) {
+      console.error("Eroare la ștergerea clientului:", error);
+      return res.status(500).json({
+        message: "Eroare internă de server",
+        error: error.message || "Eroare necunoscută",
+      });
+    }
+  });
+
   // --- Routes pentru dashboard ---
 
   // Activity Log

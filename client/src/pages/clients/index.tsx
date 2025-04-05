@@ -444,8 +444,10 @@ export default function ClientsPage() {
                               <Button variant="ghost" size="icon" title="Vezi statistici">
                                 <BarChart4 className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" title="Editează">
-                                <Edit className="h-4 w-4" />
+                              <Button variant="ghost" size="icon" title="Detalii" asChild>
+                                <Link href={`/clients/${client.id}`}>
+                                  <Edit className="h-4 w-4" />
+                                </Link>
                               </Button>
                               <Button variant="ghost" size="icon" title="Șterge">
                                 <Trash2 className="h-4 w-4" />
