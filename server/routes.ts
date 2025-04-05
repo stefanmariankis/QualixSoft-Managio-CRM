@@ -3,32 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import bcrypt from "bcryptjs";
-import { z } from "zod";
-
-// Definim schemele de validare direct aici (înlocuim Drizzle)
-const loginSchema = z.object({
-  email: z.string().email({ message: "Adresa de email nu este validă" }),
-  password: z.string().min(1, { message: "Parola este obligatorie" }),
-  rememberMe: z.boolean().optional(),
-});
-
-const registrationSchema = z.object({
-  firstName: z.string().min(1, { message: "Prenumele este obligatoriu" }),
-  lastName: z.string().min(1, { message: "Numele este obligatoriu" }),
-  email: z.string().email({ message: "Adresa de email nu este validă" }),
-  password: z
-    .string()
-    .min(8, { message: "Parola trebuie să aibă minim 8 caractere" }),
-  organizationType: z.enum(["freelancer", "agency", "company"], {
-    errorMap: () => ({ message: "Tipul organizației este obligatoriu" }),
-  }),
-  companyName: z
-    .string()
-    .min(1, { message: "Numele organizației este obligatoriu" }),
-  termsAccepted: z.boolean().refine((val) => val === true, {
-    message: "Trebuie să accepți termenii și condițiile",
-  }),
-});
+import { loginSchema, registrationSchema } from "../shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Rută de test

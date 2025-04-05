@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 import PasswordStrength from "@/components/ui/password-strength";
-import { apiRequest } from "@/lib/queryClient";
 import { PasswordStrength as PasswordStrengthEnum } from "@/types";
 
 export default function RegisterForm() {
@@ -53,38 +52,26 @@ export default function RegisterForm() {
     try {
       setIsLoading(true);
       
-      console.log("Începere proces înregistrare");
+      console.log("Începere proces înregistrare cu date:", data);
       
-      // First create the organization
-      const orgResponse = await apiRequest("POST", "/api/organizations", {
-        name: data.companyName,
-        type: data.organizationType,
-      });
-
-      if (!orgResponse.ok) {
-        console.error("Eroare la crearea organizației:", await orgResponse.text());
-        throw new Error("Eroare la crearea organizației");
-      }
-
-      const organization = await orgResponse.json();
-      console.log("Organizație creată cu succes:", organization);
-      
-      // Then register the user with Supabase
+      // Trimitem direct toate datele către API-ul de înregistrare
       try {
         await signUp(data.email, data.password, {
           firstName: data.firstName,
           lastName: data.lastName,
-          organizationId: organization.id,
-          role: "ceo", // Default role for new registrations
+          organizationType: data.organizationType,
+          companyName: data.companyName,
+          termsAccepted: data.termsAccepted
         });
         console.log("Utilizator înregistrat cu succes");
+        
+        // Afișăm un mesaj de succes suplimentar
+        toast({
+          title: "Cont creat cu succes",
+          description: "Te-ai înregistrat cu succes în platforma Managio.",
+        });
       } catch (signUpError) {
         console.error("Eroare la înregistrarea utilizatorului:", signUpError);
-        
-        // Dacă înregistrarea utilizatorului eșuează, ar trebui să ștergem organizația creată
-        // pentru a evita organizațiile orfane
-        // TODO: Implementează ștergerea organizației
-        
         throw signUpError;
       }
       
