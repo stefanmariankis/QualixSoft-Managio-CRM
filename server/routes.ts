@@ -67,7 +67,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const organization = {
         name: companyName,
         slug: slug,
-        organization_type: organizationType, // folosim numele corect al coloanei
+        organization_type: organizationType, 
         subscription_plan: 'trial', 
         is_active: true,
         trial_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 zile
@@ -204,11 +204,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const organization = {
         name,
         slug,
-        organization_type: type,
+        organization_type: type, // folosim numele corect al coloanei
+        logo: null,
+        trial_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 zile
         subscription_plan: 'trial',
-        is_active: true,
-        trial_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 zile
+        is_active: true
       };
+
+      console.log("Creare organizație:", organization)
       
       // Folosim Supabase pentru inserare
       const { data: newOrg, error: orgError } = await supabase

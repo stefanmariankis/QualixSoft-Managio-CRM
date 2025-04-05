@@ -37,7 +37,7 @@ export interface Organization {
   name: string;
   slug: string;
   logo?: string | null;
-  organization_type: typeof organizationTypes[number];
+  organization_type: typeof organizationTypes[number]; // confirmată din baza de date
   subscription_plan: typeof subscriptionPlans[number];
   trial_expires_at?: Date | null;
   subscription_started_at?: Date | null;
@@ -52,7 +52,7 @@ export interface InsertOrganization {
   name: string;
   slug: string;
   logo?: string | null;
-  organization_type: typeof organizationTypes[number];
+  organization_type: typeof organizationTypes[number]; // confirmată din baza de date
   subscription_plan?: typeof subscriptionPlans[number];
   trial_expires_at?: Date | null;
   subscription_started_at?: Date | null;
