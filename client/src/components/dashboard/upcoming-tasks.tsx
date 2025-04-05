@@ -74,10 +74,19 @@ export function UpcomingTasks({
     );
   }
 
+  // Ensure we're working with Date objects
+  const ensureDate = (dateInput: any): Date => {
+    if (dateInput instanceof Date) return dateInput;
+    // Try to convert string to Date
+    return new Date(dateInput);
+  };
+
   // Sort tasks by due date and priority
   const sortedTasks = [...tasks].sort((a, b) => {
-    // First by date
-    const dateCompare = a.dueDate.getTime() - b.dueDate.getTime();
+    // First by date (making sure we're working with Date objects)
+    const aDate = ensureDate(a.dueDate);
+    const bDate = ensureDate(b.dueDate);
+    const dateCompare = aDate.getTime() - bDate.getTime();
     if (dateCompare !== 0) return dateCompare;
     
     // Then by priority
@@ -102,8 +111,9 @@ export function UpcomingTasks({
   };
 
   // Function to get progress color
-  const getProgressColor = (progress: number, dueDate: Date) => {
-    const isOverdue = isAfter(new Date(), dueDate);
+  const getProgressColor = (progress: number, dueDate: any) => {
+    const dueDateObj = ensureDate(dueDate);
+    const isOverdue = isAfter(new Date(), dueDateObj);
     
     if (isOverdue) return "bg-red-500";
     if (progress >= 75) return "bg-green-500";
@@ -121,7 +131,7 @@ export function UpcomingTasks({
         <ScrollArea className="h-[350px] pr-4">
           <div className="space-y-4">
             {sortedTasks.slice(0, maxItems).map((task) => {
-              const isOverdue = isAfter(new Date(), task.dueDate);
+              const isOverdue = isAfter(new Date(), ensureDate(task.dueDate));
               
               return (
                 <div key={task.id} className="space-y-2">
@@ -151,7 +161,7 @@ export function UpcomingTasks({
                       ) : (
                         <span className="flex items-center text-muted-foreground">
                           <Clock className="h-3 w-3 mr-1" />
-                          {formatDistanceToNow(task.dueDate, { 
+                          {formatDistanceToNow(ensureDate(task.dueDate), { 
                             addSuffix: true,
                             locale: ro
                           })}

@@ -71,9 +71,16 @@ export function UpcomingEvents({
     );
   }
 
+  // Ensure we're working with Date objects
+  const ensureDate = (dateInput: any): Date => {
+    if (dateInput instanceof Date) return dateInput;
+    // Try to convert string to Date
+    return new Date(dateInput);
+  };
+
   // Sort events by start date
   const sortedEvents = [...events].sort(
-    (a, b) => a.startDate.getTime() - b.startDate.getTime()
+    (a, b) => ensureDate(a.startDate).getTime() - ensureDate(b.startDate).getTime()
   );
 
   // Get event type badge
@@ -99,12 +106,12 @@ export function UpcomingEvents({
       return "Toată ziua";
     }
     
-    const startTime = format(event.startDate, "HH:mm");
+    const startTime = format(ensureDate(event.startDate), "HH:mm");
     if (!event.endDate) {
       return startTime;
     }
     
-    const endTime = format(event.endDate, "HH:mm");
+    const endTime = format(ensureDate(event.endDate), "HH:mm");
     return `${startTime} - ${endTime}`;
   };
 
@@ -134,7 +141,7 @@ export function UpcomingEvents({
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span className="flex items-center">
                     <Calendar className="mr-1 h-3.5 w-3.5" />
-                    {format(event.startDate, "EEEE, d MMMM", { locale: ro })}
+                    {format(ensureDate(event.startDate), "EEEE, d MMMM", { locale: ro })}
                   </span>
                   
                   <span className="flex items-center">
