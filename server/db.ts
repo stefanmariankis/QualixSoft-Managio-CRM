@@ -6,11 +6,21 @@ const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY || '';
 const connectionString = process.env.DATABASE_URL || '';
 
-// Inițializăm clientul Supabase
+// Inițializăm clientul Supabase cu opțiuni pentru resetarea cache-ului de schemă
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: false
+  },
+  global: {
+    headers: {
+      'Prefer': 'count=exact',
+      'X-Schema-Cache-Control': 'no-cache',
+      'X-Client-Info': 'supabase-js-0-0-0' // Forțează resetarea cache-ului
+    }
+  },
+  db: {
+    schema: 'public'
   }
 });
 

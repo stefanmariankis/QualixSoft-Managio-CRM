@@ -4,9 +4,21 @@ import { z } from "zod";
 // Acestea corespund cu structura tabelelor din baza de date
 
 // Enums
-export const organizationTypes = ['freelancer', 'agency', 'company'] as const;
-export const userRoles = ['super_admin', 'ceo', 'manager', 'director', 'employee', 'client'] as const;
-export const subscriptionPlans = ['trial', 'basic', 'pro', 'pro_yearly'] as const;
+export const organizationTypes = ["freelancer", "agency", "company"] as const;
+export const userRoles = [
+  "super_admin",
+  "ceo",
+  "manager",
+  "director",
+  "employee",
+  "client",
+] as const;
+export const subscriptionPlans = [
+  "trial",
+  "basic",
+  "pro",
+  "pro_yearly",
+] as const;
 
 // Tipul pentru User
 export interface User {
@@ -15,7 +27,7 @@ export interface User {
   password: string;
   first_name: string | null;
   last_name: string | null;
-  role: typeof userRoles[number];
+  role: (typeof userRoles)[number];
   organization_id: number | null;
   created_at: Date | null;
   updated_at: Date | null;
@@ -27,7 +39,7 @@ export interface InsertUser {
   password: string;
   firstName?: string | null;
   lastName?: string | null;
-  role?: typeof userRoles[number];
+  role?: (typeof userRoles)[number];
   organizationId?: number | null;
 }
 
@@ -37,8 +49,7 @@ export interface Organization {
   name: string;
   slug: string;
   logo?: string | null;
-  organization_type: typeof organizationTypes[number]; // confirmată din baza de date
-  subscription_plan: typeof subscriptionPlans[number];
+  subscription_plan: (typeof subscriptionPlans)[number];
   trial_expires_at?: Date | null;
   subscription_started_at?: Date | null;
   subscription_expires_at?: Date | null;
@@ -52,8 +63,7 @@ export interface InsertOrganization {
   name: string;
   slug: string;
   logo?: string | null;
-  organization_type: typeof organizationTypes[number]; // confirmată din baza de date
-  subscription_plan?: typeof subscriptionPlans[number];
+  subscription_plan?: (typeof subscriptionPlans)[number];
   trial_expires_at?: Date | null;
   subscription_started_at?: Date | null;
   subscription_expires_at?: Date | null;
@@ -65,14 +75,18 @@ export const registrationSchema = z.object({
   firstName: z.string().min(1, { message: "Prenumele este obligatoriu" }),
   lastName: z.string().min(1, { message: "Numele este obligatoriu" }),
   email: z.string().email({ message: "Adresa de email nu este validă" }),
-  password: z.string().min(8, { message: "Parola trebuie să aibă minim 8 caractere" }),
+  password: z
+    .string()
+    .min(8, { message: "Parola trebuie să aibă minim 8 caractere" }),
   organizationType: z.enum(["freelancer", "agency", "company"], {
     errorMap: () => ({ message: "Tipul organizației este obligatoriu" }),
   }),
-  companyName: z.string().min(1, { message: "Numele organizației este obligatoriu" }),
-  termsAccepted: z.boolean().refine(val => val === true, {
-    message: "Trebuie să accepți termenii și condițiile"
-  })
+  companyName: z
+    .string()
+    .min(1, { message: "Numele organizației este obligatoriu" }),
+  termsAccepted: z.boolean().refine((val) => val === true, {
+    message: "Trebuie să accepți termenii și condițiile",
+  }),
 });
 
 export type RegistrationData = z.infer<typeof registrationSchema>;
@@ -81,14 +95,14 @@ export type RegistrationData = z.infer<typeof registrationSchema>;
 export const loginSchema = z.object({
   email: z.string().email({ message: "Adresa de email nu este validă" }),
   password: z.string().min(1, { message: "Parola este obligatorie" }),
-  rememberMe: z.boolean().optional()
+  rememberMe: z.boolean().optional(),
 });
 
 export type LoginData = z.infer<typeof loginSchema>;
 
 // Schema pentru resetare parolă
 export const forgotPasswordSchema = z.object({
-  email: z.string().email({ message: "Adresa de email nu este validă" })
+  email: z.string().email({ message: "Adresa de email nu este validă" }),
 });
 
 export type ForgotPasswordData = z.infer<typeof forgotPasswordSchema>;
