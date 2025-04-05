@@ -13,6 +13,15 @@ import { Redirect } from "wouter";
 const AuthPage = lazy(() => import("@/pages/auth"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 
+// Placeholders pentru paginile modulelor viitoare
+const ClientsPage = lazy(() => import("@/pages/dashboard"));
+const ProjectsPage = lazy(() => import("@/pages/dashboard"));
+const InvoicesPage = lazy(() => import("@/pages/dashboard"));
+const SettingsPage = lazy(() => import("@/pages/dashboard"));
+const ReportsPage = lazy(() => import("@/pages/dashboard"));
+const TemplatesPage = lazy(() => import("@/pages/dashboard"));
+const CalendarPage = lazy(() => import("@/pages/dashboard"));
+
 // Component pentru rutele protejate
 function ProtectedRoute({ path, children }: { path: string; children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -50,9 +59,40 @@ function Router() {
       <Switch>
         <Route path="/" component={AuthPage} />
         <Route path="/auth/:tab" component={AuthPage} />
+        
+        {/* Rute protejate pentru dashboard și module */}
         <ProtectedRoute path="/dashboard">
           <Dashboard />
         </ProtectedRoute>
+        
+        <ProtectedRoute path="/clients">
+          <ClientsPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/projects">
+          <ProjectsPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/invoices">
+          <InvoicesPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/templates">
+          <TemplatesPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/reports">
+          <ReportsPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/calendar">
+          <CalendarPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/settings">
+          <SettingsPage />
+        </ProtectedRoute>
+        
         <Route component={NotFound} />
       </Switch>
     </Suspense>

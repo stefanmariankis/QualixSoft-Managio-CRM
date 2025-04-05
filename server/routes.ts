@@ -256,6 +256,288 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Rutele /api/me și /api/logout sunt gestionate de /server/auth.ts
 
+  // --- Routes pentru dashboard ---
+
+  // Activity Log
+  app.get("/api/activity-log", async (req, res) => {
+    try {
+      // Sample data for now - this would be fetched from the database
+      res.json([
+        {
+          id: 1,
+          userId: 1,
+          userName: "Alexandru Popescu",
+          userInitials: "AP",
+          actionType: "adăugare",
+          actionDescription: "a adăugat un nou",
+          entityType: "client",
+          entityId: 101,
+          entityName: "Innovate SRL",
+          timestamp: new Date(Date.now() - 30 * 60 * 1000)
+        },
+        {
+          id: 2,
+          userId: 2,
+          userName: "Maria Ionescu",
+          userInitials: "MI",
+          actionType: "modificare",
+          actionDescription: "a actualizat",
+          entityType: "project",
+          entityId: 34,
+          entityName: "Redesign website",
+          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000)
+        },
+        {
+          id: 3,
+          userId: 1,
+          userName: "Alexandru Popescu",
+          userInitials: "AP",
+          actionType: "atribuire",
+          actionDescription: "a atribuit",
+          entityType: "task",
+          entityId: 78,
+          entityName: "Actualizare SEO",
+          timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000)
+        },
+        {
+          id: 4,
+          userId: 3,
+          userName: "Elena Vasilescu",
+          userInitials: "EV",
+          actionType: "adăugare",
+          actionDescription: "a adăugat o nouă",
+          entityType: "invoice",
+          entityId: 56,
+          entityName: "INV-2023-056",
+          timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000)
+        },
+        {
+          id: 5,
+          userId: 2,
+          userName: "Maria Ionescu",
+          userInitials: "MI",
+          actionType: "ștergere",
+          actionDescription: "a șters",
+          entityType: "task",
+          entityId: 92,
+          entityName: "Testare contact form",
+          timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
+        }
+      ]);
+    } catch (error) {
+      console.error("Error fetching activity log:", error);
+      res.status(500).json({ error: "Eroare la obținerea datelor jurnalului de activitate" });
+    }
+  });
+
+  // Statistics
+  app.get("/api/statistics", async (req, res) => {
+    try {
+      // Sample data - would be calculated from the database
+      res.json({
+        clientsCount: 28,
+        projectsCount: 12,
+        activeTasksCount: 43,
+        invoicesValue: 57800,
+        totalRevenue: 238500,
+        averageProjectValue: 19875,
+        clientsIncrease: 12,
+        projectsIncrease: 8,
+        revenueIncrease: 15
+      });
+    } catch (error) {
+      console.error("Error fetching statistics:", error);
+      res.status(500).json({ error: "Eroare la obținerea statisticilor" });
+    }
+  });
+
+  // Project Status
+  app.get("/api/projects/status", async (req, res) => {
+    try {
+      // Sample data - would be calculated from the database
+      res.json([
+        { name: "În progres", value: 7, color: "#3b82f6" },
+        { name: "Completate", value: 12, color: "#22c55e" },
+        { name: "În așteptare", value: 4, color: "#f97316" },
+        { name: "Anulate", value: 2, color: "#ef4444" }
+      ]);
+    } catch (error) {
+      console.error("Error fetching project status:", error);
+      res.status(500).json({ error: "Eroare la obținerea statusului proiectelor" });
+    }
+  });
+
+  // Invoices Data
+  app.get("/api/invoices/summary", async (req, res) => {
+    try {
+      // Sample data - would be calculated from the database
+      res.json([
+        { name: "Ian", paid: 15000, unpaid: 5000, overdue: 2000 },
+        { name: "Feb", paid: 18000, unpaid: 8000, overdue: 1500 },
+        { name: "Mar", paid: 22000, unpaid: 6000, overdue: 3000 },
+        { name: "Apr", paid: 19000, unpaid: 7000, overdue: 2500 },
+        { name: "Mai", paid: 23000, unpaid: 9000, overdue: 4000 },
+        { name: "Iun", paid: 25000, unpaid: 7500, overdue: 2000 }
+      ]);
+    } catch (error) {
+      console.error("Error fetching invoices data:", error);
+      res.status(500).json({ error: "Eroare la obținerea datelor despre facturi" });
+    }
+  });
+
+  // Upcoming Tasks
+  app.get("/api/tasks/upcoming", async (req, res) => {
+    try {
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const nextWeek = new Date(today);
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      
+      // Sample data - would be fetched from the database
+      res.json([
+        {
+          id: 1,
+          title: "Finalizare design homepage",
+          description: "Completare design pentru pagina principală",
+          dueDate: tomorrow,
+          projectId: 1,
+          projectName: "Redesign website Clisoft",
+          status: "În lucru",
+          priority: "high",
+          progress: 75
+        },
+        {
+          id: 2,
+          title: "Implementare API plăți",
+          description: "Integrare Stripe pentru procesare plăți",
+          dueDate: new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000),
+          projectId: 2,
+          projectName: "Platformă e-commerce MegaShop",
+          status: "În lucru",
+          priority: "urgent",
+          progress: 40
+        },
+        {
+          id: 3,
+          title: "Creare conținut blog",
+          dueDate: new Date(today.getTime() + 5 * 24 * 60 * 60 * 1000),
+          projectId: 1,
+          projectName: "Redesign website Clisoft",
+          status: "Neînceput",
+          priority: "medium",
+          progress: 0
+        },
+        {
+          id: 4,
+          title: "Optimizare SEO On-Page",
+          description: "Îmbunătățire titluri și meta descrieri",
+          dueDate: new Date(today.getTime() - 1 * 24 * 60 * 60 * 1000),
+          projectId: 3,
+          projectName: "Marketing digital FastTech",
+          status: "În întârziere",
+          priority: "high",
+          progress: 30
+        },
+        {
+          id: 5,
+          title: "Testare compatibilitate browsere",
+          dueDate: nextWeek,
+          projectId: 2,
+          projectName: "Platformă e-commerce MegaShop",
+          status: "Neînceput",
+          priority: "low",
+          progress: 0
+        }
+      ]);
+    } catch (error) {
+      console.error("Error fetching upcoming tasks:", error);
+      res.status(500).json({ error: "Eroare la obținerea task-urilor apropiate" });
+    }
+  });
+
+  // Time Tracking Data
+  app.get("/api/time-tracking/summary", async (req, res) => {
+    try {
+      const today = new Date();
+      
+      // Generate dates for last 7 days
+      const dates = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date(today);
+        date.setDate(date.getDate() - (6 - i));
+        return date.toLocaleDateString('ro-RO', { weekday: 'short' });
+      });
+      
+      // Sample data - would be calculated from the database
+      res.json([
+        { date: dates[0], hours: 6, billable: 5, nonBillable: 1 },
+        { date: dates[1], hours: 7.5, billable: 6.5, nonBillable: 1 },
+        { date: dates[2], hours: 8, billable: 7, nonBillable: 1 },
+        { date: dates[3], hours: 6.5, billable: 5.5, nonBillable: 1 },
+        { date: dates[4], hours: 9, billable: 8, nonBillable: 1 },
+        { date: dates[5], hours: 7, billable: 6, nonBillable: 1 },
+        { date: dates[6], hours: 4, billable: 3, nonBillable: 1 }
+      ]);
+    } catch (error) {
+      console.error("Error fetching time tracking data:", error);
+      res.status(500).json({ error: "Eroare la obținerea datelor de time tracking" });
+    }
+  });
+
+  // Upcoming Events
+  app.get("/api/events/upcoming", async (req, res) => {
+    try {
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      // Sample data - would be fetched from the database
+      res.json([
+        {
+          id: 1,
+          title: "Ședință kickoff proiect Innova",
+          description: "Discuții inițiale și planificare proiect",
+          startDate: new Date(today.getTime() + 4 * 24 * 60 * 60 * 1000 + 10 * 60 * 60 * 1000),
+          endDate: new Date(today.getTime() + 4 * 24 * 60 * 60 * 1000 + 11 * 60 * 60 * 1000),
+          location: "Sala de conferințe",
+          type: "meeting"
+        },
+        {
+          id: 2,
+          title: "Termen limită livrare design Optitech",
+          startDate: tomorrow,
+          type: "deadline"
+        },
+        {
+          id: 3,
+          title: "Call prezentare concept MegaShop",
+          startDate: new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000 + 14 * 60 * 60 * 1000),
+          endDate: new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000 + 15 * 60 * 60 * 1000),
+          location: "Online - Google Meet",
+          type: "meeting"
+        },
+        {
+          id: 4,
+          title: "Plată factură Softdev",
+          description: "Factură servicii hosting INV-2023-045",
+          startDate: new Date(today.getTime() + 5 * 24 * 60 * 60 * 1000),
+          type: "payment"
+        },
+        {
+          id: 5,
+          title: "Follow-up client Medico",
+          description: "Verificare satisfacție client după livrare",
+          startDate: new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000 + 11 * 60 * 60 * 1000),
+          endDate: new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000 + 11 * 60 * 60 * 1000 + 30 * 60 * 1000),
+          type: "reminder"
+        }
+      ]);
+    } catch (error) {
+      console.error("Error fetching upcoming events:", error);
+      res.status(500).json({ error: "Eroare la obținerea evenimentelor apropiate" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

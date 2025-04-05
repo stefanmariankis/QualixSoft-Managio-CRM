@@ -7,6 +7,12 @@ export interface User {
   organization_id: number | null;
   created_at: Date | null;
   updated_at: Date | null;
+  avatar_url?: string | null;
+  position?: string | null;
+  phone?: string | null;
+  skills?: any | null;
+  bio?: string | null;
+  hourly_rate?: number | null;
 }
 
 export interface Organization {
