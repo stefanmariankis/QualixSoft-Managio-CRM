@@ -1,24 +1,27 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/mysql2';
+import mysql from 'mysql2/promise';
 import * as schema from "@shared/schema";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "Trebuie setată variabila de mediu DATABASE_URL"
-  );
-}
+// Configurare conexiune MySQL
+const connectionConfig = {
+  host: '194.36.143.83',
+  port: 3306,
+  user: 'premium1_managio_user',
+  password: 'QualixSoft2024@',
+  database: 'premium1_managio',
+};
 
-// Creează o conexiune PostgreSQL
-export const queryClient = postgres(process.env.DATABASE_URL);
+// Creează pool de conexiuni MySQL
+export const poolConnection = mysql.createPool(connectionConfig);
 
-// Inițializează Drizzle cu conexiunea PostgreSQL
-export const db = drizzle(queryClient);
+// Inițializează Drizzle cu conexiunea MySQL
+export const db = drizzle(poolConnection, { schema });
 
 // O funcție utilă pentru a testa conexiunea
 export async function testConnection() {
   try {
-    await queryClient`SELECT 1`;
-    console.log('Conexiune reușită la baza de date PostgreSQL!');
+    const [rows] = await poolConnection.execute('SELECT 1');
+    console.log('Conexiune reușită la baza de date MySQL!');
     return true;
   } catch (error) {
     console.error('Eroare la conectarea la baza de date:', error);
