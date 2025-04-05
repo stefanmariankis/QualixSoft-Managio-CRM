@@ -13,14 +13,17 @@ import { Redirect } from "wouter";
 const AuthPage = lazy(() => import("@/pages/auth"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 
-// Placeholders pentru paginile modulelor viitoare
-const ClientsPage = lazy(() => import("@/pages/dashboard"));
-const ProjectsPage = lazy(() => import("@/pages/dashboard"));
-const InvoicesPage = lazy(() => import("@/pages/dashboard"));
-const SettingsPage = lazy(() => import("@/pages/dashboard"));
-const ReportsPage = lazy(() => import("@/pages/dashboard"));
-const TemplatesPage = lazy(() => import("@/pages/dashboard"));
-const CalendarPage = lazy(() => import("@/pages/dashboard"));
+// Module principale
+const ClientsPage = lazy(() => import("@/pages/clients/index"));
+const ProjectsPage = lazy(() => import("@/pages/projects/index"));
+const TasksPage = lazy(() => import("@/pages/tasks/index"));
+const InvoicesPage = lazy(() => import("@/pages/invoices/index"));
+const CalendarPage = lazy(() => import("@/pages/calendar/index"));
+
+// Module care vor fi implementate
+const TemplatesPage = lazy(() => import("@/pages/templates/index"));
+const ReportsPage = lazy(() => import("@/pages/reports/index"));
+const SettingsPage = lazy(() => import("@/pages/settings/index"));
 
 // Component pentru rutele protejate
 function ProtectedRoute({ path, children }: { path: string; children: React.ReactNode }) {
@@ -71,6 +74,10 @@ function Router() {
         
         <ProtectedRoute path="/projects">
           <ProjectsPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/tasks">
+          <TasksPage />
         </ProtectedRoute>
         
         <ProtectedRoute path="/invoices">
