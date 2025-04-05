@@ -17,6 +17,12 @@ async function createRemainingTables() {
 
     // Definim tabelele care trebuie create
     const tablesToCheck = [
+      'activity_log',
+      'automation_actions',
+      'automation_logs',
+      'automation_triggers',
+      'automations',
+      'calendar_events',
       'client_history_metrics',
       'client_insights',
       'client_notes',
@@ -38,12 +44,20 @@ async function createRemainingTables() {
       'emails',
       'employee_evaluations',
       'employee_goals',
+      'evaluations',
       'files',
+      'invoice_items',
       'invoices',
       'notifications',
+      'payments',
       'projects',
+      'task_assignees',
+      'task_checklists',
+      'task_tags',
       'tasks',
-      'time_logs'
+      'time_logs',
+      'user_preferences',
+      'user_profiles'
     ];
 
     // Verificăm care tabele lipsesc
@@ -478,6 +492,184 @@ async function createRemainingTables() {
         source time_log_source DEFAULT 'manual',
         created_at timestamp DEFAULT now(),
         updated_at timestamp DEFAULT now()
+      );
+      `,
+      'activity_log': `
+      CREATE TABLE IF NOT EXISTS activity_log (
+        id serial PRIMARY KEY NOT NULL,
+        user_id integer NOT NULL,
+        action text NOT NULL,
+        entity_type text NOT NULL,
+        entity_id integer,
+        metadata jsonb,
+        created_at timestamp DEFAULT now()
+      );
+      `,
+      'automation_actions': `
+      CREATE TABLE IF NOT EXISTS automation_actions (
+        id serial PRIMARY KEY NOT NULL,
+        automation_id integer NOT NULL,
+        action_type automation_action_type NOT NULL,
+        action_config jsonb NOT NULL,
+        order_index integer DEFAULT 0,
+        created_at timestamp DEFAULT now()
+      );
+      `,
+      'automation_logs': `
+      CREATE TABLE IF NOT EXISTS automation_logs (
+        id serial PRIMARY KEY NOT NULL,
+        automation_id integer NOT NULL,
+        trigger_id integer,
+        entity_type text NOT NULL,
+        entity_id integer NOT NULL,
+        execution_status automation_execution_status NOT NULL,
+        error_message text,
+        executed_at timestamp NOT NULL
+      );
+      `,
+      'automation_triggers': `
+      CREATE TABLE IF NOT EXISTS automation_triggers (
+        id serial PRIMARY KEY NOT NULL,
+        automation_id integer NOT NULL,
+        trigger_type automation_trigger_type NOT NULL,
+        entity_type text NOT NULL,
+        conditions jsonb NOT NULL,
+        order_index integer DEFAULT 0,
+        created_at timestamp DEFAULT now()
+      );
+      `,
+      'automations': `
+      CREATE TABLE IF NOT EXISTS automations (
+        id serial PRIMARY KEY NOT NULL,
+        organization_id integer NOT NULL,
+        name text NOT NULL,
+        description text,
+        is_active boolean DEFAULT true,
+        created_by integer,
+        updated_by integer,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );
+      `,
+      'calendar_events': `
+      CREATE TABLE IF NOT EXISTS calendar_events (
+        id serial PRIMARY KEY NOT NULL,
+        organization_id integer NOT NULL,
+        user_id integer NOT NULL,
+        title text NOT NULL,
+        description text,
+        start_time timestamp NOT NULL,
+        end_time timestamp NOT NULL,
+        location text,
+        is_all_day boolean DEFAULT false,
+        google_event_id text,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );
+      `,
+      'evaluations': `
+      CREATE TABLE IF NOT EXISTS evaluations (
+        id serial PRIMARY KEY NOT NULL,
+        evaluated_user_id integer NOT NULL,
+        evaluator_id integer NOT NULL,
+        organization_id integer NOT NULL,
+        score integer,
+        criteria jsonb,
+        comments text,
+        visibility evaluation_visibility DEFAULT 'private',
+        is_submitted boolean DEFAULT false,
+        date date NOT NULL,
+        created_at timestamp DEFAULT now()
+      );
+      `,
+      'invoice_items': `
+      CREATE TABLE IF NOT EXISTS invoice_items (
+        id serial PRIMARY KEY NOT NULL,
+        invoice_id integer NOT NULL,
+        description text NOT NULL,
+        quantity real NOT NULL,
+        unit_price real NOT NULL,
+        total_price real NOT NULL,
+        order_index integer DEFAULT 0
+      );
+      `,
+      'payments': `
+      CREATE TABLE IF NOT EXISTS payments (
+        id serial PRIMARY KEY NOT NULL,
+        invoice_id integer NOT NULL,
+        amount_paid real NOT NULL,
+        date_paid timestamp NOT NULL,
+        payment_method text NOT NULL,
+        transaction_id text,
+        notes text,
+        created_by integer,
+        created_at timestamp DEFAULT now()
+      );
+      `,
+      'task_assignees': `
+      CREATE TABLE IF NOT EXISTS task_assignees (
+        id serial PRIMARY KEY NOT NULL,
+        task_id integer NOT NULL,
+        user_id integer NOT NULL,
+        is_primary boolean DEFAULT false,
+        assigned_at timestamp DEFAULT now()
+      );
+      `,
+      'task_checklists': `
+      CREATE TABLE IF NOT EXISTS task_checklists (
+        id serial PRIMARY KEY NOT NULL,
+        task_id integer NOT NULL,
+        title text NOT NULL,
+        is_completed boolean DEFAULT false,
+        completed_at timestamp,
+        completed_by integer,
+        is_required boolean DEFAULT false,
+        visibility checklist_visibility DEFAULT 'internal_only',
+        order_index integer DEFAULT 0,
+        created_at timestamp DEFAULT now()
+      );
+      `,
+      'task_tags': `
+      CREATE TABLE IF NOT EXISTS task_tags (
+        id serial PRIMARY KEY NOT NULL,
+        task_id integer NOT NULL,
+        tag_id integer NOT NULL
+      );
+      `,
+      'user_preferences': `
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        id serial PRIMARY KEY NOT NULL,
+        user_id integer NOT NULL,
+        theme text DEFAULT 'light',
+        language text DEFAULT 'ro',
+        dashboard_layout jsonb,
+        notification_settings jsonb,
+        email_settings jsonb,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );
+      `,
+      'user_profiles': `
+      CREATE TABLE IF NOT EXISTS user_profiles (
+        id serial PRIMARY KEY NOT NULL,
+        user_id integer NOT NULL,
+        full_name text NOT NULL,
+        avatar_url text,
+        phone text,
+        position text,
+        skills jsonb,
+        bio text,
+        preferred_language text DEFAULT 'ro',
+        hourly_rate real,
+        role user_role DEFAULT 'employee' NOT NULL,
+        organization_id integer,
+        department_id integer,
+        stripe_customer_id text,
+        stripe_subscription_id text,
+        is_active boolean DEFAULT true,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now(),
+        CONSTRAINT user_profiles_user_id_unique UNIQUE(user_id)
       );
       `
     };
