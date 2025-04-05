@@ -379,6 +379,31 @@ export interface InsertTimeLog {
   approved_at?: Date | null;
 }
 
+// Enums pentru Automatizări
+export const automationActionTypes = [
+  "send_notification", 
+  "change_status", 
+  "assign_user", 
+  "send_email", 
+  "create_task", 
+  "add_tag"
+] as const;
+
+export const automationExecutionStatuses = [
+  "success", 
+  "failed", 
+  "pending"
+] as const;
+
+export const automationTriggerTypes = [
+  "task_status_change", 
+  "deadline_approaching", 
+  "invoice_overdue", 
+  "time_threshold_reached", 
+  "new_comment", 
+  "file_upload"
+] as const;
+
 // Tipuri pentru ActivityLog
 export interface ActivityLog {
   id: number;
@@ -386,8 +411,9 @@ export interface ActivityLog {
   user_id: number;
   entity_type: string;
   entity_id: number;
-  action_type: string;
-  action_details?: any;
+  action: string;  // Câmpul efectiv din baza de date
+  action_type?: string;  // Pentru compatibilitate
+  metadata?: any;
   created_at: Date;
 }
 
@@ -396,8 +422,8 @@ export interface InsertActivityLog {
   user_id: number;
   entity_type: string;
   entity_id: number;
-  action_type: string;
-  action_details?: any;
+  action: string;  // Câmpul efectiv din baza de date
+  metadata?: any;
 }
 
 // Schema validare client

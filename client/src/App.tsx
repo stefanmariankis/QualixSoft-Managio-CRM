@@ -22,15 +22,15 @@ const InvoicesPage = lazy(() => import("@/pages/invoices/index"));
 const CalendarPage = lazy(() => import("@/pages/calendar/index"));
 
 // Module care vor fi implementate în viitor
-// Comentăm temporar pentru a rezolva erorile LSP
-// const TemplatesPage = lazy(() => import("@/pages/templates/index"));
-// const ReportsPage = lazy(() => import("@/pages/reports/index"));
-// const SettingsPage = lazy(() => import("@/pages/settings/index"));
+// Module avansate
+const TemplatesPage = lazy(() => import("@/pages/templates/index"));
+const ReportsPage = lazy(() => import("@/pages/reports/index"));
+const SettingsPage = lazy(() => import("@/pages/settings/index"));
 
-// Pagini statica temporare pentru modulele nefinalizate
-const TemplatesPage = () => <div>Pagina templates va fi disponibilă în curând</div>;
-const ReportsPage = () => <div>Pagina rapoarte va fi disponibilă în curând</div>;
-const SettingsPage = () => <div>Pagina setări va fi disponibilă în curând</div>;
+// Pagini statice de rezervă în caz de erori
+// const TemplatesPage = () => <div>Pagina templates va fi disponibilă în curând</div>;
+// const ReportsPage = () => <div>Pagina rapoarte va fi disponibilă în curând</div>;
+// const SettingsPage = () => <div>Pagina setări va fi disponibilă în curând</div>;
 
 // Component pentru rutele protejate
 function ProtectedRoute({ path, children }: { path: string; children: React.ReactNode }) {

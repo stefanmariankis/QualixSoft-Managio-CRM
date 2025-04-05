@@ -16,10 +16,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { default: clientsRouter } = await import('./api/clients');
   const { default: projectsRouter } = await import('./api/projects');
   const { default: tasksRouter } = await import('./api/tasks');
+  const { default: reportsRouter } = await import('./api/reports');
   
   app.use('/api/clients', clientsRouter);
   app.use('/api/projects', projectsRouter);
   app.use('/api/tasks', tasksRouter);
+  app.use('/api/reports', reportsRouter);
   // Rută de test
   app.get("/api/test", (req, res) => {
     return res.json({ success: true, message: "API funcționează corect" });

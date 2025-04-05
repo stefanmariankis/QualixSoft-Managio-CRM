@@ -170,8 +170,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       action: 'create',
       entity_type: 'project',
       entity_id: createdProject.id,
-      metadata: { project_name: createdProject.name, client_id: client.id, client_name: client.name },
-      created_at: new Date(),
+      metadata: { project_name: createdProject.name, client_id: client.id, client_name: client.name }
     });
     
     res.status(201).json(createdProject);
@@ -216,8 +215,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response) => {
       action: 'update',
       entity_type: 'project',
       entity_id: projectId,
-      metadata: { project_name: updatedProject!.name },
-      created_at: new Date(),
+      metadata: { project_name: updatedProject!.name }
     });
     
     res.json(updatedProject);
@@ -264,8 +262,7 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
         action: 'delete',
         entity_type: 'project',
         entity_id: projectId,
-        metadata: { project_name: project.name },
-        created_at: new Date(),
+        metadata: { project_name: project.name }
       });
       
       res.status(200).json({ message: 'Proiect șters cu succes' });
