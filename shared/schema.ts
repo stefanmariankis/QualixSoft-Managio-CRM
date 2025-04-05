@@ -32,7 +32,7 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   logo: text("logo"),
-  type: organizationTypeEnum("organization_type").notNull(),
+  organizationType: organizationTypeEnum("organization_type").notNull(),
   subscriptionPlan: subscriptionPlanEnum("subscription_plan").notNull().default("trial"),
   trialExpiresAt: timestamp("trial_expires_at"),
   subscriptionStartedAt: timestamp("subscription_started_at"),
