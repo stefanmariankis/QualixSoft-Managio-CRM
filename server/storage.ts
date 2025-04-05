@@ -1,9 +1,5 @@
-import { users, type User, type InsertUser } from "@shared/schema";
-import { db } from "./db";
-import { eq } from "drizzle-orm";
-
-// modify the interface with any CRUD methods
-// you might need
+import { supabase, pgClient } from "./db";
+import { User, InsertUser } from "../shared/schema";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -14,48 +10,75 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
     try {
-      const users_result = await db.select().from(users).where(eq(users.id, id));
-      return users_result[0];
+      // Folosim Supabase direct
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', id)
+        .single();
+        
+      if (error) {
+        throw error;
+      }
+      
+      return data as User;
     } catch (error) {
-      console.error("Error fetching user by id:", error);
+      console.error("Eroare la obținerea utilizatorului după ID:", error);
       return undefined;
     }
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
-      // Înlocuim username cu email în această implementare, deoarece email este câmpul unic
-      const users_result = await db.select().from(users).where(eq(users.email, username));
-      return users_result[0];
+      // Folosim Supabase direct - username este de fapt email în implementarea noastră
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', username)
+        .single();
+        
+      if (error && error.code !== 'PGRST116') { // Codul pentru "no rows returned"
+        throw error;
+      }
+      
+      return data as User;
     } catch (error) {
-      console.error("Error fetching user by email:", error);
+      console.error("Eroare la obținerea utilizatorului după email:", error);
       return undefined;
     }
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     try {
-      // În PostgreSQL putem folosi metoda returning() pentru a primi utilizatorul creat
+      // Mapăm proprietățile pentru a se potrivi cu denumirile coloanelor din baza de date
       const userData = {
-        ...insertUser,
-        // Setăm valori implicite pentru câmpurile care lipsesc
-        firstName: insertUser.firstName || null,
-        lastName: insertUser.lastName || null,
-        role: insertUser.role || 'ceo',
-        organizationId: insertUser.organizationId || null
+        email: insertUser.email,
+        password: insertUser.password,
+        first_name: insertUser.firstName ?? null,
+        last_name: insertUser.lastName ?? null,
+        role: insertUser.role ?? 'ceo',
+        organization_id: insertUser.organizationId ?? null
       };
       
-      const newUsers = await db.insert(users).values(userData).returning();
-      const newUser = newUsers[0];
+      // Folosim Supabase direct
+      const { data, error } = await supabase
+        .from('users')
+        .insert(userData)
+        .select()
+        .single();
       
-      if (!newUser) {
+      if (error) {
+        throw error;
+      }
+      
+      if (!data) {
         throw new Error("Utilizatorul a fost creat dar nu a putut fi recuperat");
       }
       
-      return newUser;
+      return data as User;
     } catch (error: any) {
-      console.error("Error creating user:", error);
-      throw new Error(`Failed to create user: ${error.message || 'Unknown error'}`);
+      console.error("Eroare la crearea utilizatorului:", error);
+      throw new Error(`Nu s-a putut crea utilizatorul: ${error.message || 'Eroare necunoscută'}`);
     }
   }
 }
@@ -83,22 +106,24 @@ export class MemStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentId++;
     const now = new Date();
+    
+    // Creăm utilizatorul asigurându-ne că toate câmpurile au valorile corecte
     const user: User = { 
-      ...insertUser, 
       id, 
-      createdAt: now,
-      updatedAt: now,
-      // Setăm valori implicite pentru câmpurile care lipsesc
-      firstName: insertUser.firstName || null,
-      lastName: insertUser.lastName || null,
-      role: insertUser.role || 'ceo',
-      organizationId: insertUser.organizationId || null
+      email: insertUser.email,
+      password: insertUser.password,
+      first_name: insertUser.firstName ?? null,
+      last_name: insertUser.lastName ?? null,
+      role: insertUser.role ?? 'ceo',
+      organization_id: insertUser.organizationId ?? null,
+      created_at: now,
+      updated_at: now
     };
+    
     this.users.set(id, user);
     return user;
   }
 }
 
-// Schimbă între DatabaseStorage și MemStorage în funcție de necesități
-// Vom folosi DatabaseStorage pentru conectarea la MySQL
+// Folosim DatabaseStorage pentru conectarea la PostgreSQL
 export const storage = new DatabaseStorage();

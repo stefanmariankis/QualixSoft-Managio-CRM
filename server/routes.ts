@@ -1,10 +1,30 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { organizations, insertOrganizationSchema, InsertOrganization, loginSchema, registrationSchema } from "@shared/schema";
-import { eq } from "drizzle-orm";
-import { db } from "./db";
+import { supabase, pgClient } from "./db";
 import bcrypt from "bcryptjs";
+import { z } from "zod";
+
+// Definim schemele de validare direct aici (înlocuim Drizzle)
+const loginSchema = z.object({
+  email: z.string().email({ message: "Adresa de email nu este validă" }),
+  password: z.string().min(1, { message: "Parola este obligatorie" }),
+  rememberMe: z.boolean().optional()
+});
+
+const registrationSchema = z.object({
+  firstName: z.string().min(1, { message: "Prenumele este obligatoriu" }),
+  lastName: z.string().min(1, { message: "Numele este obligatoriu" }),
+  email: z.string().email({ message: "Adresa de email nu este validă" }),
+  password: z.string().min(8, { message: "Parola trebuie să aibă minim 8 caractere" }),
+  organizationType: z.enum(["freelancer", "agency", "company"], {
+    errorMap: () => ({ message: "Tipul organizației este obligatoriu" }),
+  }),
+  companyName: z.string().min(1, { message: "Numele organizației este obligatoriu" }),
+  termsAccepted: z.boolean().refine(val => val === true, {
+    message: "Trebuie să accepți termenii și condițiile"
+  })
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -43,22 +63,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .replace(/\s+/g, '-')
         + '-' + Date.now().toString().slice(-4);
       
-      // Creează organizația mai întâi - type se mapează la organization_type în baza de date
-      const organization: InsertOrganization = {
+      // Creează organizația mai întâi
+      const organization = {
         name: companyName,
         slug: slug,
-        type: organizationType, // coloana se numește type în typescript, dar organization_type în postgres
-        subscriptionPlan: 'trial', 
-        isActive: true,
-        trialExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 zile
+        organization_type: organizationType, // folosim numele corect al coloanei
+        subscription_plan: 'trial', 
+        is_active: true,
+        trial_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 zile
       };
       
-      // În PostgreSQL putem folosi returning() pentru a obține organizația după inserare
-      const newOrgs = await db.insert(organizations).values(organization).returning();
-      const newOrg = newOrgs[0];
-      
-      if (!newOrg) {
-        throw new Error("Nu s-a putut crea organizația");
+      // Folosim Supabase pentru inserare
+      const { data: newOrg, error: orgError } = await supabase
+        .from('organizations')
+        .insert(organization)
+        .select()
+        .single();
+        
+      if (orgError || !newOrg) {
+        throw new Error(`Nu s-a putut crea organizația: ${orgError?.message || 'Eroare necunoscută'}`);
       }
       
       // Hash parola
@@ -121,9 +144,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Obține informațiile organizației
-      const [organization] = user.organizationId 
-        ? await db.select().from(organizations).where(eq(organizations.id, user.organizationId))
-        : [];
+      let organization = null;
+      if (user.organization_id) {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('*')
+          .eq('id', user.organization_id)
+          .single();
+          
+        organization = orgData;
+      }
       
       // Exclude parola din răspuns
       const { password: _, ...userWithoutPassword } = user;
@@ -171,21 +201,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         + '-' + Date.now().toString().slice(-4);  // Adaugă timestamp pentru unicitate
       
       // Inserează organizația în baza de date
-      const organization: InsertOrganization = {
+      const organization = {
         name,
         slug,
-        type, // coloana se numește type în TypeScript, dar organization_type în baza de date
-        subscriptionPlan: 'trial',
-        isActive: true,
-        trialExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 zile
+        organization_type: type,
+        subscription_plan: 'trial',
+        is_active: true,
+        trial_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 zile
       };
       
-      // În PostgreSQL putem folosi returning() pentru a obține organizația după inserare
-      const newOrgs = await db.insert(organizations).values(organization).returning();
-      const newOrg = newOrgs[0];
-      
-      if (!newOrg) {
-        throw new Error("Nu s-a putut crea organizația");
+      // Folosim Supabase pentru inserare
+      const { data: newOrg, error: orgError } = await supabase
+        .from('organizations')
+        .insert(organization)
+        .select()
+        .single();
+        
+      if (orgError || !newOrg) {
+        throw new Error(`Nu s-a putut crea organizația: ${orgError?.message || 'Eroare necunoscută'}`);
       }
       
       return res.status(201).json(newOrg);
@@ -219,9 +252,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Obține informațiile organizației
-      const [organization] = user.organizationId 
-        ? await db.select().from(organizations).where(eq(organizations.id, user.organizationId))
-        : [];
+      let organization = null;
+      if (user.organization_id) {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('*')
+          .eq('id', user.organization_id)
+          .single();
+          
+        organization = orgData;
+      }
       
       // Exclude parola din răspuns
       const { password: _, ...userWithoutPassword } = user;

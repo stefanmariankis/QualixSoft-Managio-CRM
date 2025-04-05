@@ -1,12 +1,9 @@
-import { db, queryClient } from './db';
-import { pgEnum, pgTable } from 'drizzle-orm/pg-core';
-import { users, organizations, orgTypeEnum, userRoleEnum, subscriptionPlanEnum } from "@shared/schema";
-import { sql } from 'drizzle-orm';
+import { supabase, pgClient } from './db';
 
 async function createEnums() {
   try {
     console.log('Crearea enum-urilor...');
-    await queryClient`
+    await pgClient`
       DO $$ 
       BEGIN 
           IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'organization_type') THEN
@@ -33,40 +30,62 @@ async function createTables() {
   try {
     console.log('Crearea tabelelor...');
     
-    // Create organizations table
-    await queryClient`
-      CREATE TABLE IF NOT EXISTS organizations (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        slug VARCHAR(255) NOT NULL UNIQUE,
-        logo VARCHAR(255),
-        type organization_type NOT NULL,
-        subscription_plan subscription_plan NOT NULL DEFAULT 'trial',
-        trial_expires_at TIMESTAMP,
-        subscription_started_at TIMESTAMP,
-        subscription_expires_at TIMESTAMP,
-        is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
+    // Verificăm mai întâi dacă tabelele există deja
+    const { data: tables, error } = await supabase
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_schema', 'public')
+      .in('table_name', ['organizations', 'users']);
     
-    // Create users table
-    await queryClient`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        password VARCHAR(255) NOT NULL,
-        first_name VARCHAR(100),
-        last_name VARCHAR(100),
-        role user_role DEFAULT 'ceo',
-        organization_id INTEGER REFERENCES organizations(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
+    const existingTables = new Set(tables?.map(t => t.table_name) || []);
+    console.log('Tabele existente:', existingTables);
     
-    console.log('Tabelele au fost create cu succes!');
+    // Creăm tabelul organizations dacă nu există
+    if (!existingTables.has('organizations')) {
+      console.log('Crearea tabelului organizations...');
+      await pgClient`
+        CREATE TABLE IF NOT EXISTS organizations (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          slug VARCHAR(255) NOT NULL UNIQUE,
+          logo VARCHAR(255),
+          organization_type organization_type NOT NULL,
+          subscription_plan subscription_plan NOT NULL DEFAULT 'trial',
+          trial_expires_at TIMESTAMP,
+          subscription_started_at TIMESTAMP,
+          subscription_expires_at TIMESTAMP,
+          is_active BOOLEAN DEFAULT true,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `;
+      console.log('Tabelul organizations a fost creat cu succes!');
+    } else {
+      console.log('Tabelul organizations există deja.');
+    }
+    
+    // Creăm tabelul users dacă nu există
+    if (!existingTables.has('users')) {
+      console.log('Crearea tabelului users...');
+      await pgClient`
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          email VARCHAR(255) NOT NULL UNIQUE,
+          password VARCHAR(255) NOT NULL,
+          first_name VARCHAR(100),
+          last_name VARCHAR(100),
+          role user_role DEFAULT 'ceo',
+          organization_id INTEGER REFERENCES organizations(id),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `;
+      console.log('Tabelul users a fost creat cu succes!');
+    } else {
+      console.log('Tabelul users există deja.');
+    }
+    
+    console.log('Toate tabelele au fost create sau verificate cu succes!');
   } catch (error) {
     console.error('Eroare la crearea tabelelor:', error);
     throw error;
@@ -89,8 +108,11 @@ async function migrate() {
     console.error('Eroare la migrare:', error);
     process.exit(1);
   } finally {
-    await queryClient.end();
+    if (pgClient) {
+      await pgClient.end();
+    }
   }
 }
 
+// Rulăm migrarea
 migrate();

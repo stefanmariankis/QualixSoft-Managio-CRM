@@ -1,60 +1,66 @@
-import { mysqlTable, varchar, int, timestamp, boolean, mysqlEnum } from "drizzle-orm/mysql-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Enums pentru MySQL
+// Definim tipurile de bază pentru utilizarea în aplicație
+// Acestea corespund cu structura tabelelor din baza de date
+
+// Enums
 export const organizationTypes = ['freelancer', 'agency', 'company'] as const;
 export const userRoles = ['super_admin', 'ceo', 'manager', 'director', 'employee', 'client'] as const;
 export const subscriptionPlans = ['trial', 'basic', 'pro', 'pro_yearly'] as const;
 
-// Users table
-export const users = mysqlTable("users", {
-  id: int("id").primaryKey().autoincrement(),
-  email: varchar("email", { length: 255 }).notNull().unique(),
-  password: varchar("password", { length: 255 }).notNull(),
-  firstName: varchar("first_name", { length: 100 }),
-  lastName: varchar("last_name", { length: 100 }),
-  role: mysqlEnum("role", userRoles).default("ceo"),
-  organizationId: int("organization_id"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+// Tipul pentru User
+export interface User {
+  id: number;
+  email: string;
+  password: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: typeof userRoles[number];
+  organization_id: number | null;
+  created_at: Date | null;
+  updated_at: Date | null;
+}
 
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+// Tipul pentru date de inserare User
+export interface InsertUser {
+  email: string;
+  password: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  role?: typeof userRoles[number];
+  organizationId?: number | null;
+}
 
-// Organizations table
-export const organizations = mysqlTable("organizations", {
-  id: int("id").primaryKey().autoincrement(),
-  name: varchar("name", { length: 255 }).notNull(),
-  slug: varchar("slug", { length: 255 }).notNull().unique(),
-  logo: varchar("logo", { length: 255 }),
-  type: mysqlEnum("organization_type", organizationTypes).notNull(),
-  subscriptionPlan: mysqlEnum("subscription_plan", subscriptionPlans).notNull().default("trial"),
-  trialExpiresAt: timestamp("trial_expires_at"),
-  subscriptionStartedAt: timestamp("subscription_started_at"),
-  subscriptionExpiresAt: timestamp("subscription_expires_at"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+// Tipul pentru organizație
+export interface Organization {
+  id: number;
+  name: string;
+  slug: string;
+  logo?: string | null;
+  organization_type: typeof organizationTypes[number];
+  subscription_plan: typeof subscriptionPlans[number];
+  trial_expires_at?: Date | null;
+  subscription_started_at?: Date | null;
+  subscription_expires_at?: Date | null;
+  is_active: boolean;
+  created_at?: Date | null;
+  updated_at?: Date | null;
+}
 
-export const insertOrganizationSchema = createInsertSchema(organizations).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+// Tipul pentru date de inserare Organizație
+export interface InsertOrganization {
+  name: string;
+  slug: string;
+  logo?: string | null;
+  organization_type: typeof organizationTypes[number];
+  subscription_plan?: typeof subscriptionPlans[number];
+  trial_expires_at?: Date | null;
+  subscription_started_at?: Date | null;
+  subscription_expires_at?: Date | null;
+  is_active?: boolean;
+}
 
-// Define types
-export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type Organization = typeof organizations.$inferSelect;
-export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
-
-// Registration Schema
+// Schema pentru validare înregistrare
 export const registrationSchema = z.object({
   firstName: z.string().min(1, { message: "Prenumele este obligatoriu" }),
   lastName: z.string().min(1, { message: "Numele este obligatoriu" }),
@@ -71,7 +77,7 @@ export const registrationSchema = z.object({
 
 export type RegistrationData = z.infer<typeof registrationSchema>;
 
-// Login Schema
+// Schema pentru validare login
 export const loginSchema = z.object({
   email: z.string().email({ message: "Adresa de email nu este validă" }),
   password: z.string().min(1, { message: "Parola este obligatorie" }),
@@ -80,7 +86,7 @@ export const loginSchema = z.object({
 
 export type LoginData = z.infer<typeof loginSchema>;
 
-// Forgot Password Schema
+// Schema pentru resetare parolă
 export const forgotPasswordSchema = z.object({
   email: z.string().email({ message: "Adresa de email nu este validă" })
 });
