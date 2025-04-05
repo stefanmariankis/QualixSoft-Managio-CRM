@@ -5,6 +5,7 @@ import { z } from "zod";
 // Enums from Supabase database
 export const organizationTypeEnum = pgEnum('organization_type', ['freelancer', 'agency', 'company']);
 export const userRoleEnum = pgEnum('user_role', ['super_admin', 'ceo', 'manager', 'director', 'employee', 'client']);
+export const subscriptionPlanEnum = pgEnum('subscription_plan', ['trial', 'basic', 'pro', 'pro_yearly']);
 
 // Users table
 export const users = pgTable("users", {
@@ -28,8 +29,15 @@ export const insertUserSchema = createInsertSchema(users).omit({
 // Organizations table
 export const organizations = pgTable("organizations", {
   id: serial("id").primaryKey(),
-  name: text("company_name").notNull(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  logo: text("logo"),
   type: organizationTypeEnum("organization_type").notNull(),
+  subscriptionPlan: subscriptionPlanEnum("subscription_plan").notNull().default("trial"),
+  trialExpiresAt: timestamp("trial_expires_at"),
+  subscriptionStartedAt: timestamp("subscription_started_at"),
+  subscriptionExpiresAt: timestamp("subscription_expires_at"),
+  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -56,8 +64,8 @@ export const registrationSchema = z.object({
     errorMap: () => ({ message: "Tipul organizației este obligatoriu" }),
   }),
   companyName: z.string().min(1, { message: "Numele organizației este obligatoriu" }),
-  termsAccepted: z.literal(true, {
-    errorMap: () => ({ message: "Trebuie să accepți termenii și condițiile" }),
+  termsAccepted: z.boolean().refine(val => val === true, {
+    message: "Trebuie să accepți termenii și condițiile"
   })
 });
 

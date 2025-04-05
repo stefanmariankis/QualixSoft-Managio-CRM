@@ -22,12 +22,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Tipul organizației trebuie să fie 'freelancer', 'agency' sau 'company'" 
         });
       }
-
+      
+      // Generează un slug unic din nume
+      const slug = name
+        .toLowerCase()
+        .replace(/[^\w\s]/gi, '')  // Îndepărtează caracterele speciale
+        .replace(/\s+/g, '-')      // Înlocuiește spațiile cu cratime
+        + '-' + Date.now().toString().slice(-4);  // Adaugă timestamp pentru unicitate
+      
       // Inserează organizația în Supabase
       const { data, error } = await supabase
         .from("organizations")
         .insert([
-          { company_name: name, organization_type: type }
+          { 
+            name: name, 
+            slug: slug,
+            organization_type: type,
+            is_active: true,
+            subscription_plan: 'trial',
+            trial_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 zile
+          }
         ])
         .select()
         .single();
