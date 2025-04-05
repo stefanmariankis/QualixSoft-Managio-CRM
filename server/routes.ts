@@ -258,6 +258,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // --- Routes pentru entități ---
 
+  // Middleware de autorizare pentru a verifica dacă utilizatorul este autentificat și are organizație
+  const requireAuth = async (req: any, res: Response, next: NextFunction) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+      
+      // Adăugăm utilizatorul și organizația la request pentru a fi folosite mai târziu
+      req.user = user;
+      
+      next();
+    } catch (error: any) {
+      console.error("Eroare la autorizare:", error);
+      return res.status(500).json({
+        message: "Eroare internă de server",
+        error: error.message || "Eroare necunoscută",
+      });
+    }
+  };
+
   // Client Routes
   app.get("/api/clients", async (req, res) => {
     try {
