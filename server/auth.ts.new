@@ -80,7 +80,6 @@ export function setupAuth(app: Express) {
       // Obține informațiile organizației
       let organization = null;
       if (user.organization_id) {
-        
         const orgResults = await db`
           SELECT * FROM organizations
           WHERE id = ${user.organization_id}
@@ -146,7 +145,6 @@ export function setupAuth(app: Express) {
       // Obține informațiile organizației
       let organization = null;
       if (user.organization_id) {
-        
         const orgResults = await db`
           SELECT * FROM organizations
           WHERE id = ${user.organization_id}
