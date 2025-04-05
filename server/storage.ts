@@ -1,13 +1,30 @@
 import { db } from "./db";
 import { User, InsertUser } from "../shared/schema";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  sessionStore: session.Store;
 }
 
 export class DatabaseStorage implements IStorage {
+  sessionStore: session.Store;
+
+  constructor() {
+    // Inițializăm session store-ul PostgreSQL
+    const PostgresStore = connectPg(session);
+    this.sessionStore = new PostgresStore({
+      conObject: {
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+      },
+      createTableIfMissing: true
+    });
+  }
+
   async getUser(id: number): Promise<User | undefined> {
     try {
       // Folosim clientul PostgreSQL direct
@@ -82,10 +99,17 @@ export class DatabaseStorage implements IStorage {
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   currentId: number;
+  sessionStore: session.Store;
 
   constructor() {
     this.users = new Map();
     this.currentId = 1;
+    
+    // Utilizăm un MemoryStore pentru sesiuni (doar pentru dezvoltare/testare)
+    const MemoryStore = require('memorystore')(session);
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000 // Curățare o dată pe zi
+    });
   }
 
   async getUser(id: number): Promise<User | undefined> {

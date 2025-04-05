@@ -1,11 +1,15 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import "express-session";
 import { storage } from "./storage";
 import { db } from "./db";
 import bcrypt from "bcryptjs";
-import { loginSchema, registrationSchema } from "../shared/schema";
+import { registrationSchema } from "../shared/schema";
+import { setupAuth } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Configurăm autentificarea
+  setupAuth(app);
   // Rută de test
   app.get("/api/test", (req, res) => {
     return res.json({ success: true, message: "API funcționează corect" });
@@ -161,6 +165,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Utilizator creat cu succes, ID:", user.id);
 
+      // Setăm sesiunea pentru a autentifica automat utilizatorul după înregistrare
+      if (req.session) {
+        req.session.userId = user.id;
+        await new Promise<void>((resolve) => {
+          req.session.save((err) => {
+            if (err) console.error("Eroare la salvarea sesiunii:", err);
+            resolve();
+          });
+        });
+      }
+
       // Exclude parola din răspuns
       const { password: _, ...userWithoutPassword } = user;
 
@@ -177,67 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Ruta pentru autentificare
-  app.post("/api/login", async (req, res) => {
-    try {
-      // Validează datele de login
-      const validationResult = loginSchema.safeParse(req.body);
-
-      if (!validationResult.success) {
-        return res.status(400).json({
-          message: "Date invalide",
-          errors: validationResult.error.format(),
-        });
-      }
-
-      const { email, password } = validationResult.data;
-
-      // Caută utilizatorul după email
-      const user = await storage.getUserByUsername(email);
-
-      if (!user) {
-        return res.status(401).json({ message: "Email sau parolă incorecte" });
-      }
-
-      // Verifică parola
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-
-      if (!isPasswordValid) {
-        return res.status(401).json({ message: "Email sau parolă incorecte" });
-      }
-
-      // Obține informațiile organizației folosind PostgreSQL direct
-      let organization = null;
-      if (user.organization_id) {
-        const orgResults = await db`
-          SELECT * FROM organizations
-          WHERE id = ${user.organization_id}
-          LIMIT 1
-        `;
-
-        if (orgResults.length > 0) {
-          organization = orgResults[0];
-        }
-      }
-
-      // Exclude parola din răspuns
-      const { password: _, ...userWithoutPassword } = user;
-
-      // Aici ar trebui să setați sesiunea sau să generați un token JWT
-      // Pentru simplitate, trimitem doar datele utilizatorului și organizației
-
-      return res.status(200).json({
-        user: userWithoutPassword,
-        organization,
-      });
-    } catch (error: any) {
-      console.error("Eroare la autentificare:", error);
-      return res.status(500).json({
-        message: "Eroare internă de server",
-        error: error.message || "Eroare necunoscută",
-      });
-    }
-  });
+  // Ruta pentru autentificare este gestionată de /server/auth.ts
 
   // Ruta pentru crearea organizației
   app.post("/api/organizations", async (req, res) => {
@@ -299,71 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Ruta pentru a obține datele utilizatorului
-  app.get("/api/me", async (req, res) => {
-    try {
-      // Aici ar trebui să verifici sesiunea sau token-ul JWT
-      // Pentru simplitate, am comenta acest cod
-
-      // În implementarea reală, veți avea acces la ID-ul utilizatorului din sesiune
-      // const userId = req.session.userId;
-      const userId = req.headers["user-id"]; // temporar pentru testare
-
-      if (!userId) {
-        return res.status(401).json({ message: "Neautorizat" });
-      }
-
-      const user = await storage.getUser(Number(userId));
-
-      if (!user) {
-        return res.status(404).json({ message: "Utilizator negăsit" });
-      }
-
-      // Obține informațiile organizației folosind PostgreSQL direct
-      let organization = null;
-      if (user.organization_id) {
-        const orgResults = await db`
-          SELECT * FROM organizations
-          WHERE id = ${user.organization_id}
-          LIMIT 1
-        `;
-
-        if (orgResults.length > 0) {
-          organization = orgResults[0];
-        }
-      }
-
-      // Exclude parola din răspuns
-      const { password: _, ...userWithoutPassword } = user;
-
-      return res.json({
-        user: userWithoutPassword,
-        organization,
-      });
-    } catch (error: any) {
-      console.error("Eroare la obținerea datelor utilizatorului:", error);
-      return res.status(500).json({
-        message: "Eroare internă de server",
-        error: error.message || "Eroare necunoscută",
-      });
-    }
-  });
-  
-  // Ruta pentru delogare
-  app.post("/api/logout", (req, res) => {
-    try {
-      // Aici ar trebui să distrugi sesiunea sau să invalidezi token-ul JWT
-      // Pentru simplitate, doar returnăm succes
-      
-      return res.status(200).json({ message: "Deconectat cu succes" });
-    } catch (error: any) {
-      console.error("Eroare la deconectare:", error);
-      return res.status(500).json({
-        message: "Eroare internă de server",
-        error: error.message || "Eroare necunoscută",
-      });
-    }
-  });
+  // Rutele /api/me și /api/logout sunt gestionate de /server/auth.ts
 
   const httpServer = createServer(app);
   return httpServer;

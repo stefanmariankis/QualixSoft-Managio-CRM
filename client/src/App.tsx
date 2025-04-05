@@ -6,22 +6,42 @@ import NotFound from "@/pages/not-found";
 import { lazy, Suspense, useEffect } from "react";
 import { useAuth } from "./context/auth-context";
 import { AuthProvider } from "./context/auth-context";
+import { Loader2 } from "lucide-react";
+import { Redirect } from "wouter";
 
 // Lazy load pages
 const AuthPage = lazy(() => import("@/pages/auth"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 
+// Component pentru rutele protejate
+function ProtectedRoute({ path, children }: { path: string; children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <Route path={path}>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Route>
+    );
+  }
+
+  return (
+    <Route path={path}>
+      {user ? children : <Redirect to="/auth/login" />}
+    </Route>
+  );
+}
+
 function Router() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
 
-  // Redirect to dashboard if logged in, to login if not
+  // Redirecționăm utilizatorii autentificați către dashboard când accesează /
   useEffect(() => {
-    const pathname = window.location.pathname;
-    if (user && pathname === "/") {
+    if (user && window.location.pathname === "/") {
       setLocation("/dashboard");
-    } else if (!user && pathname !== "/" && !pathname.startsWith("/auth")) {
-      setLocation("/");
     }
   }, [user, setLocation]);
 
@@ -30,7 +50,9 @@ function Router() {
       <Switch>
         <Route path="/" component={AuthPage} />
         <Route path="/auth/:tab" component={AuthPage} />
-        <Route path="/dashboard" component={Dashboard} />
+        <ProtectedRoute path="/dashboard">
+          <Dashboard />
+        </ProtectedRoute>
         <Route component={NotFound} />
       </Switch>
     </Suspense>
