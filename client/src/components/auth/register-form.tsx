@@ -53,6 +53,8 @@ export default function RegisterForm() {
     try {
       setIsLoading(true);
       
+      console.log("Începere proces înregistrare");
+      
       // First create the organization
       const orgResponse = await apiRequest("POST", "/api/organizations", {
         name: data.companyName,
@@ -60,21 +62,35 @@ export default function RegisterForm() {
       });
 
       if (!orgResponse.ok) {
+        console.error("Eroare la crearea organizației:", await orgResponse.text());
         throw new Error("Eroare la crearea organizației");
       }
 
       const organization = await orgResponse.json();
+      console.log("Organizație creată cu succes:", organization);
       
       // Then register the user with Supabase
-      await signUp(data.email, data.password, {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        organizationId: organization.id,
-        role: "ceo", // Default role for new registrations
-      });
+      try {
+        await signUp(data.email, data.password, {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          organizationId: organization.id,
+          role: "ceo", // Default role for new registrations
+        });
+        console.log("Utilizator înregistrat cu succes");
+      } catch (signUpError) {
+        console.error("Eroare la înregistrarea utilizatorului:", signUpError);
+        
+        // Dacă înregistrarea utilizatorului eșuează, ar trebui să ștergem organizația creată
+        // pentru a evita organizațiile orfane
+        // TODO: Implementează ștergerea organizației
+        
+        throw signUpError;
+      }
       
       // Înregistrare reușită - mesaj de succes afișat în AuthContext
     } catch (error) {
+      console.error("Eroare completă proces înregistrare:", error);
       toast({
         title: "Înregistrare eșuată",
         description: error instanceof Error ? error.message : "Nu s-a putut crea contul. Încearcă din nou.",

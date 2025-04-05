@@ -7,6 +7,11 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Lipsesc credențialele Supabase. Asigură-te că ai configurat corect variabilele de mediu VITE_SUPABASE_URL și VITE_SUPABASE_ANON_KEY');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+  },
+});
 
 export default supabase;

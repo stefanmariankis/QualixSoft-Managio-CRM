@@ -102,13 +102,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
+      console.log('Încercare înregistrare cu:', { email, userData });
+      
+      // Transformăm userData într-un format compatibil Supabase
+      const metadata = {
+        first_name: userData.firstName,
+        last_name: userData.lastName,
+        organization_id: userData.organizationId,
+        role: userData.role,
+      };
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: userData,
+          data: metadata,
         },
       });
+
+      console.log('Răspuns Supabase:', { data, error });
 
       if (error) throw error;
 
@@ -128,6 +140,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setState(prev => ({ ...prev, loading: false }));
       }
     } catch (error) {
+      console.error('Eroare înregistrare:', error);
       setState(prev => ({ 
         ...prev, 
         error: error instanceof Error ? error.message : 'Înregistrare eșuată', 

@@ -8,5 +8,12 @@ export function createSupabaseClient() {
     throw new Error('Lipsesc credențialele Supabase. Asigură-te că ai configurat corect variabilele de mediu SUPABASE_URL și SUPABASE_SERVICE_KEY');
   }
 
-  return createClient(supabaseUrl, supabaseServiceKey);
+  console.log('Inițializare Supabase cu URL:', supabaseUrl);
+  
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: false,
+    },
+  });
 }
