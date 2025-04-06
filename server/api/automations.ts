@@ -55,13 +55,28 @@ export async function getAutomationById(req: Request, res: Response) {
       return res.status(401).json({ message: "Utilizator neautentificat sau fără organizație" });
     }
 
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
+    console.log("API - GET /api/automations/:id - parametru brut:", req.params.id, "tip:", typeof req.params.id);
+    
+    // Convertim explicit parametrul la număr
+    let id: number;
+    try {
+      id = Number(req.params.id);
+      
+      // Verificăm dacă este un număr valid
+      if (isNaN(id) || id <= 0 || !Number.isInteger(id)) {
+        console.error(`API - ID automatizare invalid: ${req.params.id} => ${id}`);
+        return res.status(400).json({ message: "ID automatizare invalid" });
+      }
+      
+      console.log("API - ID automatizare convertit cu succes:", id, "tip:", typeof id);
+    } catch (err) {
+      console.error(`API - Eroare la conversie ID automatizare: ${req.params.id}`, err);
       return res.status(400).json({ message: "ID automatizare invalid" });
     }
     
     // Obținem automatizarea cu ID-ul dat
     const automation = await storage.getAutomation(id);
+    console.log("API - Rezultat căutare automatizare:", automation ? `găsită (id=${automation.id})` : "negăsită");
     
     if (!automation) {
       return res.status(404).json({ message: "Automatizare negăsită" });

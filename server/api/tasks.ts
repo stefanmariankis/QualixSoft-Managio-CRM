@@ -10,35 +10,103 @@ const router = Router();
 // Obține lista de task-uri
 router.get('/', requireAuth, async (req: Request, res: Response) => {
   try {
+    console.log("API - GET /api/tasks - parametri:", req.query);
+    
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ message: 'Neautorizat' });
     }
 
+    // Helper pentru conversia și validarea parametrilor numerici
+    const getValidNumberParam = (param: string | undefined, paramName: string): number | null => {
+      if (!param) return null;
+      
+      console.log(`API - Conversie parametru ${paramName}: ${param}, tip: ${typeof param}`);
+      
+      try {
+        const numValue = Number(param);
+        if (isNaN(numValue) || numValue <= 0 || !Number.isInteger(numValue)) {
+          console.error(`API - Parametru ${paramName} invalid: ${param} => ${numValue}`);
+          return null;
+        }
+        
+        console.log(`API - Parametru ${paramName} valid: ${numValue}`);
+        return numValue;
+      } catch (err) {
+        console.error(`API - Eroare la conversie parametru ${paramName}: ${param}`, err);
+        return null;
+      }
+    };
+    
     // Filtrare după proiect dacă este specificat
     if (req.query.projectId) {
-      const projectId = parseInt(req.query.projectId as string);
-      if (isNaN(projectId)) {
+      const projectId = getValidNumberParam(req.query.projectId as string, 'projectId');
+      if (projectId === null) {
         return res.status(400).json({ message: 'ID proiect invalid' });
       }
       
+      console.log(`API - Obținere task-uri pentru proiect ID=${projectId}`);
       const projectTasks = await storage.getTasksByProject(projectId);
       return res.json(projectTasks);
     }
     
     // Filtrare după utilizator asignat dacă este specificat
     if (req.query.assigneeId) {
-      const assigneeId = parseInt(req.query.assigneeId as string);
-      if (isNaN(assigneeId)) {
+      const assigneeId = getValidNumberParam(req.query.assigneeId as string, 'assigneeId');
+      if (assigneeId === null) {
         return res.status(400).json({ message: 'ID utilizator invalid' });
       }
       
+      console.log(`API - Obținere task-uri pentru utilizator ID=${assigneeId}`);
       const assigneeTasks = await storage.getTasksByUser(assigneeId);
       return res.json(assigneeTasks);
     }
-
-    const userTasks = await storage.getTasksByOrganization(req.user!.organization_id);
-    res.json(userTasks);
+    
+    // Filtrare după status dacă este specificat
+    const statuses = req.query.status ? 
+      Array.isArray(req.query.status) ? 
+        req.query.status as string[] : 
+        [req.query.status as string] 
+      : null;
+      
+    if (statuses) {
+      console.log(`API - Filtrare task-uri după status:`, statuses);
+    }
+    
+    // Obține toate task-urile din organizație
+    const organizationId = req.user!.organization_id;
+    console.log(`API - Obținere toate task-urile pentru organizație ID=${organizationId}`);
+    let allTasks = await storage.getTasksByOrganization(organizationId);
+    
+    // Aplicare filtru după status dacă există
+    if (statuses && statuses.length > 0) {
+      allTasks = allTasks.filter(task => statuses.includes(task.status));
+    }
+    
+    // Sortare dacă este specificată
+    const sortBy = req.query.sortBy as string || 'due_date';
+    const sortDir = req.query.sortDir as string || 'asc';
+    
+    console.log(`API - Sortare task-uri după ${sortBy} în direcția ${sortDir}`);
+    
+    allTasks.sort((a: any, b: any) => {
+      let valA = a[sortBy];
+      let valB = b[sortBy];
+      
+      // Tratament special pentru date
+      if (sortBy === 'due_date' || sortBy === 'created_at' || sortBy === 'updated_at') {
+        valA = valA ? new Date(valA).getTime() : 0;
+        valB = valB ? new Date(valB).getTime() : 0;
+      }
+      
+      if (sortDir === 'desc') {
+        return valA > valB ? -1 : valA < valB ? 1 : 0;
+      } else {
+        return valA < valB ? -1 : valA > valB ? 1 : 0;
+      }
+    });
+    
+    res.json(allTasks);
   } catch (error) {
     console.error('Eroare la obținerea task-urilor:', error);
     res.status(500).json({ message: 'Eroare la obținerea task-urilor' });
@@ -90,12 +158,28 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Neautorizat' });
     }
     
-    const taskId = parseInt(req.params.id);
-    if (isNaN(taskId)) {
+    console.log("API - GET /api/tasks/:id - parametru brut:", req.params.id, "tip:", typeof req.params.id);
+    
+    // Convertim explicit parametrul la număr
+    let taskId: number;
+    try {
+      taskId = Number(req.params.id);
+      
+      // Verificăm dacă este un număr valid
+      if (isNaN(taskId) || taskId <= 0 || !Number.isInteger(taskId)) {
+        console.error(`API - ID task invalid: ${req.params.id} => ${taskId}`);
+        return res.status(400).json({ message: 'ID task invalid' });
+      }
+      
+      console.log("API - ID task convertit cu succes:", taskId, "tip:", typeof taskId);
+    } catch (err) {
+      console.error(`API - Eroare la conversie ID task: ${req.params.id}`, err);
       return res.status(400).json({ message: 'ID task invalid' });
     }
     
     const task = await storage.getTask(taskId);
+    console.log("API - Rezultat căutare task:", task ? `găsit (id=${task.id})` : "negăsit");
+    
     if (!task || task.organization_id !== req.user!.organization_id) {
       return res.status(404).json({ message: 'Task negăsit' });
     }
@@ -195,12 +279,28 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Neautorizat' });
     }
     
-    const taskId = parseInt(req.params.id);
-    if (isNaN(taskId)) {
+    console.log("API - PATCH /api/tasks/:id - parametru brut:", req.params.id, "tip:", typeof req.params.id);
+    
+    // Convertim explicit parametrul la număr
+    let taskId: number;
+    try {
+      taskId = Number(req.params.id);
+      
+      // Verificăm dacă este un număr valid
+      if (isNaN(taskId) || taskId <= 0 || !Number.isInteger(taskId)) {
+        console.error(`API - ID task invalid: ${req.params.id} => ${taskId}`);
+        return res.status(400).json({ message: 'ID task invalid' });
+      }
+      
+      console.log("API - ID task convertit cu succes:", taskId, "tip:", typeof taskId);
+    } catch (err) {
+      console.error(`API - Eroare la conversie ID task: ${req.params.id}`, err);
       return res.status(400).json({ message: 'ID task invalid' });
     }
     
     const task = await storage.getTask(taskId);
+    console.log("API - Rezultat căutare task pentru actualizare:", task ? `găsit (id=${task.id})` : "negăsit");
+    
     if (!task || task.organization_id !== req.user!.organization_id) {
       return res.status(404).json({ message: 'Task negăsit' });
     }
@@ -244,12 +344,28 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Neautorizat' });
     }
     
-    const taskId = parseInt(req.params.id);
-    if (isNaN(taskId)) {
+    console.log("API - DELETE /api/tasks/:id - parametru brut:", req.params.id, "tip:", typeof req.params.id);
+    
+    // Convertim explicit parametrul la număr
+    let taskId: number;
+    try {
+      taskId = Number(req.params.id);
+      
+      // Verificăm dacă este un număr valid
+      if (isNaN(taskId) || taskId <= 0 || !Number.isInteger(taskId)) {
+        console.error(`API - ID task invalid: ${req.params.id} => ${taskId}`);
+        return res.status(400).json({ message: 'ID task invalid' });
+      }
+      
+      console.log("API - ID task convertit cu succes:", taskId, "tip:", typeof taskId);
+    } catch (err) {
+      console.error(`API - Eroare la conversie ID task: ${req.params.id}`, err);
       return res.status(400).json({ message: 'ID task invalid' });
     }
     
     const task = await storage.getTask(taskId);
+    console.log("API - Rezultat căutare task pentru ștergere:", task ? `găsit (id=${task.id})` : "negăsit");
+    
     if (!task || task.organization_id !== req.user!.organization_id) {
       return res.status(404).json({ message: 'Task negăsit' });
     }
@@ -286,12 +402,28 @@ router.post('/:id/comments', requireAuth, async (req: Request, res: Response) =>
       return res.status(401).json({ message: 'Neautorizat' });
     }
     
-    const taskId = parseInt(req.params.id);
-    if (isNaN(taskId)) {
+    console.log("API - POST /api/tasks/:id/comments - parametru brut:", req.params.id, "tip:", typeof req.params.id);
+    
+    // Convertim explicit parametrul la număr
+    let taskId: number;
+    try {
+      taskId = Number(req.params.id);
+      
+      // Verificăm dacă este un număr valid
+      if (isNaN(taskId) || taskId <= 0 || !Number.isInteger(taskId)) {
+        console.error(`API - ID task invalid: ${req.params.id} => ${taskId}`);
+        return res.status(400).json({ message: 'ID task invalid' });
+      }
+      
+      console.log("API - ID task convertit cu succes:", taskId, "tip:", typeof taskId);
+    } catch (err) {
+      console.error(`API - Eroare la conversie ID task: ${req.params.id}`, err);
       return res.status(400).json({ message: 'ID task invalid' });
     }
     
     const task = await storage.getTask(taskId);
+    console.log("API - Rezultat căutare task pentru comentariu:", task ? `găsit (id=${task.id})` : "negăsit");
+    
     if (!task || task.organization_id !== req.user!.organization_id) {
       return res.status(404).json({ message: 'Task negăsit' });
     }

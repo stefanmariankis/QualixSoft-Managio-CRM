@@ -101,12 +101,28 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Neautorizat' });
     }
     
-    const projectId = parseInt(req.params.id);
-    if (isNaN(projectId)) {
+    console.log("API - GET /api/projects/:id - parametru brut:", req.params.id, "tip:", typeof req.params.id);
+    
+    // Convertim explicit parametrul la număr
+    let projectId: number;
+    try {
+      projectId = Number(req.params.id);
+      
+      // Verificăm dacă este un număr valid
+      if (isNaN(projectId) || projectId <= 0 || !Number.isInteger(projectId)) {
+        console.error(`API - ID proiect invalid: ${req.params.id} => ${projectId}`);
+        return res.status(400).json({ message: 'ID proiect invalid' });
+      }
+      
+      console.log("API - ID proiect convertit cu succes:", projectId, "tip:", typeof projectId);
+    } catch (err) {
+      console.error(`API - Eroare la conversie ID proiect: ${req.params.id}`, err);
       return res.status(400).json({ message: 'ID proiect invalid' });
     }
     
     const project = await storage.getProject(projectId);
+    console.log("API - Rezultat căutare proiect:", project ? `găsit (id=${project.id})` : "negăsit");
+    
     if (!project || project.organization_id !== req.user!.organization_id) {
       return res.status(404).json({ message: 'Proiect negăsit' });
     }

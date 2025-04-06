@@ -331,11 +331,16 @@ export class DatabaseStorage implements IStorage {
   // Client operations
   async getClient(id: number): Promise<Client | undefined> {
     try {
+      console.log("DatabaseStorage.getClient - id primit:", id, "tip:", typeof id);
+      
       const result = await db`
         SELECT * FROM clients
         WHERE id = ${id}
         LIMIT 1
       `;
+      
+      console.log("DatabaseStorage.getClient - rezultat SQL:", result.length > 0 ? "găsit" : "negăsit", 
+                  result.length > 0 ? `client id=${result[0].id}, nume=${result[0].company_name}` : "");
       
       if (result.length === 0) {
         return undefined;
@@ -435,11 +440,16 @@ export class DatabaseStorage implements IStorage {
   // Project operations
   async getProject(id: number): Promise<Project | undefined> {
     try {
+      console.log("DatabaseStorage.getProject - id primit:", id, "tip:", typeof id);
+      
       const result = await db`
         SELECT * FROM projects
         WHERE id = ${id}
         LIMIT 1
       `;
+      
+      console.log("DatabaseStorage.getProject - rezultat SQL:", result.length > 0 ? "găsit" : "negăsit", 
+                  result.length > 0 ? `project id=${result[0].id}, nume=${result[0].name}` : "");
       
       if (result.length === 0) {
         return undefined;
@@ -556,11 +566,16 @@ export class DatabaseStorage implements IStorage {
   // Task operations
   async getTask(id: number): Promise<Task | undefined> {
     try {
+      console.log("DatabaseStorage.getTask - id primit:", id, "tip:", typeof id);
+      
       const result = await db`
         SELECT * FROM tasks
         WHERE id = ${id}
         LIMIT 1
       `;
+      
+      console.log("DatabaseStorage.getTask - rezultat SQL:", result.length > 0 ? "găsit" : "negăsit", 
+                  result.length > 0 ? `task id=${result[0].id}, titlu=${result[0].title}` : "");
       
       if (result.length === 0) {
         return undefined;

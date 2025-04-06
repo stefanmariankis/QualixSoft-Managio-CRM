@@ -31,12 +31,28 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Neautorizat' });
     }
     
-    const clientId = parseInt(req.params.id);
-    if (isNaN(clientId)) {
+    console.log("API - GET /api/clients/:id - parametru brut:", req.params.id, "tip:", typeof req.params.id);
+    
+    // Convertim explicit parametrul la număr
+    let clientId: number;
+    try {
+      clientId = Number(req.params.id);
+      
+      // Verificăm dacă este un număr valid
+      if (isNaN(clientId) || clientId <= 0 || !Number.isInteger(clientId)) {
+        console.error(`API - ID client invalid: ${req.params.id} => ${clientId}`);
+        return res.status(400).json({ message: 'ID client invalid' });
+      }
+      
+      console.log("API - ID client convertit cu succes:", clientId, "tip:", typeof clientId);
+    } catch (err) {
+      console.error(`API - Eroare la conversie ID client: ${req.params.id}`, err);
       return res.status(400).json({ message: 'ID client invalid' });
     }
     
     const client = await storage.getClient(clientId);
+    console.log("API - Rezultat căutare client:", client ? `găsit (id=${client.id})` : "negăsit");
+    
     if (!client || client.organization_id !== req.user!.organization_id) {
       return res.status(404).json({ message: 'Client negăsit' });
     }
