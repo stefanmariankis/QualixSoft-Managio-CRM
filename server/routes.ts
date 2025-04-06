@@ -955,26 +955,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const today = new Date();
 
+      // Funcție helper pentru a valida și converti datele în formate de timp valide
+      const safeDate = (dateStr: string | null | undefined): Date | null => {
+        if (!dateStr) return null;
+        try {
+          const date = new Date(dateStr);
+          return isNaN(date.getTime()) ? null : date;
+        } catch (e) {
+          console.error(`Eroare la conversia datei ${dateStr}:`, e);
+          return null;
+        }
+      };
+
       // Filtrăm pentru a include doar task-urile necompletate cu deadline în viitor sau recent expirate
       // Și le sortăm după data limită
       const upcomingTasks = tasks
         .filter(
-          (task) =>
+          (task) => {
             // Excludem task-urile care au fost completate sau anulate
-            task.status !== "completed" &&
-            task.status !== "cancelled" &&
-            // Includem task-urile care au o dată limită
-            task.due_date &&
-            // Includem doar task-urile cu deadline în următoarele 7 zile sau expirate recent (ultima săptămână)
-            new Date(task.due_date).getTime() >
-              today.getTime() - 7 * 24 * 60 * 60 * 1000 &&
-            new Date(task.due_date).getTime() <
-              today.getTime() + 14 * 24 * 60 * 60 * 1000,
+            if (task.status === "completed" || task.status === "cancelled") return false;
+            
+            // Verificăm dacă task-ul are o dată limită validă
+            const dueDate = safeDate(task.due_date);
+            if (!dueDate) return false;
+            
+            // Includem doar task-urile cu deadline în următoarele 14 zile sau expirate recent (ultima săptămână)
+            const pastThreshold = today.getTime() - 7 * 24 * 60 * 60 * 1000;
+            const futureThreshold = today.getTime() + 14 * 24 * 60 * 60 * 1000;
+            return dueDate.getTime() > pastThreshold && dueDate.getTime() < futureThreshold;
+          }
         )
-        .sort(
-          (a, b) =>
-            new Date(a.due_date).getTime() - new Date(b.due_date).getTime(),
-        )
+        .sort((a, b) => {
+          const dateA = safeDate(a.due_date);
+          const dateB = safeDate(b.due_date);
+          
+          // Dacă una dintre date este invalidă, o punem la sfârșit
+          if (!dateA) return 1;
+          if (!dateB) return -1;
+          
+          return dateA.getTime() - dateB.getTime();
+        })
         // Luăm doar primele 5 task-uri
         .slice(0, 5);
 
@@ -1168,17 +1188,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return map;
       }, {});
 
+      // Funcție helper pentru a valida și converti datele în formate de timp valide
+      const safeDate = (dateStr: string | null | undefined): Date | null => {
+        if (!dateStr) return null;
+        try {
+          const date = new Date(dateStr);
+          return isNaN(date.getTime()) ? null : date;
+        } catch (e) {
+          console.error(`Eroare la conversia datei ${dateStr}:`, e);
+          return null;
+        }
+      };
+
       // Filtrăm task-urile și le convertim în evenimente de tip deadline
       const taskDeadlines = tasks
-        .filter(
-          (task) =>
-            task.status !== "completed" &&
-            task.status !== "cancelled" &&
-            task.due_date &&
-            new Date(task.due_date) > today &&
-            new Date(task.due_date) <
-              new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000),
-        )
+        .filter(task => {
+          // Excludem task-urile care au fost completate sau anulate
+          if (task.status === "completed" || task.status === "cancelled") return false;
+          
+          // Verificăm dacă task-ul are o dată limită validă
+          const dueDate = safeDate(task.due_date);
+          if (!dueDate) return false;
+          
+          // Includem doar task-urile cu deadline în următoarele 14 zile
+          const futureThreshold = today.getTime() + 14 * 24 * 60 * 60 * 1000;
+          return dueDate > today && dueDate.getTime() < futureThreshold;
+        })
         .map((task) => {
           const project = projectsMap[task.project_id];
           const projectName = project
@@ -1205,15 +1240,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Filtrăm facturile și le convertim în evenimente de tip plată
       const invoicePayments = invoices
-        .filter(
-          (invoice) =>
-            invoice.status !== "paid" &&
-            invoice.status !== "cancelled" &&
-            invoice.due_date &&
-            new Date(invoice.due_date) > today &&
-            new Date(invoice.due_date) <
-              new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000),
-        )
+        .filter(invoice => {
+          // Excludem facturile care au fost plătite sau anulate
+          if (invoice.status === "paid" || invoice.status === "cancelled") return false;
+          
+          // Verificăm dacă factura are o dată scadentă validă
+          const dueDate = safeDate(invoice.due_date);
+          if (!dueDate) return false;
+          
+          // Includem doar facturile cu scadență în următoarele 14 zile
+          const futureThreshold = today.getTime() + 14 * 24 * 60 * 60 * 1000;
+          return dueDate > today && dueDate.getTime() < futureThreshold;
+        })
         .map((invoice) => {
           return {
             id: `invoice-${invoice.id}`,
@@ -1262,10 +1300,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Sortăm toate evenimentele după dată
-      events.sort(
-        (a, b) =>
-          new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
-      );
+      events.sort((a, b) => {
+        try {
+          // Validăm și comparăm datele
+          const dateA = new Date(a.startDate);
+          const dateB = new Date(b.startDate);
+          
+          // Verificăm dacă datele sunt valide
+          if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
+          if (isNaN(dateA.getTime())) return 1; // a e invalid, b ar trebui să fie primul
+          if (isNaN(dateB.getTime())) return -1; // b e invalid, a ar trebui să fie primul
+          
+          return dateA.getTime() - dateB.getTime();
+        } catch (error) {
+          console.error("Eroare la sortarea evenimentelor:", error);
+          return 0; // În caz de eroare, nu schimbăm ordinea
+        }
+      });
 
       // Returnăm primele 5 evenimente
       res.json(events.slice(0, 5));

@@ -74,8 +74,24 @@ export function UpcomingEvents({
   // Ensure we're working with Date objects
   const ensureDate = (dateInput: any): Date => {
     if (dateInput instanceof Date) return dateInput;
-    // Try to convert string to Date
-    return new Date(dateInput);
+    
+    try {
+      // Try to convert string to Date
+      const date = new Date(dateInput);
+      
+      // Verificăm dacă data este validă
+      if (isNaN(date.getTime())) {
+        console.error(`Dată invalidă: ${dateInput}`, typeof dateInput);
+        // Returnăm data curentă ca fallback pentru a evita eroarea
+        return new Date();
+      }
+      
+      return date;
+    } catch (error) {
+      console.error(`Eroare la conversia datei ${dateInput}:`, error);
+      // Returnăm data curentă ca fallback pentru a evita eroarea
+      return new Date();
+    }
   };
 
   // Sort events by start date

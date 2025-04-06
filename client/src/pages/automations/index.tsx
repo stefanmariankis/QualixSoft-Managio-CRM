@@ -255,7 +255,19 @@ export default function AutomationsPage() {
   // Funcții helper pentru formatare
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Niciodată';
-    return format(new Date(dateString), 'dd MMM yyyy, HH:mm', { locale: ro });
+    
+    try {
+      const date = new Date(dateString);
+      // Verificăm dacă data este validă
+      if (isNaN(date.getTime())) {
+        console.error(`Dată invalidă: ${dateString}`);
+        return 'Dată invalidă';
+      }
+      return format(date, 'dd MMM yyyy, HH:mm', { locale: ro });
+    } catch (error) {
+      console.error(`Eroare la formatarea datei ${dateString}:`, error);
+      return 'Dată invalidă';
+    }
   };
   
   // Dacă se încarcă datele, afișăm un loader
