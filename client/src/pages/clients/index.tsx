@@ -115,7 +115,15 @@ export default function ClientsPage() {
     return `Utilizator ${assigneeId}`;
   };
 
-  const daysAgo = (date: Date) => {
+  const daysAgo = (dateValue: string | Date) => {
+    if (!dateValue) return "Necunoscut";
+    
+    // Convertim string la Date dacă e necesar
+    const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
+    
+    // Verificăm dacă data este validă
+    if (isNaN(date.getTime())) return "Dată invalidă";
+    
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - date.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
