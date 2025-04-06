@@ -215,7 +215,7 @@ export default function TasksPage() {
                             </SelectItem>
                           ))
                         ) : (
-                          <SelectItem value="" disabled>Nu există proiecte disponibile</SelectItem>
+                          <SelectItem value="no-projects">Nu există proiecte disponibile</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
@@ -237,7 +237,7 @@ export default function TasksPage() {
                             </SelectItem>
                           ))
                         ) : (
-                          <SelectItem value="" disabled>Nu există utilizatori disponibili</SelectItem>
+                          <SelectItem value="no-users">Nu există utilizatori disponibili</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
@@ -257,7 +257,7 @@ export default function TasksPage() {
                             </SelectItem>
                           ))
                         ) : (
-                          <SelectItem value="" disabled>Nu există sarcini disponibile</SelectItem>
+                          <SelectItem value="no-tasks">Nu există sarcini disponibile</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
@@ -379,7 +379,7 @@ export default function TasksPage() {
                             </SelectItem>
                           ))
                         ) : (
-                          <SelectItem value="" disabled>Nu există proiecte disponibile</SelectItem>
+                          <SelectItem value="no-projects">Nu există proiecte disponibile</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
@@ -405,7 +405,7 @@ export default function TasksPage() {
                             </SelectItem>
                           ))
                         ) : (
-                          <SelectItem value="" disabled>Nu există utilizatori disponibili</SelectItem>
+                          <SelectItem value="no-users">Nu există utilizatori disponibili</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
