@@ -4,7 +4,8 @@ import {
   automationTriggerTypes, 
   automationActionTypes,
   automationExecutionStatuses,
-  type InsertAutomation
+  type InsertAutomation,
+  type AutomationLog
 } from "../../shared/schema";
 import { ApiError, ValidationError, NotFoundError } from "../errors";
 import { z } from "zod";
@@ -333,6 +334,37 @@ export async function deleteAutomation(req: Request, res: Response) {
     console.error("Eroare la ștergerea automatizării:", error);
     return res.status(500).json({
       message: "Eroare la ștergerea automatizării",
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Obține jurnalul de execuție al automatizărilor pentru organizația utilizatorului
+ */
+export async function getAutomationLogs(req: Request, res: Response) {
+  try {
+    if (!req.user || !req.user.organization_id) {
+      return res.status(401).json({ message: "Utilizator neautentificat sau fără organizație" });
+    }
+    
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+    
+    // Obținem jurnalele de execuție pentru organizația utilizatorului
+    const logs = await storage.getAutomationLogsByOrganization(req.user.organization_id, limit);
+    
+    // Obținem toate automatizările pentru a putea asocia nume la fiecare jurnal
+    const automations = await storage.getAutomationsByOrganization(req.user.organization_id);
+    
+    // Returnăm jurnalele împreună cu automatizări pentru a facilita afișarea pe frontend
+    return res.status(200).json({
+      logs,
+      automations
+    });
+  } catch (error: any) {
+    console.error("Eroare la obținerea jurnalelor de automatizare:", error);
+    return res.status(500).json({
+      message: "Eroare la obținerea jurnalelor de automatizare",
       error: error.message
     });
   }

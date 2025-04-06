@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useAuth } from '@/context/auth-context';
 import { 
   Table, TableBody, TableCell, TableHead, 
   TableHeader, TableRow 
@@ -118,6 +119,7 @@ type AutomationLog = {
 
 export default function AutomationsPage() {
   const { toast } = useToast();
+  const { user } = useAuth(); // Obținem utilizatorul autentificat aici
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [newAutomation, setNewAutomation] = useState<{
@@ -133,7 +135,7 @@ export default function AutomationsPage() {
   });
   
   // Obținem lista de automatizări
-  const { data, isLoading, error } = useQuery({
+  const { data: automations = [], isLoading, error } = useQuery({
     queryKey: ['/api/automations'],
     queryFn: async () => {
       const response = await fetch('/api/automations');
@@ -144,10 +146,29 @@ export default function AutomationsPage() {
     }
   });
   
+  // Obținem jurnalul de execuție al automatizărilor
+  const { data: automationLogsData = { logs: [], automations: [] }, isLoading: isLoadingLogs } = useQuery({
+    queryKey: ['/api/automation-logs'],
+    queryFn: async () => {
+      const response = await fetch('/api/automation-logs');
+      if (!response.ok) {
+        throw new Error('Nu s-au putut încărca jurnalele de automatizări');
+      }
+      return await response.json();
+    }
+  });
+  
+  // Extragem logurile și automatizările asociate din răspunsul API-ului
+  const automationLogs = automationLogsData.logs || [];
+  
   // Mutație pentru activarea/dezactivarea unei automatizări
   const toggleAutomationMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: number; is_active: boolean }) => {
-      const response = await apiRequest('PATCH', `/api/automations/${id}`, { is_active });
+      console.log(`Schimbare stare automatizare ${id} la ${is_active ? 'activă' : 'inactivă'}`);
+      const response = await apiRequest('PATCH', `/api/automations/${id}`, { 
+        is_active, 
+        updated_by: user?.id || 1 // Folosim ID-ul utilizatorului sau un fallback de 1
+      });
       return response.json();
     },
     onSuccess: () => {
@@ -169,7 +190,19 @@ export default function AutomationsPage() {
   // Mutație pentru crearea unei automatizări
   const createAutomationMutation = useMutation({
     mutationFn: async (automationData: typeof newAutomation) => {
-      const response = await apiRequest('POST', '/api/automations', automationData);
+      // Convertim în formatul așteptat de API
+      const apiPayload = {
+        name: automationData.name,
+        description: automationData.description,
+        is_active: true,
+        organization_id: user?.organization_id || 3, // Folosim un fallback de 3 dacă user?.organization_id lipsește
+        created_by: user?.id || 1, // Folosim un fallback de 1 dacă user?.id lipsește
+        trigger_types: automationData.trigger_type ? [automationData.trigger_type] : [],
+        action_types: automationData.action_type ? [automationData.action_type] : []
+      };
+      
+      console.log('Creez automatizare:', apiPayload);
+      const response = await apiRequest('POST', '/api/automations', apiPayload);
       return response.json();
     },
     onSuccess: () => {
@@ -196,7 +229,7 @@ export default function AutomationsPage() {
   });
   
   // Filtrarea automatizărilor pe baza căutării
-  const filteredAutomations = data?.automations?.filter((automation: Automation) => 
+  const filteredAutomations = automations.filter((automation: Automation) => 
     automation.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (automation.description && automation.description.toLowerCase().includes(searchQuery.toLowerCase()))
   ) || [];
@@ -536,15 +569,24 @@ export default function AutomationsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data?.logs?.length === 0 ? (
+                  {isLoadingLogs ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center h-32">
+                        <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                        <p className="text-sm text-muted-foreground mt-2">Se încarcă jurnalul de execuții...</p>
+                      </TableCell>
+                    </TableRow>
+                  ) : automationLogs.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center h-32">
                         Nu există înregistrări în jurnalul de execuții
                       </TableCell>
                     </TableRow>
                   ) : (
-                    data?.logs?.map((log: AutomationLog) => {
-                      const automation = data.automations.find((a: Automation) => a.id === log.automation_id);
+                    automationLogs.map((log: AutomationLog) => {
+                      // Folosim colecția de automatizări furnizată de API sau căutăm în lista principală
+                      const automation = (automationLogsData.automations || []).find((a: Automation) => a.id === log.automation_id) || 
+                                          automations.find((a: Automation) => a.id === log.automation_id);
                       return (
                         <TableRow key={log.id}>
                           <TableCell className="font-medium">{automation?.name || `Automatizare #${log.automation_id}`}</TableCell>

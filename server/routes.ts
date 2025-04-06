@@ -50,6 +50,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     createAutomation,
     updateAutomation,
     deleteAutomation,
+    getAutomationLogs,
   } = await import("./api/automations");
 
   app.use("/api/clients", clientsRouter);
@@ -63,6 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/automations", requireAuth, createAutomation);
   app.patch("/api/automations/:id", requireAuth, updateAutomation);
   app.delete("/api/automations/:id", requireAuth, deleteAutomation);
+  app.get("/api/automation-logs", requireAuth, getAutomationLogs);
   // Rută de test
   app.get("/api/test", (req, res) => {
     return res.json({ success: true, message: "API funcționează corect" });
