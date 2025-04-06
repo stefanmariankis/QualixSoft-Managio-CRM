@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
@@ -50,81 +51,30 @@ import {
   DollarSign,
   Copy,
   Eye,
-  Send
+  Send,
+  AlertCircle
 } from "lucide-react";
 import { Invoice } from "@shared/schema";
-
-// Pentru simulare date
-const fakeInvoices: Invoice[] = Array.from({ length: 15 }, (_, i) => ({
-  id: i + 1,
-  organization_id: 1,
-  client_id: Math.floor(Math.random() * 15) + 1,
-  project_id: Math.random() > 0.3 ? Math.floor(Math.random() * 12) + 1 : null,
-  invoice_number: `INV-${(new Date().getFullYear())}-${(i + 1).toString().padStart(3, '0')}`,
-  issue_date: new Date(Date.now() - Math.floor(Math.random() * 90) * 24 * 60 * 60 * 1000),
-  due_date: new Date(Date.now() + Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000),
-  subtotal: Math.floor(Math.random() * 10000) + 1000,
-  tax_rate: 19,
-  tax_amount: 0, // se va calcula
-  discount_rate: Math.random() > 0.7 ? Math.floor(Math.random() * 15) + 5 : null,
-  discount_amount: 0, // se va calcula
-  total_amount: 0, // se va calcula
-  paid_amount: Math.random() > 0.4 ? Math.floor(Math.random() * 10000) + 1000 : 0,
-  remaining_amount: 0, // se va calcula
-  status: ['draft', 'paid', 'sent', 'viewed', 'overdue', 'cancelled'][i % 6] as any,
-  payment_terms: "15 zile",
-  notes: i % 4 === 0 ? "Notă pentru factură" : null,
-  currency: "RON",
-  created_by: 1,
-  created_at: new Date(Date.now() - Math.floor(Math.random() * 90) * 24 * 60 * 60 * 1000),
-  updated_at: new Date(),
-}));
-
-// Calculăm valorile financiare pentru fiecare factură
-fakeInvoices.forEach(invoice => {
-  invoice.tax_amount = invoice.subtotal * (invoice.tax_rate || 0) / 100;
-  invoice.discount_amount = invoice.subtotal * (invoice.discount_rate || 0) / 100;
-  invoice.total_amount = invoice.subtotal + invoice.tax_amount - invoice.discount_amount;
-  invoice.remaining_amount = invoice.total_amount - invoice.paid_amount;
-  
-  // Actualizăm statusul bazat pe sumele plătite
-  if (invoice.status !== 'cancelled') {
-    if (invoice.remaining_amount <= 0) {
-      invoice.status = 'paid';
-    } else if (invoice.paid_amount > 0) {
-      invoice.status = 'sent';
-    } else if (invoice.due_date < new Date()) {
-      invoice.status = 'overdue';
-    }
-  }
-});
-
-// Lista clienți pentru dropdown
-const fakeClients = Array.from({ length: 15 }, (_, i) => ({
-  id: i + 1,
-  name: `Client ${i + 1}`
-}));
-
-// Lista proiecte pentru dropdown
-const fakeProjects = Array.from({ length: 12 }, (_, i) => ({
-  id: i + 1,
-  name: `Proiect ${i + 1}`
-}));
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function InvoicesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("toate");
   const [filterClient, setFilterClient] = useState("toate");
   
-  // Simulează apel API la server
-  const { data: invoices, isLoading } = useQuery({
+  // Obține lista de facturi de la server
+  const { data: invoices, isLoading, error } = useQuery({
     queryKey: ["/api/invoices"],
-    queryFn: async () => {
-      // În implementarea reală, de înlocuit cu apelul API real
-      return new Promise<Invoice[]>((resolve) => {
-        setTimeout(() => resolve(fakeInvoices), 300);
-      });
-    },
+  });
+  
+  // Obține lista de clienți pentru filtrare și afișare
+  const { data: clients, isLoading: isClientsLoading } = useQuery({
+    queryKey: ["/api/clients"],
+  });
+  
+  // Obține lista de proiecte pentru afișare
+  const { data: projects, isLoading: isProjectsLoading } = useQuery({
+    queryKey: ["/api/projects"],
   });
 
   // Filtrare facturi
@@ -162,13 +112,15 @@ export default function InvoicesPage() {
   };
 
   const getClientName = (clientId: number) => {
-    const client = fakeClients.find(c => c.id === clientId);
-    return client ? client.name : `Client ${clientId}`;
+    if (!clients) return `Client ${clientId}`;
+    const client = clients.find(c => c.id === clientId);
+    return client ? (client.name || client.company_name) : `Client ${clientId}`;
   };
 
   const getProjectName = (projectId: number | null) => {
     if (projectId === null) return "-";
-    const project = fakeProjects.find(p => p.id === projectId);
+    if (!projects) return `Proiect ${projectId}`;
+    const project = projects.find(p => p.id === projectId);
     return project ? project.name : `Proiect ${projectId}`;
   };
 
@@ -187,6 +139,24 @@ export default function InvoicesPage() {
     if (isOverdue(dueDate)) return "text-red-600 font-medium";
     return "";
   };
+
+  // Afișare erori
+  if (error) {
+    return (
+      <DashboardLayout>
+        <Alert className="mb-6" variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Eroare</AlertTitle>
+          <AlertDescription>
+            {error instanceof Error ? error.message : "Nu s-au putut încărca facturile. Încearcă din nou."}
+          </AlertDescription>
+        </Alert>
+        <Button onClick={() => window.location.reload()} variant="outline">
+          Reîncarcă pagina
+        </Button>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -221,11 +191,17 @@ export default function InvoicesPage() {
                         <SelectValue placeholder="Selectează client" />
                       </SelectTrigger>
                       <SelectContent>
-                        {fakeClients.map(client => (
-                          <SelectItem key={client.id} value={client.id.toString()}>
-                            {client.name}
-                          </SelectItem>
-                        ))}
+                        {isClientsLoading ? (
+                          <SelectItem value="loading">Se încarcă...</SelectItem>
+                        ) : clients && clients.length > 0 ? (
+                          clients.map(client => (
+                            <SelectItem key={client.id} value={client.id.toString()}>
+                              {client.name || client.company_name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="none">Nu există clienți</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -237,11 +213,17 @@ export default function InvoicesPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="">Fără proiect</SelectItem>
-                        {fakeProjects.map(project => (
-                          <SelectItem key={project.id} value={project.id.toString()}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
+                        {isProjectsLoading ? (
+                          <SelectItem value="loading">Se încarcă...</SelectItem>
+                        ) : projects && projects.length > 0 ? (
+                          projects.map(project => (
+                            <SelectItem key={project.id} value={project.id.toString()}>
+                              {project.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="none">Nu există proiecte</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -364,11 +346,17 @@ export default function InvoicesPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="toate">Toți clienții</SelectItem>
-                        {fakeClients.map(client => (
-                          <SelectItem key={client.id} value={client.id.toString()}>
-                            {client.name}
-                          </SelectItem>
-                        ))}
+                        {isClientsLoading ? (
+                          <SelectItem value="loading">Se încarcă...</SelectItem>
+                        ) : clients && clients.length > 0 ? (
+                          clients.map(client => (
+                            <SelectItem key={client.id} value={client.id.toString()}>
+                              {client.name || client.company_name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="none">Nu există clienți</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
