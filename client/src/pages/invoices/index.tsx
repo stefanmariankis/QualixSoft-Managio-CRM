@@ -124,7 +124,10 @@ export default function InvoicesPage() {
     return project ? project.name : `Proiect ${projectId}`;
   };
 
-  const formatCurrency = (amount: number, currency: string) => {
+  const formatCurrency = (amount: number | undefined, currency: string | undefined) => {
+    if (amount === undefined || currency === undefined) {
+      return "N/A";
+    }
     return `${amount.toLocaleString('ro-RO')} ${currency}`;
   };
   
