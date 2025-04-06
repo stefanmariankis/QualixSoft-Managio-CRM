@@ -112,15 +112,18 @@ export default function TaskDetails() {
   const { data, isLoading, error } = useQuery<TaskDetailsResponse>({
     queryKey: ['/api/tasks', taskId],
     queryFn: async () => {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
+      try {
+        const response = await apiRequest('GET', `/api/tasks/${taskId}`);
+        
+        if (!response.ok) {
+          throw new Error('Nu s-au putut încărca detaliile task-ului');
+        }
+        
+        return await response.json();
+      } catch (err) {
+        console.error('Eroare la încărcarea task-ului:', err);
         throw new Error('Nu s-au putut încărca detaliile task-ului');
       }
-      
-      return await response.json();
     }
   });
   
