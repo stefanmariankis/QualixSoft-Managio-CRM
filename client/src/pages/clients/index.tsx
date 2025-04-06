@@ -54,38 +54,10 @@ import {
 import { Client } from "@shared/schema";
 import { Textarea } from "@/components/ui/textarea";
 
-// Pentru simulare date
-const fakeClients: Client[] = Array.from({ length: 20 }, (_, i) => ({
-  id: i + 1,
-  organization_id: 1,
-  name: `Client ${i + 1} SRL`,
-  email: `client${i + 1}@example.com`,
-  phone: `+40 7${(i + 10).toString().padStart(2, '0')} ${Math.floor(Math.random() * 900) + 100} ${Math.floor(Math.random() * 900) + 100}`,
-  address: i % 3 === 0 ? `Strada Exemplu ${i + 1}, București` : null,
-  city: i % 3 === 0 ? 'București' : null,
-  county: i % 3 === 0 ? 'București' : null,
-  postal_code: i % 3 === 0 ? `0${Math.floor(Math.random() * 9000) + 1000}` : null,
-  country: 'România',
-  website: i % 2 === 0 ? `https://client${i + 1}.ro` : null,
-  industry: ['IT', 'Retail', 'Construcții', 'Sănătate', 'Educație', 'Producție'][i % 6] as any,
-  company_size: ['1-10', '11-50', '51-200', '201-500', '500+'][i % 5] as any,
-  vat_number: `RO${Math.floor(Math.random() * 9000000) + 1000000}`,
-  registration_number: `J${Math.floor(Math.random() * 40) + 1}/${Math.floor(Math.random() * 900) + 100}/${Math.floor(Math.random() * 9000) + 1000}`,
-  bank_account: i % 4 === 0 ? `RO${Math.floor(Math.random() * 90) + 10}BANK${Math.floor(Math.random() * 90000000000) + 10000000000}` : null,
-  bank_name: i % 4 === 0 ? ['BCR', 'BRD', 'Banca Transilvania', 'ING', 'Raiffeisen', 'UniCredit'][i % 6] : null,
-  notes: i % 5 === 0 ? `Note despre clientul ${i + 1}` : null,
-  status: ['activ', 'inactiv', 'prospect', 'fost-client'][i % 4] as any,
-  created_by: 1,
-  assigned_to: i % 3 === 0 ? null : (i % 3) + 1,
-  created_at: new Date(Date.now() - Math.floor(Math.random() * 365) * 24 * 60 * 60 * 1000),
-  updated_at: new Date(),
-}));
-
-// Lista utilizatori pentru dropdown
-const fakeUsers = [
-  { id: 1, name: "Alexandru Popescu" },
-  { id: 2, name: "Maria Ionescu" },
-  { id: 3, name: "Ion Vasilescu" }
+// Diverse industrii pentru filtrare
+const industries = [
+  'IT', 'Retail', 'Construcții', 'Sănătate', 'Educație', 'Producție', 
+  'Servicii financiare', 'Transport', 'Turism', 'Imobiliare', 'Alimentație'
 ];
 
 export default function ClientsPage() {
@@ -93,37 +65,33 @@ export default function ClientsPage() {
   const [filterStatus, setFilterStatus] = useState("toate");
   const [filterIndustry, setFilterIndustry] = useState("toate");
   
-  // Simulează apel API la server
+  // Apel API real către server
   const { data: clients, isLoading } = useQuery({
     queryKey: ["/api/clients"],
-    queryFn: async () => {
-      // În implementarea reală, de înlocuit cu apelul API real
-      return new Promise<Client[]>((resolve) => {
-        setTimeout(() => resolve(fakeClients), 300);
-      });
-    },
   });
 
   // Filtrare clienți
-  const filteredClients = clients ? clients.filter(client => {
-    // Filtrare după termen de căutare
-    const matchesSearch = 
-      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (client.phone && client.phone.includes(searchTerm));
-    
-    // Filtrare după status
-    const matchesStatus = filterStatus === "toate" || client.status === filterStatus;
-    
-    // Filtrare după industrie
-    const matchesIndustry = filterIndustry === "toate" || client.industry === filterIndustry;
-    
-    return matchesSearch && matchesStatus && matchesIndustry;
-  }) : [];
+  const filteredClients = clients && Array.isArray(clients) 
+    ? clients.filter(client => {
+        // Filtrare după termen de căutare
+        const matchesSearch = 
+          client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (client.phone && client.phone.includes(searchTerm));
+        
+        // Filtrare după status
+        const matchesStatus = filterStatus === "toate" || client.status === filterStatus;
+        
+        // Filtrare după industrie
+        const matchesIndustry = filterIndustry === "toate" || client.industry === filterIndustry;
+        
+        return matchesSearch && matchesStatus && matchesIndustry;
+      }) 
+    : [];
 
-  // Lista unică de industrii
-  const industries = clients 
-    ? [...new Set(clients.map(client => client.industry))]
+  // Lista unică de industrii din datele reale
+  const uniqueIndustries = clients && Array.isArray(clients) 
+    ? Array.from(new Set(clients.map(client => client.industry).filter(Boolean)))
     : [];
 
   const getStatusBadgeColors = (status: string) => {
@@ -141,10 +109,10 @@ export default function ClientsPage() {
     }
   };
 
+  // Obține numele responsabilului (assignee) pe baza ID-ului
   const getAssigneeName = (assigneeId: number | null) => {
     if (assigneeId === null) return "Neasignat";
-    const user = fakeUsers.find(u => u.id === assigneeId);
-    return user ? user.name : `Utilizator ${assigneeId}`;
+    return `Utilizator ${assigneeId}`;
   };
 
   const daysAgo = (date: Date) => {
@@ -356,7 +324,7 @@ export default function ClientsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="toate">Toate industriile</SelectItem>
-                        {industries.map((industry, index) => (
+                        {uniqueIndustries.map((industry, index) => (
                           <SelectItem key={index} value={industry}>
                             {industry}
                           </SelectItem>
