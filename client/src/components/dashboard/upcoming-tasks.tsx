@@ -75,7 +75,8 @@ export function UpcomingTasks({
   }
 
   // Ensure we're working with Date objects
-  const ensureDate = (dateInput: any): Date => {
+  const ensureDate = (dateInput: any): Date | null => {
+    if (!dateInput) return null;
     if (dateInput instanceof Date) return dateInput;
     
     try {
@@ -84,16 +85,12 @@ export function UpcomingTasks({
       
       // Verificăm dacă data este validă
       if (isNaN(date.getTime())) {
-        console.error(`Dată invalidă: ${dateInput}`, typeof dateInput);
-        // Returnăm data curentă ca fallback pentru a evita eroarea
-        return new Date();
+        return null;
       }
       
       return date;
     } catch (error) {
-      console.error(`Eroare la conversia datei ${dateInput}:`, error);
-      // Returnăm data curentă ca fallback pentru a evita eroarea
-      return new Date();
+      return null;
     }
   };
 
@@ -102,6 +99,12 @@ export function UpcomingTasks({
     // First by date (making sure we're working with Date objects)
     const aDate = ensureDate(a.dueDate);
     const bDate = ensureDate(b.dueDate);
+    
+    // Handle null date cases
+    if (!aDate && !bDate) return 0;
+    if (!aDate) return 1; // Push tasks with no due date to the end
+    if (!bDate) return -1; // Keep tasks with due date at the top
+    
     const dateCompare = aDate.getTime() - bDate.getTime();
     if (dateCompare !== 0) return dateCompare;
     
@@ -112,7 +115,9 @@ export function UpcomingTasks({
       medium: 1,
       low: 0
     };
-    return priorityWeight[b.priority] - priorityWeight[a.priority];
+    const aPriority = priorityWeight[a.priority] || 0;
+    const bPriority = priorityWeight[b.priority] || 0;
+    return bPriority - aPriority;
   });
 
   // Function to get priority badge variant
@@ -129,7 +134,7 @@ export function UpcomingTasks({
   // Function to get progress color
   const getProgressColor = (progress: number, dueDate: any) => {
     const dueDateObj = ensureDate(dueDate);
-    const isOverdue = isAfter(new Date(), dueDateObj);
+    const isOverdue = dueDateObj ? isAfter(new Date(), dueDateObj) : false;
     
     if (isOverdue) return "bg-red-500";
     if (progress >= 75) return "bg-green-500";
@@ -147,7 +152,8 @@ export function UpcomingTasks({
         <ScrollArea className="h-[350px] pr-4">
           <div className="space-y-4">
             {sortedTasks.slice(0, maxItems).map((task) => {
-              const isOverdue = isAfter(new Date(), ensureDate(task.dueDate));
+              const dateObj = ensureDate(task.dueDate);
+              const isOverdue = dateObj ? isAfter(new Date(), dateObj) : false;
               
               return (
                 <div key={task.id} className="space-y-2">
@@ -177,10 +183,13 @@ export function UpcomingTasks({
                       ) : (
                         <span className="flex items-center text-muted-foreground">
                           <Clock className="h-3 w-3 mr-1" />
-                          {formatDistanceToNow(ensureDate(task.dueDate), { 
-                            addSuffix: true,
-                            locale: ro
-                          })}
+                          {dateObj 
+                            ? formatDistanceToNow(dateObj, { 
+                                addSuffix: true,
+                                locale: ro
+                              })
+                            : "Termen nedefinit"
+                          }
                         </span>
                       )}
                     </div>

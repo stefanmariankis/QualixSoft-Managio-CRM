@@ -72,7 +72,8 @@ export function UpcomingEvents({
   }
 
   // Ensure we're working with Date objects
-  const ensureDate = (dateInput: any): Date => {
+  const ensureDate = (dateInput: any): Date | null => {
+    if (!dateInput) return null;
     if (dateInput instanceof Date) return dateInput;
     
     try {
@@ -81,23 +82,23 @@ export function UpcomingEvents({
       
       // Verificăm dacă data este validă
       if (isNaN(date.getTime())) {
-        console.error(`Dată invalidă: ${dateInput}`, typeof dateInput);
-        // Returnăm data curentă ca fallback pentru a evita eroarea
-        return new Date();
+        return null;
       }
       
       return date;
     } catch (error) {
-      console.error(`Eroare la conversia datei ${dateInput}:`, error);
-      // Returnăm data curentă ca fallback pentru a evita eroarea
-      return new Date();
+      return null;
     }
   };
 
   // Sort events by start date
-  const sortedEvents = [...events].sort(
-    (a, b) => ensureDate(a.startDate).getTime() - ensureDate(b.startDate).getTime()
-  );
+  const sortedEvents = [...events].sort((a, b) => {
+    const dateA = ensureDate(a.startDate);
+    const dateB = ensureDate(b.startDate);
+    
+    if (!dateA || !dateB) return 0;
+    return dateA.getTime() - dateB.getTime();
+  });
 
   // Get event type badge
   const getEventBadge = (type: Event["type"]) => {
@@ -122,12 +123,18 @@ export function UpcomingEvents({
       return "Toată ziua";
     }
     
-    const startTime = format(ensureDate(event.startDate), "HH:mm");
+    const startDate = ensureDate(event.startDate);
+    if (!startDate) return "Oră nedefinită";
+    
+    const startTime = format(startDate, "HH:mm");
     if (!event.endDate) {
       return startTime;
     }
     
-    const endTime = format(ensureDate(event.endDate), "HH:mm");
+    const endDate = ensureDate(event.endDate);
+    if (!endDate) return startTime;
+    
+    const endTime = format(endDate, "HH:mm");
     return `${startTime} - ${endTime}`;
   };
 
@@ -157,7 +164,10 @@ export function UpcomingEvents({
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span className="flex items-center">
                     <Calendar className="mr-1 h-3.5 w-3.5" />
-                    {format(ensureDate(event.startDate), "EEEE, d MMMM", { locale: ro })}
+                    {ensureDate(event.startDate) 
+                      ? format(ensureDate(event.startDate) as Date, "EEEE, d MMMM", { locale: ro })
+                      : "Dată nedefinită"
+                    }
                   </span>
                   
                   <span className="flex items-center">
