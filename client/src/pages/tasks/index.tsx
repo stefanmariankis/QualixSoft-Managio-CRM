@@ -150,22 +150,37 @@ export default function TasksPage() {
     return map[priority] || priority;
   };
 
+  // Funcție ajutător pentru a asigura că avem un obiect Date valid
+  const ensureDate = (dateValue: any): Date | null => {
+    if (!dateValue) return null;
+    if (dateValue instanceof Date) return dateValue;
+    try {
+      const date = new Date(dateValue);
+      return isNaN(date.getTime()) ? null : date;
+    } catch (error) {
+      console.error("Eroare la conversia datei:", error);
+      return null;
+    }
+  };
+
   // Verificare deadline apropiat
-  const isNearDeadline = (dueDate: Date | null) => {
-    if (!dueDate) return false;
+  const isNearDeadline = (dueDate: any) => {
+    const date = ensureDate(dueDate);
+    if (!date) return false;
     const now = new Date();
-    const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     return diffDays > 0 && diffDays <= 3;
   };
 
   // Verificare depășire deadline
-  const isOverdue = (dueDate: Date | null) => {
-    if (!dueDate) return false;
-    return dueDate < new Date();
+  const isOverdue = (dueDate: any) => {
+    const date = ensureDate(dueDate);
+    if (!date) return false;
+    return date < new Date();
   };
 
   // Determinare CSS class pentru deadline
-  const getDeadlineClass = (dueDate: Date | null) => {
+  const getDeadlineClass = (dueDate: any) => {
     if (isOverdue(dueDate)) return "text-red-600 font-medium";
     if (isNearDeadline(dueDate)) return "text-amber-600 font-medium";
     return "";
@@ -496,7 +511,7 @@ export default function TasksPage() {
                               <div className="flex items-center space-x-1">
                                 <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
                                 <span className={getDeadlineClass(task.due_date)}>
-                                  {task.due_date.toLocaleDateString('ro-RO')}
+                                  {ensureDate(task.due_date)?.toLocaleDateString('ro-RO') || 'Dată invalidă'}
                                 </span>
                               </div>
                             ) : (
