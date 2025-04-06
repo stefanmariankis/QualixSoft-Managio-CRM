@@ -51,38 +51,7 @@ import {
 } from "lucide-react";
 import { Task } from "@shared/schema";
 
-// Pentru simulare date
-const fakeTasks: Task[] = Array.from({ length: 20 }, (_, i) => ({
-  id: i + 1,
-  organization_id: 1,
-  project_id: Math.floor(Math.random() * 12) + 1,
-  title: `Sarcina ${i + 1}`,
-  description: i % 3 === 0 ? `Descriere pentru sarcina ${i + 1}` : null,
-  status: ['not_started', 'in_progress', 'under_review', 'completed', 'on_hold'][i % 5] as any,
-  priority: ['low', 'medium', 'high', 'urgent'][i % 4] as any,
-  assigned_to: i % 5 !== 0 ? Math.floor(Math.random() * 3) + 1 : null,
-  created_by: 1,
-  start_date: i % 7 !== 0 ? new Date(Date.now() - Math.floor(Math.random() * 15) * 24 * 60 * 60 * 1000) : null,
-  due_date: i % 8 !== 0 ? new Date(Date.now() + Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000) : null,
-  estimated_hours: i % 4 === 0 ? null : Math.floor(Math.random() * 40) + 1,
-  completion_percentage: Math.floor(Math.random() * 100),
-  parent_task_id: i % 10 === 0 ? Math.floor(Math.random() * 20) + 1 : null,
-  created_at: new Date(Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000),
-  updated_at: new Date(),
-}));
-
-// Lista proiecte pentru dropdown
-const fakeProjects = Array.from({ length: 12 }, (_, i) => ({
-  id: i + 1,
-  name: `Proiect ${i + 1}`
-}));
-
-// Lista utilizatori pentru dropdown
-const fakeUsers = [
-  { id: 1, name: "Alexandru Popescu" },
-  { id: 2, name: "Maria Ionescu" },
-  { id: 3, name: "Ion Vasilescu" }
-];
+// Vom folosi date reale din API în loc de date simulate
 
 export default function TasksPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -90,15 +59,19 @@ export default function TasksPage() {
   const [filterProject, setFilterProject] = useState("toate");
   const [filterAssignee, setFilterAssignee] = useState("toate");
   
-  // Simulează apel API la server
+  // Obține lista de sarcini din API
   const { data: tasks, isLoading } = useQuery({
     queryKey: ["/api/tasks"],
-    queryFn: async () => {
-      // În implementarea reală, de înlocuit cu apelul API real
-      return new Promise<Task[]>((resolve) => {
-        setTimeout(() => resolve(fakeTasks), 300);
-      });
-    },
+  });
+  
+  // Obține lista de proiecte pentru dropdown
+  const { data: projects } = useQuery({
+    queryKey: ["/api/projects"],
+  });
+  
+  // Obține lista de utilizatori pentru dropdown
+  const { data: users } = useQuery({
+    queryKey: ["/api/users/organization"],
   });
 
   // Filtrare sarcini
@@ -155,14 +128,16 @@ export default function TasksPage() {
   };
 
   const getProjectName = (projectId: number) => {
-    const project = fakeProjects.find(p => p.id === projectId);
+    if (!projects) return `Proiect ${projectId}`;
+    const project = projects.find(p => p.id === projectId);
     return project ? project.name : `Proiect ${projectId}`;
   };
 
   const getAssigneeName = (assigneeId: number | null) => {
     if (assigneeId === null) return "Neasignat";
-    const user = fakeUsers.find(u => u.id === assigneeId);
-    return user ? user.name : `Utilizator ${assigneeId}`;
+    if (!users) return `Utilizator ${assigneeId}`;
+    const user = users.find(u => u.id === assigneeId);
+    return user ? `${user.firstName} ${user.lastName}` : `Utilizator ${assigneeId}`;
   };
 
   const getPriorityLabel = (priority: string) => {
@@ -233,11 +208,15 @@ export default function TasksPage() {
                         <SelectValue placeholder="Selectează proiect" />
                       </SelectTrigger>
                       <SelectContent>
-                        {fakeProjects.map(project => (
-                          <SelectItem key={project.id} value={project.id.toString()}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
+                        {projects && projects.length > 0 ? (
+                          projects.map(project => (
+                            <SelectItem key={project.id} value={project.id.toString()}>
+                              {project.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="" disabled>Nu există proiecte disponibile</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -251,11 +230,15 @@ export default function TasksPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="">Neasignat</SelectItem>
-                        {fakeUsers.map(user => (
-                          <SelectItem key={user.id} value={user.id.toString()}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
+                        {users && users.length > 0 ? (
+                          users.map(user => (
+                            <SelectItem key={user.id} value={user.id.toString()}>
+                              {user.firstName} {user.lastName}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="" disabled>Nu există utilizatori disponibili</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -267,11 +250,15 @@ export default function TasksPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="">Fără părinte</SelectItem>
-                        {fakeTasks.map(task => (
-                          <SelectItem key={task.id} value={task.id.toString()}>
-                            {task.title}
-                          </SelectItem>
-                        ))}
+                        {tasks && tasks.length > 0 ? (
+                          tasks.map(task => (
+                            <SelectItem key={task.id} value={task.id.toString()}>
+                              {task.title}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="" disabled>Nu există sarcini disponibile</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -385,11 +372,15 @@ export default function TasksPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="toate">Toate proiectele</SelectItem>
-                        {fakeProjects.map(project => (
-                          <SelectItem key={project.id} value={project.id.toString()}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
+                        {projects && projects.length > 0 ? (
+                          projects.map(project => (
+                            <SelectItem key={project.id} value={project.id.toString()}>
+                              {project.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="" disabled>Nu există proiecte disponibile</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -407,11 +398,15 @@ export default function TasksPage() {
                       <SelectContent>
                         <SelectItem value="toate">Toți utilizatorii</SelectItem>
                         <SelectItem value="neasignat">Neasignat</SelectItem>
-                        {fakeUsers.map(user => (
-                          <SelectItem key={user.id} value={user.id.toString()}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
+                        {users && users.length > 0 ? (
+                          users.map(user => (
+                            <SelectItem key={user.id} value={user.id.toString()}>
+                              {user.firstName} {user.lastName}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="" disabled>Nu există utilizatori disponibili</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
