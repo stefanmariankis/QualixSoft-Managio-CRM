@@ -127,16 +127,44 @@ export default function InvoicesPage() {
   const formatCurrency = (amount: number, currency: string) => {
     return `${amount.toLocaleString('ro-RO')} ${currency}`;
   };
+  
+  // Funcție utilitară pentru a valida o dată
+  const ensureDate = (dateInput: any): Date | null => {
+    if (!dateInput) return null;
+    
+    if (dateInput instanceof Date) {
+      // Verificăm dacă obiectul Date este valid
+      return isNaN(dateInput.getTime()) ? null : dateInput;
+    }
+    
+    try {
+      // Încercăm să convertim string-ul sau alt tip de date în Date
+      const date = new Date(dateInput);
+      return isNaN(date.getTime()) ? null : date;
+    } catch (error) {
+      console.error(`Dată invalidă:`, dateInput);
+      return null;
+    }
+  };
+  
+  // Funcție pentru formatarea datelor
+  const formatDate = (dateInput: any) => {
+    const date = ensureDate(dateInput);
+    if (!date) return "Dată nespecificată";
+    return date.toLocaleDateString('ro-RO');
+  };
 
   // Verificare dată scadentă depășită
-  const isOverdue = (dueDate: Date) => {
-    return dueDate < new Date() && dueDate < new Date();
+  const isOverdue = (dueDateInput: any) => {
+    const dueDate = ensureDate(dueDateInput);
+    if (!dueDate) return false;
+    return dueDate < new Date();
   };
 
   // Determinare CSS class pentru deadline
-  const getDueDateClass = (dueDate: Date, status: string) => {
+  const getDueDateClass = (dueDateInput: any, status: string) => {
     if (status === 'paid' || status === 'cancelled') return "";
-    if (isOverdue(dueDate)) return "text-red-600 font-medium";
+    if (isOverdue(dueDateInput)) return "text-red-600 font-medium";
     return "";
   };
 
@@ -414,11 +442,11 @@ export default function InvoicesPage() {
                             {!invoice.project_id && <span className="text-muted-foreground">-</span>}
                           </TableCell>
                           <TableCell>
-                            {invoice.issue_date.toLocaleDateString('ro-RO')}
+                            {formatDate(invoice.issue_date)}
                           </TableCell>
                           <TableCell>
                             <span className={getDueDateClass(invoice.due_date, invoice.status)}>
-                              {invoice.due_date.toLocaleDateString('ro-RO')}
+                              {formatDate(invoice.due_date)}
                             </span>
                           </TableCell>
                           <TableCell>
