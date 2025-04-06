@@ -758,6 +758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Project Status
   app.get("/api/projects/status", async (req, res) => {
     try {
+      // Verifică autentificarea și organizația
       if (!req.session.userId) {
         return res.status(401).json({ message: "Neautorizat" });
       }
@@ -830,6 +831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Invoices Data
   app.get("/api/invoices/summary", async (req, res) => {
     try {
+      // Verifică autentificarea și organizația
       if (!req.session.userId) {
         return res.status(401).json({ message: "Neautorizat" });
       }
