@@ -53,8 +53,19 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
     const client = await storage.getClient(clientId);
     console.log("API - Rezultat căutare client:", client ? `găsit (id=${client.id})` : "negăsit");
     
-    if (!client || client.organization_id !== req.user!.organization_id) {
-      return res.status(404).json({ message: 'Client negăsit' });
+    // Verificăm direct valorile implicate în condiția de verificare
+    console.log("API - DEBUG - client?.organization_id =", client?.organization_id, "tip:", typeof client?.organization_id);
+    console.log("API - DEBUG - req.user!.organization_id =", req.user!.organization_id, "tip:", typeof req.user!.organization_id);
+    console.log("API - DEBUG - Sunt egale?", client?.organization_id === req.user!.organization_id);
+    
+    if (!client) {
+      console.log("API - DEBUG - Client este null sau undefined");
+      return res.status(404).json({ message: 'Client inexistent' });
+    }
+    
+    if (client.organization_id !== req.user!.organization_id) {
+      console.log("API - DEBUG - Client aparține altei organizații");
+      return res.status(403).json({ message: 'Nu aveți acces la acest client' });
     }
     
     // Obține proiectele asociate acestui client

@@ -343,21 +343,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
       }
 
-      const clientId = parseInt(req.params.id);
-      if (isNaN(clientId)) {
+      // Adaug logging extins pentru depanare
+      console.log("DEBUG ROUTES - API /clients/:id - tipul id-ului din params:", typeof req.params.id, "valoare:", req.params.id);
+      console.log("DEBUG ROUTES - API /clients/:id - user.organization_id:", user.organization_id, "tip:", typeof user.organization_id);
+
+      // Convertim ID-ul la număr prin metoda Number() mai robustă și verificăm validitatea
+      let clientId: number;
+      try {
+        clientId = Number(req.params.id);
+        if (isNaN(clientId) || clientId <= 0 || !Number.isInteger(clientId)) {
+          console.log("DEBUG ROUTES - API /clients/:id - ID invalid:", req.params.id);
+          return res.status(400).json({ message: "ID client invalid" });
+        }
+      } catch (err) {
+        console.error("DEBUG ROUTES - API /clients/:id - Eroare la conversia ID-ului:", err);
         return res.status(400).json({ message: "ID client invalid" });
       }
 
+      console.log("DEBUG ROUTES - API /clients/:id - clientId convertit:", clientId, "tip:", typeof clientId);
+
       const client = await storage.getClient(clientId);
+      console.log("DEBUG ROUTES - API /clients/:id - client returnat:", client ? "găsit" : "negăsit", client ? `ID=${client.id}, organization_id=${client.organization_id}` : "");
       
       if (!client) {
         return res.status(404).json({ message: "Client negăsit" });
       }
 
-      // Verificăm dacă clientul aparține organizației utilizatorului
-      if (client.organization_id !== user.organization_id) {
+      // Verificăm tipurile și valorile pentru comparare
+      console.log("DEBUG ROUTES - API /clients/:id - Comparare: client.organization_id =", client.organization_id, 
+                "(tip:", typeof client.organization_id, ") user.organization_id =", user.organization_id, 
+                "(tip:", typeof user.organization_id, ")");
+      console.log("DEBUG ROUTES - API /clients/:id - Sunt egale?", client.organization_id === user.organization_id);
+      console.log("DEBUG ROUTES - API /clients/:id - După conversie:", Number(client.organization_id) === Number(user.organization_id));
+
+      // Verificăm dacă clientul aparține organizației utilizatorului - forțăm conversia la număr pentru a evita probleme de tip
+      if (Number(client.organization_id) !== Number(user.organization_id)) {
+        console.log("DEBUG ROUTES - API /clients/:id - Acces refuzat: organizații diferite");
         return res.status(403).json({ message: "Nu aveți acces la acest client" });
       }
+      
+      console.log("DEBUG ROUTES - API /clients/:id - Verificare trecută, clientul aparține organizației utilizatorului");
 
       // Obținem proiectele asociate clientului
       const projects = await storage.getProjectsByClient(clientId);
@@ -503,71 +528,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Activity Log
   app.get("/api/activity-log", async (req, res) => {
     try {
-      // Sample data for now - this would be fetched from the database
-      res.json([
-        {
-          id: 1,
-          userId: 1,
-          userName: "Alexandru Popescu",
-          userInitials: "AP",
-          actionType: "adăugare",
-          actionDescription: "a adăugat un nou",
-          entityType: "client",
-          entityId: 101,
-          entityName: "Innovate SRL",
-          timestamp: new Date(Date.now() - 30 * 60 * 1000)
-        },
-        {
-          id: 2,
-          userId: 2,
-          userName: "Maria Ionescu",
-          userInitials: "MI",
-          actionType: "modificare",
-          actionDescription: "a actualizat",
-          entityType: "project",
-          entityId: 34,
-          entityName: "Redesign website",
-          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000)
-        },
-        {
-          id: 3,
-          userId: 1,
-          userName: "Alexandru Popescu",
-          userInitials: "AP",
-          actionType: "atribuire",
-          actionDescription: "a atribuit",
-          entityType: "task",
-          entityId: 78,
-          entityName: "Actualizare SEO",
-          timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000)
-        },
-        {
-          id: 4,
-          userId: 3,
-          userName: "Elena Vasilescu",
-          userInitials: "EV",
-          actionType: "adăugare",
-          actionDescription: "a adăugat o nouă",
-          entityType: "invoice",
-          entityId: 56,
-          entityName: "INV-2023-056",
-          timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000)
-        },
-        {
-          id: 5,
-          userId: 2,
-          userName: "Maria Ionescu",
-          userInitials: "MI",
-          actionType: "ștergere",
-          actionDescription: "a șters",
-          entityType: "task",
-          entityId: 92,
-          entityName: "Testare contact form",
-          timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
-        }
-      ]);
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+
+      // Folosim storage pentru a obține log-urile de activitate din baza de date pentru organizația curentă
+      const activityLogs = await storage.getActivityLogsByOrganization(user.organization_id, 10);
+      
+      // Pentru fiecare înregistrare, obținem și informațiile despre utilizator
+      const logsWithUserDetails = await Promise.all(
+        activityLogs.map(async (log) => {
+          const actionUser = await storage.getUser(log.user_id);
+          
+          // Generăm inițialele din numele utilizatorului
+          const firstName = actionUser?.first_name || '';
+          const lastName = actionUser?.last_name || '';
+          const userInitials = `${firstName.charAt(0)}${lastName.charAt(0)}`;
+          
+          return {
+            id: log.id,
+            userId: log.user_id,
+            userName: `${firstName} ${lastName}`.trim(),
+            userInitials: userInitials,
+            actionType: log.action_type,
+            actionDescription: log.action,
+            entityType: log.entity_type,
+            entityId: log.entity_id,
+            entityName: log.entity_name || `${log.entity_type} #${log.entity_id}`,
+            timestamp: log.created_at
+          };
+        })
+      );
+      
+      res.json(logsWithUserDetails);
     } catch (error) {
-      console.error("Error fetching activity log:", error);
+      console.error("Eroare la obținerea jurnalului de activitate:", error);
       res.status(500).json({ error: "Eroare la obținerea datelor jurnalului de activitate" });
     }
   });
@@ -575,20 +575,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Statistics
   app.get("/api/statistics", async (req, res) => {
     try {
-      // Sample data - would be calculated from the database
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+
+      // Obținem toate datele necesare din baza de date
+      const clients = await storage.getClientsByOrganization(user.organization_id);
+      const projects = await storage.getProjectsByOrganization(user.organization_id);
+      const tasks = await storage.getTasksByOrganization(user.organization_id);
+      const invoices = await storage.getInvoicesByOrganization(user.organization_id);
+      
+      // Calculăm statisticile pentru clienți
+      const clientsCount = clients.length;
+      
+      // Calculăm statisticile pentru proiecte
+      const projectsCount = projects.length;
+      const activeProjects = projects.filter(p => p.status === 'in_progress' || p.status === 'active');
+      const activeProjectsCount = activeProjects.length;
+      
+      // Calculăm statisticile pentru task-uri
+      const activeTasks = tasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled');
+      const activeTasksCount = activeTasks.length;
+      
+      // Calculăm statisticile pentru facturi
+      const invoicesValue = invoices.reduce((sum, invoice) => sum + (invoice.total_amount || 0), 0);
+      const paidInvoices = invoices.filter(i => i.status === 'paid');
+      const totalRevenue = paidInvoices.reduce((sum, invoice) => sum + (invoice.total_amount || 0), 0);
+      
+      // Calculăm valoarea medie a proiectelor
+      const averageProjectValue = projectsCount > 0 
+        ? Math.round(projects.reduce((sum, project) => sum + (project.budget || 0), 0) / projectsCount) 
+        : 0;
+      
+      // Pentru creșteri, ar trebui să avem date istorice - în acest moment vom folosi valori hardcodate
+      // În viitor, acestea ar trebui să fie calculate pe baza datelor din ultimele luni
+      const clientsIncrease = 0;
+      const projectsIncrease = 0;
+      const revenueIncrease = 0;
+      
       res.json({
-        clientsCount: 28,
-        projectsCount: 12,
-        activeTasksCount: 43,
-        invoicesValue: 57800,
-        totalRevenue: 238500,
-        averageProjectValue: 19875,
-        clientsIncrease: 12,
-        projectsIncrease: 8,
-        revenueIncrease: 15
+        clientsCount,
+        projectsCount,
+        activeProjectsCount,
+        activeTasksCount,
+        invoicesValue,
+        totalRevenue,
+        averageProjectValue,
+        clientsIncrease,
+        projectsIncrease,
+        revenueIncrease
       });
     } catch (error) {
-      console.error("Error fetching statistics:", error);
+      console.error("Eroare la obținerea statisticilor:", error);
       res.status(500).json({ error: "Eroare la obținerea statisticilor" });
     }
   });
@@ -596,15 +639,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Project Status
   app.get("/api/projects/status", async (req, res) => {
     try {
-      // Sample data - would be calculated from the database
-      res.json([
-        { name: "În progres", value: 7, color: "#3b82f6" },
-        { name: "Completate", value: 12, color: "#22c55e" },
-        { name: "În așteptare", value: 4, color: "#f97316" },
-        { name: "Anulate", value: 2, color: "#ef4444" }
-      ]);
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+
+      // Obținem toate proiectele organizației
+      const projects = await storage.getProjectsByOrganization(user.organization_id);
+      
+      // Definim culorile statusurilor
+      const statusColors = {
+        'in_progress': '#3b82f6',  // albastru - în progres
+        'active': '#3b82f6',       // albastru - activ
+        'completed': '#22c55e',    // verde - completat
+        'on_hold': '#f97316',      // portocaliu - în așteptare
+        'pending': '#f97316',      // portocaliu - în așteptare
+        'cancelled': '#ef4444',    // roșu - anulat
+        'archived': '#94a3b8'      // gri - arhivat
+      };
+      
+      // Traducem statusurile pentru interfața în limba română
+      const statusNames = {
+        'in_progress': 'În progres',
+        'active': 'Activ',
+        'completed': 'Completat',
+        'on_hold': 'În așteptare',
+        'pending': 'În așteptare',
+        'cancelled': 'Anulat',
+        'archived': 'Arhivat'
+      };
+      
+      // Grupăm proiectele după status
+      const statusGroups = projects.reduce((acc, project) => {
+        const status = project.status || 'pending';
+        if (!acc[status]) {
+          acc[status] = 0;
+        }
+        acc[status]++;
+        return acc;
+      }, {});
+      
+      // Convertim în formatul așteptat de frontend
+      const statusData = Object.entries(statusGroups).map(([status, count]) => ({
+        name: statusNames[status] || status, 
+        value: count, 
+        color: statusColors[status] || '#94a3b8'
+      }));
+      
+      res.json(statusData);
     } catch (error) {
-      console.error("Error fetching project status:", error);
+      console.error("Eroare la obținerea statisticilor de status proiecte:", error);
       res.status(500).json({ error: "Eroare la obținerea statusului proiectelor" });
     }
   });
@@ -612,17 +700,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Invoices Data
   app.get("/api/invoices/summary", async (req, res) => {
     try {
-      // Sample data - would be calculated from the database
-      res.json([
-        { name: "Ian", paid: 15000, unpaid: 5000, overdue: 2000 },
-        { name: "Feb", paid: 18000, unpaid: 8000, overdue: 1500 },
-        { name: "Mar", paid: 22000, unpaid: 6000, overdue: 3000 },
-        { name: "Apr", paid: 19000, unpaid: 7000, overdue: 2500 },
-        { name: "Mai", paid: 23000, unpaid: 9000, overdue: 4000 },
-        { name: "Iun", paid: 25000, unpaid: 7500, overdue: 2000 }
-      ]);
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+
+      // Obținem toate facturile organizației
+      const invoices = await storage.getInvoicesByOrganization(user.organization_id);
+      
+      // Definim numele lunilor în română
+      const monthNames = [
+        "Ian", "Feb", "Mar", "Apr", "Mai", "Iun", 
+        "Iul", "Aug", "Sep", "Oct", "Nov", "Dec"
+      ];
+      
+      // Obținem data curentă și calculăm luna de început pentru analiza ultimelor 6 luni
+      const today = new Date();
+      const startMonth = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+      
+      // Creăm o structură pentru a ține sumarul lunar
+      const monthlySummary = {};
+      
+      // Inițializăm structura pentru ultimele 6 luni
+      for (let i = 0; i < 6; i++) {
+        const month = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1);
+        const monthKey = `${month.getFullYear()}-${month.getMonth() + 1}`;
+        const monthName = monthNames[month.getMonth()];
+        
+        monthlySummary[monthKey] = {
+          name: monthName,
+          paid: 0,
+          unpaid: 0,
+          overdue: 0,
+          month: month.getMonth(),
+          year: month.getFullYear()
+        };
+      }
+      
+      // Parcurgem facturile și le grupăm pe luni
+      invoices.forEach(invoice => {
+        if (!invoice.issue_date) return;
+        
+        const invoiceDate = new Date(invoice.issue_date);
+        const monthKey = `${invoiceDate.getFullYear()}-${invoiceDate.getMonth() + 1}`;
+        
+        // Verificăm dacă luna este în perioada analizată
+        if (monthlySummary[monthKey]) {
+          const amount = invoice.total_amount || 0;
+          
+          // Clasificăm factura în funcție de status
+          if (invoice.status === 'paid') {
+            monthlySummary[monthKey].paid += amount;
+          } else if (invoice.status === 'overdue' || 
+                    (invoice.due_date && new Date(invoice.due_date) < today)) {
+            monthlySummary[monthKey].overdue += amount;
+          } else {
+            monthlySummary[monthKey].unpaid += amount;
+          }
+        }
+      });
+      
+      // Convertim obiectul în array și sortăm după an și lună
+      const result = Object.values(monthlySummary)
+        .sort((a, b) => {
+          if (a.year !== b.year) return a.year - b.year;
+          return a.month - b.month;
+        });
+      
+      res.json(result);
     } catch (error) {
-      console.error("Error fetching invoices data:", error);
+      console.error("Eroare la obținerea datelor despre facturi:", error);
       res.status(500).json({ error: "Eroare la obținerea datelor despre facturi" });
     }
   });
@@ -630,70 +781,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Upcoming Tasks
   app.get("/api/tasks/upcoming", async (req, res) => {
     try {
-      const today = new Date();
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const nextWeek = new Date(today);
-      nextWeek.setDate(nextWeek.getDate() + 7);
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+
+      // Obținem toate task-urile organizației
+      const tasks = await storage.getTasksByOrganization(user.organization_id);
       
-      // Sample data - would be fetched from the database
-      res.json([
-        {
-          id: 1,
-          title: "Finalizare design homepage",
-          description: "Completare design pentru pagina principală",
-          dueDate: tomorrow,
-          projectId: 1,
-          projectName: "Redesign website Clisoft",
-          status: "În lucru",
-          priority: "high",
-          progress: 75
-        },
-        {
-          id: 2,
-          title: "Implementare API plăți",
-          description: "Integrare Stripe pentru procesare plăți",
-          dueDate: new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000),
-          projectId: 2,
-          projectName: "Platformă e-commerce MegaShop",
-          status: "În lucru",
-          priority: "urgent",
-          progress: 40
-        },
-        {
-          id: 3,
-          title: "Creare conținut blog",
-          dueDate: new Date(today.getTime() + 5 * 24 * 60 * 60 * 1000),
-          projectId: 1,
-          projectName: "Redesign website Clisoft",
-          status: "Neînceput",
-          priority: "medium",
-          progress: 0
-        },
-        {
-          id: 4,
-          title: "Optimizare SEO On-Page",
-          description: "Îmbunătățire titluri și meta descrieri",
-          dueDate: new Date(today.getTime() - 1 * 24 * 60 * 60 * 1000),
-          projectId: 3,
-          projectName: "Marketing digital FastTech",
-          status: "În întârziere",
-          priority: "high",
-          progress: 30
-        },
-        {
-          id: 5,
-          title: "Testare compatibilitate browsere",
-          dueDate: nextWeek,
-          projectId: 2,
-          projectName: "Platformă e-commerce MegaShop",
-          status: "Neînceput",
-          priority: "low",
-          progress: 0
+      // Obținem toate proiectele organizației pentru a face legătura cu numele proiectelor
+      const projects = await storage.getProjectsByOrganization(user.organization_id);
+      const projectsMap = projects.reduce((map, project) => {
+        map[project.id] = project;
+        return map;
+      }, {});
+      
+      const today = new Date();
+      
+      // Filtrăm pentru a include doar task-urile necompletate cu deadline în viitor sau recent expirate
+      // Și le sortăm după data limită
+      const upcomingTasks = tasks
+        .filter(task => 
+          // Excludem task-urile care au fost completate sau anulate
+          task.status !== 'completed' && task.status !== 'cancelled' && 
+          // Includem task-urile care au o dată limită
+          task.due_date && 
+          // Includem doar task-urile cu deadline în următoarele 7 zile sau expirate recent (ultima săptămână)
+          new Date(task.due_date).getTime() > today.getTime() - 7 * 24 * 60 * 60 * 1000 &&
+          new Date(task.due_date).getTime() < today.getTime() + 14 * 24 * 60 * 60 * 1000
+        )
+        .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+        // Luăm doar primele 5 task-uri
+        .slice(0, 5);
+      
+      // Traducem statusurile pentru interfața în limba română
+      const statusTranslations = {
+        'not_started': 'Neînceput',
+        'in_progress': 'În lucru',
+        'on_hold': 'În așteptare',
+        'completed': 'Completat',
+        'cancelled': 'Anulat',
+        'delayed': 'În întârziere'
+      };
+      
+      // Traducem prioritățile pentru interfața în limba română
+      const priorityTranslations = {
+        'low': 'scăzută',
+        'medium': 'medie',
+        'high': 'ridicată',
+        'urgent': 'urgentă'
+      };
+      
+      // Transformăm datele în formatul așteptat de frontend
+      const formattedTasks = upcomingTasks.map(task => {
+        const project = projectsMap[task.project_id];
+        const projectName = project ? project.name : `Proiect #${task.project_id}`;
+        
+        // Determinăm statusul în funcție de data limită
+        let displayStatus = statusTranslations[task.status] || task.status;
+        if (task.due_date && new Date(task.due_date).getTime() < today.getTime() && task.status !== 'completed') {
+          displayStatus = 'În întârziere';
         }
-      ]);
+        
+        return {
+          id: task.id,
+          title: task.title,
+          description: task.description || '',
+          dueDate: task.due_date,
+          projectId: task.project_id,
+          projectName: projectName,
+          status: displayStatus,
+          priority: priorityTranslations[task.priority] || task.priority,
+          progress: task.progress || 0
+        };
+      });
+      
+      res.json(formattedTasks);
     } catch (error) {
-      console.error("Error fetching upcoming tasks:", error);
+      console.error("Eroare la obținerea task-urilor apropiate:", error);
       res.status(500).json({ error: "Eroare la obținerea task-urilor apropiate" });
     }
   });
@@ -701,27 +870,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Time Tracking Data
   app.get("/api/time-tracking/summary", async (req, res) => {
     try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+
+      // Obținem toate înregistrările de timp din organizație
+      let timeLogs = await storage.getTimeLogsByUser(user.id);
+      
+      // Dacă utilizatorul are rol de admin sau manager, obținem datele pentru întreaga organizație
+      if (user.role === 'admin' || user.role === 'manager' || user.role === 'ceo') {
+        timeLogs = await Promise.all((await storage.getUsersByOrganization(user.organization_id))
+          .flatMap(async orgUser => await storage.getTimeLogsByUser(orgUser.id)));
+      }
+      
       const today = new Date();
       
-      // Generate dates for last 7 days
-      const dates = Array.from({ length: 7 }, (_, i) => {
-        const date = new Date(today);
-        date.setDate(date.getDate() - (6 - i));
-        return date.toLocaleDateString('ro-RO', { weekday: 'short' });
+      // Calculăm data de început (7 zile în urmă)
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - 6);
+      startDate.setHours(0, 0, 0, 0);
+      
+      // Generăm zilele pentru ultimele 7 zile
+      const days = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() + i);
+        return {
+          date: date.toLocaleDateString('ro-RO', { weekday: 'short' }),
+          fullDate: new Date(date),
+          hours: 0,
+          billable: 0,
+          nonBillable: 0
+        };
       });
       
-      // Sample data - would be calculated from the database
-      res.json([
-        { date: dates[0], hours: 6, billable: 5, nonBillable: 1 },
-        { date: dates[1], hours: 7.5, billable: 6.5, nonBillable: 1 },
-        { date: dates[2], hours: 8, billable: 7, nonBillable: 1 },
-        { date: dates[3], hours: 6.5, billable: 5.5, nonBillable: 1 },
-        { date: dates[4], hours: 9, billable: 8, nonBillable: 1 },
-        { date: dates[5], hours: 7, billable: 6, nonBillable: 1 },
-        { date: dates[6], hours: 4, billable: 3, nonBillable: 1 }
-      ]);
+      // Creăm un Map pentru a facilita căutarea zilei după data completă
+      const daysMap = new Map();
+      days.forEach(day => {
+        const dateKey = day.fullDate.toISOString().split('T')[0];
+        daysMap.set(dateKey, day);
+      });
+      
+      // Procesăm înregistrările de timp pentru fiecare zi
+      if (Array.isArray(timeLogs)) {
+        timeLogs.flat().forEach(log => {
+          if (!log.start_time) return;
+          
+          // Convertim la dată locală și extragem doar data (fără timp)
+          const logDate = new Date(log.start_time);
+          const dateKey = logDate.toISOString().split('T')[0];
+          
+          // Dacă data este în intervalul nostru
+          if (daysMap.has(dateKey)) {
+            const day = daysMap.get(dateKey);
+            
+            // Calculăm orele înregistrate 
+            const durationHours = ((log.duration || 0) / 60); // conversia din minute în ore
+            
+            // Actualizăm sumarul zilei
+            day.hours += durationHours;
+            
+            if (log.billable) {
+              day.billable += durationHours;
+            } else {
+              day.nonBillable += durationHours;
+            }
+          }
+        });
+      }
+      
+      // Rotunjim valorile pentru o afișare mai plăcută
+      days.forEach(day => {
+        day.hours = parseFloat(day.hours.toFixed(1));
+        day.billable = parseFloat(day.billable.toFixed(1));
+        day.nonBillable = parseFloat(day.nonBillable.toFixed(1));
+        
+        // Eliminăm proprietatea fullDate care nu este necesară în răspuns
+        delete day.fullDate;
+      });
+      
+      res.json(days);
     } catch (error) {
-      console.error("Error fetching time tracking data:", error);
+      console.error("Eroare la obținerea datelor de time tracking:", error);
       res.status(500).json({ error: "Eroare la obținerea datelor de time tracking" });
     }
   });
@@ -729,53 +963,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Upcoming Events
   app.get("/api/events/upcoming", async (req, res) => {
     try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Neautorizat" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user || !user.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+
+      const organizationId = user.organization_id;
       const today = new Date();
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      today.setHours(0, 0, 0, 0);
       
-      // Sample data - would be fetched from the database
-      res.json([
-        {
-          id: 1,
-          title: "Ședință kickoff proiect Innova",
-          description: "Discuții inițiale și planificare proiect",
-          startDate: new Date(today.getTime() + 4 * 24 * 60 * 60 * 1000 + 10 * 60 * 60 * 1000),
-          endDate: new Date(today.getTime() + 4 * 24 * 60 * 60 * 1000 + 11 * 60 * 60 * 1000),
-          location: "Sala de conferințe",
-          type: "meeting"
-        },
-        {
-          id: 2,
-          title: "Termen limită livrare design Optitech",
-          startDate: tomorrow,
-          type: "deadline"
-        },
-        {
-          id: 3,
-          title: "Call prezentare concept MegaShop",
-          startDate: new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000 + 14 * 60 * 60 * 1000),
-          endDate: new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000 + 15 * 60 * 60 * 1000),
-          location: "Online - Google Meet",
-          type: "meeting"
-        },
-        {
-          id: 4,
-          title: "Plată factură Softdev",
-          description: "Factură servicii hosting INV-2023-045",
-          startDate: new Date(today.getTime() + 5 * 24 * 60 * 60 * 1000),
-          type: "payment"
-        },
-        {
-          id: 5,
-          title: "Follow-up client Medico",
-          description: "Verificare satisfacție client după livrare",
-          startDate: new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000 + 11 * 60 * 60 * 1000),
-          endDate: new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000 + 11 * 60 * 60 * 1000 + 30 * 60 * 1000),
-          type: "reminder"
+      // Inițializăm array-ul pentru evenimente
+      const events = [];
+      
+      // Obținem task-urile din baza de date pentru a identifica deadline-uri
+      const tasks = await storage.getTasksByOrganization(organizationId);
+      const projects = await storage.getProjectsByOrganization(organizationId);
+      const projectsMap = projects.reduce((map, project) => {
+        map[project.id] = project;
+        return map;
+      }, {});
+      
+      // Filtrăm task-urile și le convertim în evenimente de tip deadline
+      const taskDeadlines = tasks
+        .filter(task => 
+          task.status !== 'completed' && 
+          task.status !== 'cancelled' && 
+          task.due_date && 
+          new Date(task.due_date) > today && 
+          new Date(task.due_date) < new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000)
+        )
+        .map(task => {
+          const project = projectsMap[task.project_id];
+          const projectName = project ? project.name : `Proiect #${task.project_id}`;
+          
+          return {
+            id: `task-${task.id}`,
+            title: `Deadline: ${task.title}`,
+            description: task.description || `Termen limită pentru task din proiectul ${projectName}`,
+            startDate: new Date(task.due_date),
+            type: "deadline",
+            relatedEntityType: "task",
+            relatedEntityId: task.id
+          };
+        });
+        
+      events.push(...taskDeadlines);
+      
+      // Obținem facturile din baza de date pentru a identifica date de plată
+      const invoices = await storage.getInvoicesByOrganization(organizationId);
+      
+      // Filtrăm facturile și le convertim în evenimente de tip plată
+      const invoicePayments = invoices
+        .filter(invoice => 
+          invoice.status !== 'paid' && 
+          invoice.status !== 'cancelled' && 
+          invoice.due_date && 
+          new Date(invoice.due_date) > today && 
+          new Date(invoice.due_date) < new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000)
+        )
+        .map(invoice => {
+          return {
+            id: `invoice-${invoice.id}`,
+            title: `Plată: ${invoice.invoice_number || `Factură #${invoice.id}`}`,
+            description: `Plată factură ${invoice.total_amount ? `în valoare de ${invoice.total_amount} ${invoice.currency || 'RON'}` : ''}`,
+            startDate: new Date(invoice.due_date),
+            type: "payment",
+            relatedEntityType: "invoice",
+            relatedEntityId: invoice.id
+          };
+        });
+        
+      events.push(...invoicePayments);
+      
+      // Adăugăm întâlniri sau alte evenimente programate (ar trebui să vină din tabela events)
+      try {
+        const calendarEvents = await db`
+          SELECT * FROM events 
+          WHERE organization_id = ${organizationId}
+          AND start_date > ${today}
+          AND start_date < ${new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000)}
+          ORDER BY start_date ASC
+        `;
+        
+        if (calendarEvents && calendarEvents.length > 0) {
+          const formattedEvents = calendarEvents.map(event => ({
+            id: `event-${event.id}`,
+            title: event.title,
+            description: event.description,
+            startDate: new Date(event.start_date),
+            endDate: event.end_date ? new Date(event.end_date) : undefined,
+            location: event.location,
+            type: event.event_type || "meeting",
+            relatedEntityType: event.related_entity_type,
+            relatedEntityId: event.related_entity_id
+          }));
+          
+          events.push(...formattedEvents);
         }
-      ]);
+      } catch (error) {
+        console.log("Nu s-au putut încărca evenimentele din calendar:", error.message);
+        // Continuăm execuția chiar dacă nu avem evenimente din calendar
+      }
+      
+      // Sortăm toate evenimentele după dată
+      events.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+      
+      // Returnăm primele 5 evenimente
+      res.json(events.slice(0, 5));
     } catch (error) {
-      console.error("Error fetching upcoming events:", error);
+      console.error("Eroare la obținerea evenimentelor apropiate:", error);
       res.status(500).json({ error: "Eroare la obținerea evenimentelor apropiate" });
     }
   });
