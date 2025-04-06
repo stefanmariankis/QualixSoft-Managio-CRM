@@ -434,7 +434,8 @@ export class DatabaseStorage implements IStorage {
         return undefined;
       }
 
-      return result as Client;
+      // Returnăm primul element din array (care este un obiect Client)
+      return result[0] as Client;
     } catch (error) {
       console.error("Eroare la obținerea clientului:", error);
       return undefined;
