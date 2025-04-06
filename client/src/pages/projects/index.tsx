@@ -174,21 +174,51 @@ export default function ProjectsPage() {
     return map[priority] || priority;
   };
 
-  const formatDateRange = (startDate: Date, endDate: Date | null) => {
+  // Funcție utilitară pentru a valida o dată
+  const ensureDate = (dateInput: any): Date | null => {
+    if (!dateInput) return null;
+    
+    if (dateInput instanceof Date) {
+      // Verificăm dacă obiectul Date este valid
+      return isNaN(dateInput.getTime()) ? null : dateInput;
+    }
+    
+    try {
+      // Încercăm să convertim string-ul sau alt tip de date în Date
+      const date = new Date(dateInput);
+      return isNaN(date.getTime()) ? null : date;
+    } catch (error) {
+      console.error(`Eroare la conversia datei ${dateInput}:`, error);
+      return null;
+    }
+  };
+
+  const formatDateRange = (startDateInput: any, endDateInput: any) => {
+    const startDate = ensureDate(startDateInput);
+    const endDate = ensureDate(endDateInput);
+    
+    if (!startDate) return "Dată nespecificată";
+    
     const start = startDate.toLocaleDateString('ro-RO');
     if (!endDate) return `${start} - nedefinit`;
+    
     return `${start} - ${endDate.toLocaleDateString('ro-RO')}`;
   };
 
   // Verifică dacă proiectul este întârziat (data de final depășită și nu este finalizat)
-  const isOverdue = (endDate: Date | null, status: string) => {
+  const isOverdue = (endDateInput: any, status: string) => {
+    const endDate = ensureDate(endDateInput);
     if (!endDate) return false;
     return endDate < new Date() && status !== 'finalizat' && status !== 'anulat';
   };
 
   // Calculează durata proiectului în zile
-  const calculateDuration = (startDate: Date, endDate: Date | null) => {
-    if (!endDate) return "nedefinit";
+  const calculateDuration = (startDateInput: any, endDateInput: any) => {
+    const startDate = ensureDate(startDateInput);
+    const endDate = ensureDate(endDateInput);
+    
+    if (!startDate || !endDate) return "nedefinit";
+    
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return `${diffDays} zile`;
