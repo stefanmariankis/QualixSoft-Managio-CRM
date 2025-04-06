@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,44 +53,24 @@ import {
   FolderKanban,
   FileText
 } from "lucide-react";
-import { Project } from "@shared/schema";
+import { Project, InsertProject, projectSchema } from "@shared/schema";
+import { z } from "zod";
 import { Textarea } from "@/components/ui/textarea";
+import { 
+  Form, 
+  FormControl, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage 
+} from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
-// Pentru simulare date
-const fakeProjects: Project[] = Array.from({ length: 15 }, (_, i) => ({
-  id: i + 1,
-  organization_id: 1,
-  client_id: Math.floor(Math.random() * 15) + 1,
-  name: `Proiect ${i + 1}`,
-  description: i % 3 === 0 ? `Descriere pentru proiectul ${i + 1}` : null,
-  start_date: new Date(Date.now() - Math.floor(Math.random() * 90) * 24 * 60 * 60 * 1000),
-  end_date: i % 7 !== 0 ? new Date(Date.now() + Math.floor(Math.random() * 180) * 24 * 60 * 60 * 1000) : null,
-  status: ['planificat', 'în desfășurare', 'în așteptare', 'finalizat', 'anulat'][i % 5] as any,
-  budget: i % 3 === 0 ? null : Math.floor(Math.random() * 50000) + 5000,
-  currency: 'RON',
-  estimated_hours: i % 4 === 0 ? null : Math.floor(Math.random() * 300) + 50,
-  completion_percentage: Math.floor(Math.random() * 100),
-  priority: ['low', 'medium', 'high'][i % 3] as any,
-  manager_id: (i % 3) + 1,
-  created_by: 1,
-  is_fixed_price: i % 2 === 0,
-  category: ['website', 'aplicație mobilă', 'design', 'marketing', 'consultanță'][i % 5] as any,
-  created_at: new Date(Date.now() - Math.floor(Math.random() * 180) * 24 * 60 * 60 * 1000),
-  updated_at: new Date(),
-}));
-
-// Lista clienți pentru dropdown
-const fakeClients = Array.from({ length: 15 }, (_, i) => ({
-  id: i + 1,
-  name: `Client ${i + 1} SRL`
-}));
-
-// Lista utilizatori pentru dropdown (manageri de proiect)
-const fakeUsers = [
-  { id: 1, name: "Alexandru Popescu" },
-  { id: 2, name: "Maria Ionescu" },
-  { id: 3, name: "Ion Vasilescu" }
-];
+// Constante pentru utilizare când datele nu sunt încă încărcate
+const statusOptions = ['planificat', 'în desfășurare', 'în așteptare', 'finalizat', 'anulat'];
+const priorityOptions = ['low', 'medium', 'high'];
+const categoryOptions = ['website', 'aplicație mobilă', 'design', 'marketing', 'consultanță'];
 
 export default function ProjectsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -96,15 +78,19 @@ export default function ProjectsPage() {
   const [filterClient, setFilterClient] = useState("toate");
   const [filterCategory, setFilterCategory] = useState("toate");
   
-  // Simulează apel API la server
+  // Obținem datele despre clienți pentru afișare nume
+  const { data: clients } = useQuery({
+    queryKey: ['/api/clients'],
+  });
+
+  // Obținem utilizatorii organizației pentru managerii de proiect
+  const { data: users } = useQuery({
+    queryKey: ['/api/users/organization'],
+  });
+
+  // Obținem lista de proiecte din API
   const { data: projects, isLoading } = useQuery({
-    queryKey: ["/api/projects"],
-    queryFn: async () => {
-      // În implementarea reală, de înlocuit cu apelul API real
-      return new Promise<Project[]>((resolve) => {
-        setTimeout(() => resolve(fakeProjects), 300);
-      });
-    },
+    queryKey: ['/api/projects'],
   });
 
   // Filtrare proiecte
@@ -162,13 +148,16 @@ export default function ProjectsPage() {
   };
 
   const getClientName = (clientId: number) => {
-    const client = fakeClients.find(c => c.id === clientId);
+    if (!clients) return `Client ${clientId}`;
+    const client = clients.find(c => c.id === clientId);
     return client ? client.name : `Client ${clientId}`;
   };
 
   const getManagerName = (managerId: number) => {
-    const user = fakeUsers.find(u => u.id === managerId);
-    return user ? user.name : `Manager ${managerId}`;
+    if (!users) return `Manager ${managerId}`;
+    const user = users.find(u => u.id === managerId);
+    // Folosim firstName și lastName pentru a afișa numele întreg
+    return user ? `${user.firstName} ${user.lastName}` : `Manager ${managerId}`;
   };
 
   const formatCurrency = (amount: number | null, currency: string) => {
@@ -205,6 +194,77 @@ export default function ProjectsPage() {
     return `${diffDays} zile`;
   };
 
+  // Definește mutația pentru adăugarea unui proiect nou
+  const { toast } = useToast();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  
+  // Folosim schema de proiect existentă pentru validare
+  const projectFormSchema = projectSchema.extend({
+    name: projectSchema.shape.name.min(3, {
+      message: "Numele proiectului trebuie să aibă cel puțin 3 caractere"
+    }),
+  });
+
+  // Definește formularul
+  const form = useForm({
+    resolver: zodResolver(projectFormSchema),
+    defaultValues: {
+      name: "",
+      client_id: 0,
+      manager_id: 0,
+      start_date: new Date(),
+      end_date: null,
+      status: "planificat",
+      priority: "medium",
+      category: "website",
+      budget: null,
+      currency: "EUR",
+      description: "",
+      estimated_hours: null,
+      completion_percentage: 0
+    }
+  });
+
+  // Mutația pentru adăugarea unui proiect nou
+  const createProjectMutation = useMutation({
+    mutationFn: async (data: InsertProject) => {
+      const response = await apiRequest("POST", "/api/projects", data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      // Invalidează query-ul pentru a reîncărca lista de proiecte
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      toast({
+        title: "Proiect adăugat",
+        description: "Proiectul a fost adăugat cu succes",
+      });
+      setIsAddDialogOpen(false);
+      form.reset();
+    },
+    onError: (error) => {
+      console.error(error);
+      toast({
+        title: "Eroare",
+        description: "A apărut o eroare la adăugarea proiectului",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Handler pentru trimiterea formularului
+  const onSubmit = (data: z.infer<typeof projectFormSchema>) => {
+    // Convertim ID-urile la numere
+    const formattedData: Partial<InsertProject> = {
+      ...data,
+      client_id: parseInt(data.client_id.toString(), 10),
+      manager_id: data.manager_id ? parseInt(data.manager_id.toString(), 10) : null,
+      budget: data.budget ? parseFloat(data.budget.toString()) : null,
+      estimated_hours: data.estimated_hours ? parseFloat(data.estimated_hours.toString()) : null,
+      completion_percentage: 0
+    };
+    createProjectMutation.mutate(formattedData as InsertProject);
+  };
+
   return (
     <DashboardLayout>
       <div className="flex flex-col">
@@ -215,7 +275,7 @@ export default function ProjectsPage() {
               Gestionează proiectele și monitorizează progresul acestora
             </p>
           </div>
-          <Dialog>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="flex items-center gap-1">
                 <Plus size={16} />
@@ -229,132 +289,304 @@ export default function ProjectsPage() {
                   Completează detaliile pentru a crea un nou proiect
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <label htmlFor="name" className="text-sm font-medium">Nume proiect</label>
-                  <Input id="name" placeholder="Nume proiect" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label htmlFor="client_id" className="text-sm font-medium">Client</label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selectează client" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {fakeClients.map(client => (
-                          <SelectItem key={client.id} value={client.id.toString()}>
-                            {client.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nume proiect</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nume proiect" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="client_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Client</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            defaultValue={field.value.toString()}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selectează client" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {clients ? clients.map(client => (
+                                <SelectItem key={client.id} value={client.id.toString()}>
+                                  {client.name}
+                                </SelectItem>
+                              )) : null}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="manager_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Manager proiect</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            defaultValue={field.value.toString()}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selectează manager" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {users ? users.map(user => (
+                                <SelectItem key={user.id} value={user.id.toString()}>
+                                  {`${user.firstName} ${user.lastName}`}
+                                </SelectItem>
+                              )) : null}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <label htmlFor="manager_id" className="text-sm font-medium">Manager proiect</label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selectează manager" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {fakeUsers.map(user => (
-                          <SelectItem key={user.id} value={user.id.toString()}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="start_date"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Data început</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="date" 
+                              {...field} 
+                              value={field.value ? new Date(field.value).toISOString().substring(0, 10) : ''} 
+                              onChange={(e) => field.onChange(new Date(e.target.value))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="end_date"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Data estimată încheiere</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="date" 
+                              {...field} 
+                              value={field.value ? new Date(field.value).toISOString().substring(0, 10) : ''} 
+                              onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label htmlFor="start_date" className="text-sm font-medium">Data început</label>
-                    <Input id="start_date" type="date" />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selectează status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {statusOptions.map((status) => (
+                                <SelectItem key={status} value={status}>
+                                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="priority"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Prioritate</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selectează prioritate" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {priorityOptions.map((priority) => (
+                                <SelectItem key={priority} value={priority}>
+                                  {getPriorityLabel(priority)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <label htmlFor="end_date" className="text-sm font-medium">Data estimată încheiere</label>
-                    <Input id="end_date" type="date" />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="budget"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Buget</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              placeholder="0" 
+                              {...field} 
+                              value={field.value || ''} 
+                              onChange={(e) => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="currency"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Monedă</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selectează moneda" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="RON">RON</SelectItem>
+                              <SelectItem value="EUR">EUR</SelectItem>
+                              <SelectItem value="USD">USD</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label htmlFor="status" className="text-sm font-medium">Status</label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selectează status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="planificat">Planificat</SelectItem>
-                        <SelectItem value="în desfășurare">În desfășurare</SelectItem>
-                        <SelectItem value="în așteptare">În așteptare</SelectItem>
-                        <SelectItem value="finalizat">Finalizat</SelectItem>
-                        <SelectItem value="anulat">Anulat</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="estimated_hours"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Ore estimate</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              placeholder="0" 
+                              {...field} 
+                              value={field.value || ''} 
+                              onChange={(e) => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="category"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Categorie</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selectează categorie" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {categoryOptions.map((category) => (
+                                <SelectItem key={category} value={category}>
+                                  {category.charAt(0).toUpperCase() + category.slice(1)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <label htmlFor="priority" className="text-sm font-medium">Prioritate</label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selectează prioritate" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Scăzută</SelectItem>
-                        <SelectItem value="medium">Medie</SelectItem>
-                        <SelectItem value="high">Ridicată</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label htmlFor="budget" className="text-sm font-medium">Buget</label>
-                    <Input id="budget" type="number" placeholder="0" />
-                  </div>
-                  <div className="space-y-2">
-                    <label htmlFor="currency" className="text-sm font-medium">Monedă</label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selectează moneda" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="RON">RON</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="USD">USD</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label htmlFor="estimated_hours" className="text-sm font-medium">Ore estimate</label>
-                    <Input id="estimated_hours" type="number" placeholder="0" />
-                  </div>
-                  <div className="space-y-2">
-                    <label htmlFor="category" className="text-sm font-medium">Categorie</label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selectează categorie" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="website">Website</SelectItem>
-                        <SelectItem value="aplicație mobilă">Aplicație mobilă</SelectItem>
-                        <SelectItem value="design">Design</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
-                        <SelectItem value="consultanță">Consultanță</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="description" className="text-sm font-medium">Descriere</label>
-                  <Textarea id="description" placeholder="Descriere proiect" rows={3} />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline">Anulează</Button>
-                <Button>Salvează proiect</Button>
-              </DialogFooter>
+                  
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Descriere</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Descriere proiect" 
+                            rows={3} 
+                            {...field} 
+                            value={field.value || ''} 
+                            onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <DialogFooter>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setIsAddDialogOpen(false)}
+                    >
+                      Anulează
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={createProjectMutation.isPending}
+                    >
+                      {createProjectMutation.isPending && (
+                        <span className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Salvează proiect
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
             </DialogContent>
           </Dialog>
         </div>
@@ -414,11 +646,11 @@ export default function ProjectsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="toate">Toți clienții</SelectItem>
-                        {fakeClients.map(client => (
+                        {clients ? clients.map(client => (
                           <SelectItem key={client.id} value={client.id.toString()}>
                             {client.name}
                           </SelectItem>
-                        ))}
+                        )) : null}
                       </SelectContent>
                     </Select>
                   </div>
