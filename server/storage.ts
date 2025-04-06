@@ -1285,6 +1285,9 @@ export class MemStorage implements IStorage {
     return this.projects.delete(id);
   }
   
+  // Aceste metode nu sunt folosite, deoarece folosim DatabaseStorage în implementarea curentă
+  // Ele sunt înlocuite cu implementările din DatabaseStorage
+  /*
   // Task operations
   async getTask(id: number): Promise<Task | undefined> {
     return this.tasks.get(id);
@@ -1307,6 +1310,7 @@ export class MemStorage implements IStorage {
       task => task.organization_id === organizationId
     );
   }
+  */
   
   async createTask(task: InsertTask): Promise<Task> {
     const id = this.taskIdCounter++;
