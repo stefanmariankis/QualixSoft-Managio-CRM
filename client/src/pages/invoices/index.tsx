@@ -243,7 +243,7 @@ export default function InvoicesPage() {
                         <SelectValue placeholder="Selectează proiect" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Fără proiect</SelectItem>
+                        <SelectItem value="no-project">Fără proiect</SelectItem>
                         {isProjectsLoading ? (
                           <SelectItem value="loading">Se încarcă...</SelectItem>
                         ) : projects && projects.length > 0 ? (
