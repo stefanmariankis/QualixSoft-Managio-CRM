@@ -310,7 +310,12 @@ export default function InvoiceDetails() {
     );
   }
   
-  const { invoice, items, payments, client, project } = data;
+  // Verificăm dacă avem toate datele necesare și le folosim cu fallback-uri
+  const invoice = data?.invoice || {}; 
+  const items = data?.items || [];
+  const payments = data?.payments || [];
+  const client = data?.client || {};
+  const project = data?.project || null;
   
   // Funcție pentru formatarea datelor
   const formatDate = (dateString: string | null | undefined) => {
@@ -319,7 +324,9 @@ export default function InvoiceDetails() {
   };
   
   // Funcție pentru formatarea sumelor
-  const formatAmount = (amount: number, currency: string = invoice.currency) => {
+  const formatAmount = (amount: number | undefined | null, currency: string = invoice?.currency || 'RON') => {
+    if (amount === undefined || amount === null) return '0,00 ' + currency;
+    
     return new Intl.NumberFormat('ro-RO', { 
       style: 'currency', 
       currency: currency,
@@ -328,21 +335,31 @@ export default function InvoiceDetails() {
   };
   
   // Calculează suma plătită
-  const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const totalPaid = payments && Array.isArray(payments) 
+    ? payments.reduce((sum, payment) => sum + payment.amount, 0) 
+    : 0;
   
   // Calculează suma rămasă de plată
-  const remainingAmount = invoice.total_amount - totalPaid;
+  const remainingAmount = (invoice.total_amount || 0) - totalPaid;
   
   // Verifică dacă factura este scadentă
   const isOverdue = () => {
+    if (!invoice.due_date) return false;
     if (invoice.status === 'paid' || invoice.status === 'cancelled') return false;
     return isAfter(new Date(), new Date(invoice.due_date));
   };
   
   // Calculează zilele rămase până la scadență sau zilele de întârziere
   const getDaysInfo = () => {
+    if (!invoice.due_date) return 'Termen nedefinit';
+    
     const today = new Date();
     const dueDate = new Date(invoice.due_date);
+    
+    if (isNaN(dueDate.getTime())) {
+      return 'Termen nedefinit';
+    }
+    
     const days = differenceInDays(dueDate, today);
     
     if (days > 0) {
@@ -355,7 +372,9 @@ export default function InvoiceDetails() {
   };
   
   // Culori pentru statusuri
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | undefined) => {
+    if (!status) return 'bg-gray-100 text-gray-800';
+    
     switch (status.toLowerCase()) {
       case 'draft':
         return 'bg-gray-100 text-gray-800';
@@ -373,7 +392,9 @@ export default function InvoiceDetails() {
   };
   
   // Traduce statusul facturii
-  const translateStatus = (status: string) => {
+  const translateStatus = (status: string | undefined) => {
+    if (!status) return 'Nedefinit';
+    
     switch (status.toLowerCase()) {
       case 'draft':
         return 'Ciornă';
@@ -391,7 +412,8 @@ export default function InvoiceDetails() {
   };
   
   // Inițiale pentru avatar
-  const getInitials = (name: string) => {
+  const getInitials = (name: string | undefined) => {
+    if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
