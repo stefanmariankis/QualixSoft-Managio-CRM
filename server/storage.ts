@@ -12,6 +12,8 @@ import {
   InsertTask,
   Invoice,
   InsertInvoice,
+  InvoiceItem,
+  InsertInvoiceItem,
   TimeLog,
   InsertTimeLog,
   ActivityLog,
@@ -91,9 +93,10 @@ export interface IStorage {
   getInvoicesByOrganization(organizationId: number): Promise<Invoice[]>;
   getInvoicesByClient(clientId: number): Promise<Invoice[]>;
   getInvoicesByProject(projectId: number): Promise<Invoice[]>;
-  getInvoiceItems(invoiceId: number): Promise<any[]>;
+  getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]>;
   getInvoicePayments(invoiceId: number): Promise<any[]>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
+  createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem>;
   updateInvoice(
     id: number,
     invoiceData: Partial<Invoice>,
@@ -1341,18 +1344,47 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getInvoiceItems(invoiceId: number): Promise<any[]> {
+  async getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]> {
     try {
       const result = await db`
         SELECT * FROM invoice_items
         WHERE invoice_id = ${invoiceId}
-        ORDER BY id
+        ORDER BY order_index, id
       `;
 
-      return result;
+      return result as unknown as InvoiceItem[];
     } catch (error) {
       console.error("Eroare la obținerea elementelor facturii:", error);
       return [];
+    }
+  }
+  
+  async createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem> {
+    try {
+      const now = new Date();
+      
+      // Pregătim datele pentru inserare
+      const itemData = {
+        ...item,
+        created_at: now,
+        updated_at: now,
+      };
+
+      const result = await db`
+        INSERT INTO invoice_items ${db(itemData)}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        throw new Error("Elementul facturii a fost creat dar nu a putut fi recuperat");
+      }
+
+      return result[0] as InvoiceItem;
+    } catch (error: any) {
+      console.error("Eroare la crearea elementului facturii:", error);
+      throw new Error(
+        `Nu s-a putut crea elementul facturii: ${error.message || "Eroare necunoscută"}`
+      );
     }
   }
 

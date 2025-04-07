@@ -145,21 +145,51 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       throw new ApiError("Nu există o organizație asociată acestui utilizator", 400);
     }
 
+    // Logăm datele primite pentru debugging
+    console.log("Date primite pentru crearea facturii:", req.body);
+    
     // Validăm datele primite
     const validationResult = apiInvoiceSchema.safeParse(req.body);
     if (!validationResult.success) {
       throw new ValidationError("Datele facturii sunt invalide", validationResult.error);
     }
 
+    // Extragem elementele facturii separat
+    const { items, ...invoiceData } = req.body;
+
     // Adăugăm organization_id la datele facturii
-    const invoiceData = {
-      ...validationResult.data,
+    const invoiceWithOrgData = {
+      ...invoiceData,
       organization_id: user.organization_id,
       created_by: user.id
     };
 
     // Creăm factura în baza de date
-    const newInvoice = await storage.createInvoice(invoiceData);
+    const newInvoice = await storage.createInvoice(invoiceWithOrgData);
+
+    // Procesăm și salvăm elementele facturii dacă există
+    if (items && Array.isArray(items)) {
+      console.log(`Salvăm ${items.length} elemente pentru factura #${newInvoice.id}`);
+      
+      // Salvăm fiecare element al facturii
+      for (const item of items) {
+        // Asigurăm-ne că datele elementului sunt valide
+        if (!item.description || !item.quantity || !item.unit_price) {
+          console.warn("Element factură ignorat - date incomplete:", item);
+          continue;
+        }
+        
+        // Creăm elementul facturii cu referința către factură
+        await storage.createInvoiceItem({
+          invoice_id: newInvoice.id,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_price: item.total || (item.quantity * item.unit_price),
+          order_index: item.order_index || 0
+        });
+      }
+    }
 
     // Înregistrăm activitatea
     await storage.createActivityLog({
@@ -171,7 +201,13 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       metadata: { invoice_number: newInvoice.invoice_number }
     });
 
-    res.status(201).json(newInvoice);
+    // Returnăm detaliile complete ale facturii, inclusiv elementele adăugate
+    const invoiceItems = await storage.getInvoiceItems(newInvoice.id);
+    
+    res.status(201).json({
+      ...newInvoice,
+      items: invoiceItems
+    });
   } catch (error) {
     console.error("Eroare la crearea facturii:", error);
     res.status(error instanceof ApiError ? error.statusCode : 500).json({ 

@@ -335,6 +335,28 @@ export interface Invoice {
   updated_at: Date;
 }
 
+// Tipuri pentru InvoiceItem
+export interface InvoiceItem {
+  id: number;
+  invoice_id: number;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  order_index?: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface InsertInvoiceItem {
+  invoice_id: number;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  order_index?: number;
+}
+
 export interface InsertInvoice {
   organization_id: number;
   client_id: number;
