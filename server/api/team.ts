@@ -4,6 +4,23 @@ import { NotFoundError, ValidationError, ApiError } from "../errors";
 import { teamMemberSchema, InsertTeamMember } from "../../shared/schema";
 import { requireAuth } from "../auth";
 
+/**
+ * IMPORTANT: Diferența dintre Users și TeamMembers
+ * 
+ * În Managio avem două concepte separate:
+ * 
+ * 1. Users (Utilizatori) - Aceștia sunt conturi cu acces la platformă, care se pot autentifica
+ *    direct prin interfața principală de login. Aceștia sunt de obicei administratori, proprietari
+ *    de conturi sau utilizatori care au nevoie de acces complet la platformă.
+ * 
+ * 2. TeamMembers (Membri Echipă) - Aceștia sunt persoane care fac parte din echipa unei organizații,
+ *    dar nu au neapărat acces la platformă. Ei sunt gestionați prin interfața de echipă și pot primi 
+ *    invitații de conectare dacă acest lucru este necesar.
+ * 
+ * Membrii echipei nu sunt înregistrați automat ca utilizatori în tabela "users", deoarece ei nu 
+ * au în mod necesar acces direct la platformă, ci sunt doar înregistrați în organizație.
+ */
+
 export const teamRouter = Router();
 
 // Obține toți membrii echipei din organizație

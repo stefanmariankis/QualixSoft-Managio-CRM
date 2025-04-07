@@ -482,6 +482,35 @@ export class DatabaseStorage implements IStorage {
       // Generăm o parolă temporară pentru membru
       const tempPassword = this.generateRandomPassword(10);
       
+      // 1. Creăm un utilizator corespunzător în tabela users
+      let userId = null;
+      try {
+        // Verificăm dacă utilizatorul există deja
+        const existingUser = await this.getUserByUsername(teamMember.email);
+        
+        if (!existingUser) {
+          // Creăm un utilizator nou dacă nu există
+          const newUser = await this.createUser({
+            email: teamMember.email,
+            password: tempPassword, // Folosim aceeași parolă temporară
+            firstName: teamMember.first_name,
+            lastName: teamMember.last_name,
+            role: teamMember.role,
+            organizationId: teamMember.organization_id
+          });
+          
+          userId = newUser.id;
+          console.log(`Utilizator nou creat pentru membrul echipei cu ID-ul: ${userId}`);
+        } else {
+          // Dacă utilizatorul există deja, folosim id-ul existent
+          userId = existingUser.id;
+          console.log(`Utilizator existent pentru membrul echipei cu ID-ul: ${userId}`);
+        }
+      } catch (userError) {
+        console.error("Eroare la crearea utilizatorului pentru membrul echipei:", userError);
+        // Continuăm fără a crea utilizator, dar logam eroarea
+      }
+      
       // Asigurăm că toate câmpurile necesare au valori
       // Extragem doar câmpurile necesare pentru a evita valori nedefinite
       const teamMemberData = {
@@ -497,7 +526,7 @@ export class DatabaseStorage implements IStorage {
         bio: teamMember.bio || null,
         avatar: teamMember.avatar || null,
         hourly_rate: teamMember.hourly_rate || null,
-        user_id: teamMember.user_id || null,
+        user_id: userId, // Asociem ID-ul utilizatorului creat sau existent
         is_active: teamMember.is_active ?? true,
         temp_password: tempPassword,
         password_set: false,

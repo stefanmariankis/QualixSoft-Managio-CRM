@@ -26,9 +26,12 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       return false;
     }
     
+    // Folosim o adresă de email verificată
+    // Notă: SendGrid necesită ca adresa expeditorului să fie verificată
+    // Utilizăm adresa administratorului pentru moment
     const message = {
       to: options.to,
-      from: options.from || 'noreply@managio.app', // Adresa implicită de la care se trimite emailul
+      from: options.from || 'kis.stefan1704@yahoo.com', // Adresa verificată pentru testare
       subject: options.subject,
       text: options.text || '',
       html: options.html || '',
@@ -39,6 +42,12 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('Eroare la trimiterea emailului:', error);
+    
+    // Verificăm tipul specific de eroare pentru mai multe detalii
+    if (error.response && error.response.body && error.response.body.errors) {
+      console.error('Detalii eroare SendGrid:', error.response.body.errors);
+    }
+    
     return false;
   }
 }
