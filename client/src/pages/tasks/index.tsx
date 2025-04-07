@@ -72,22 +72,22 @@ export default function TasksPage() {
   const { user } = useAuth();
   
   // Obține lista de sarcini din API
-  const { data: tasks, isLoading } = useQuery({
+  const { data: tasks = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/tasks"],
   });
   
   // Obține lista de proiecte pentru dropdown
-  const { data: projects } = useQuery({
+  const { data: projects = [] } = useQuery<any[]>({
     queryKey: ["/api/projects"],
   });
   
   // Obține lista de utilizatori pentru dropdown
-  const { data: users } = useQuery({
+  const { data: users = [] } = useQuery<any[]>({
     queryKey: ["/api/users/organization"],
   });
 
   // Filtrare sarcini
-  const filteredTasks = tasks ? tasks.filter(task => {
+  const filteredTasks = tasks.filter((task: any) => {
     // Filtrare după termen de căutare
     const matchesSearch = 
       task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -105,7 +105,7 @@ export default function TasksPage() {
                             (task.assignee_id && task.assignee_id.toString() === filterAssignee);
     
     return matchesSearch && matchesStatus && matchesProject && matchesAssignee;
-  }) : [];
+  });
 
   const getStatusBadgeColors = (status: string) => {
     switch(status) {

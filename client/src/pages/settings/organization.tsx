@@ -97,7 +97,7 @@ export default function OrganizationSettingsPage() {
         title: "Succes",
         description: "Setările organizației au fost actualizate cu succes",
       });
-      queryClient.invalidateQueries(["/api/organization"]);
+      queryClient.invalidateQueries({ queryKey: ["/api/organization"] });
     },
     onError: (error: any) => {
       toast({
@@ -119,7 +119,7 @@ export default function OrganizationSettingsPage() {
         title: "Succes",
         description: `Setările structurii organizaționale au fost actualizate. Departamentele sunt acum ${data.has_departments ? 'activate' : 'dezactivate'}.`,
       });
-      queryClient.invalidateQueries(["/api/organization"]);
+      queryClient.invalidateQueries({ queryKey: ["/api/organization"] });
     },
     onError: (error: any) => {
       toast({

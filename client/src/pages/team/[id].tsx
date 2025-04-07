@@ -163,7 +163,7 @@ export default function TeamMemberDetailsPage() {
           description: "Datele membrului au fost actualizate cu succes",
         });
         setIsEditing(false);
-        queryClient.invalidateQueries([`/api/team/${memberId}`]);
+        queryClient.invalidateQueries({ queryKey: [`/api/team/${memberId}`] });
       } else {
         const errorData = await response.json();
         throw new Error(errorData.message || "A apărut o eroare");
