@@ -1392,18 +1392,23 @@ export class DatabaseStorage implements IStorage {
         issue_date: invoice.issue_date,
         due_date: invoice.due_date,
         status: invoice.status || 'sent',
-        amount: invoice.total_amount || 0, // Folosim total_amount pentru amount 
+        total_amount: invoice.total_amount || 0, // Folosim total_amount direct (coloana a fost redenumită)
         tax_amount: invoice.tax_amount || 0,
         currency: invoice.currency || 'RON',
         created_at: now,
         updated_at: now,
+        subtotal: invoice.subtotal || 0,
+        discount_amount: invoice.discount_amount || 0,
+        discount_rate: invoice.discount_rate || 0,
+        tax_rate: invoice.tax_rate || 19, // TVA standard în România
+        paid_amount: invoice.paid_amount || 0,
+        remaining_amount: invoice.remaining_amount || invoice.total_amount || 0,
       };
       
       // Adăugăm doar câmpurile care nu sunt undefined
       if (invoice.project_id) invoiceData.project_id = invoice.project_id;
       if (invoice.notes) invoiceData.notes = invoice.notes;
-      if (invoice.payment_terms) invoiceData.payment_method = invoice.payment_terms;
-      if (invoice.payment_date) invoiceData.payment_date = invoice.payment_date;
+      if (invoice.payment_terms) invoiceData.payment_terms = invoice.payment_terms; // Nume coloană actualizat
 
       const result = await db`
         INSERT INTO invoices ${db(invoiceData)}
@@ -1437,19 +1442,24 @@ export class DatabaseStorage implements IStorage {
         updated_at: new Date(),
       };
       
-      // Mapăm doar câmpurile care există în baza de date
+      // Mapăm doar câmpurile care există în baza de date, folosind noile denumiri de coloane
       if (invoiceData.client_id) adaptedData.client_id = invoiceData.client_id;
       if (invoiceData.project_id) adaptedData.project_id = invoiceData.project_id;
       if (invoiceData.invoice_number) adaptedData.invoice_number = invoiceData.invoice_number;
       if (invoiceData.issue_date) adaptedData.issue_date = invoiceData.issue_date;
       if (invoiceData.due_date) adaptedData.due_date = invoiceData.due_date;
       if (invoiceData.status) adaptedData.status = invoiceData.status;
-      if (invoiceData.total_amount) adaptedData.amount = invoiceData.total_amount;
+      if (invoiceData.total_amount) adaptedData.total_amount = invoiceData.total_amount; // Nume coloană actualizat
       if (invoiceData.tax_amount) adaptedData.tax_amount = invoiceData.tax_amount;
+      if (invoiceData.tax_rate) adaptedData.tax_rate = invoiceData.tax_rate; // Coloană nouă
+      if (invoiceData.subtotal) adaptedData.subtotal = invoiceData.subtotal; // Coloană nouă
+      if (invoiceData.discount_amount) adaptedData.discount_amount = invoiceData.discount_amount; // Coloană nouă
+      if (invoiceData.discount_rate) adaptedData.discount_rate = invoiceData.discount_rate; // Coloană nouă
+      if (invoiceData.paid_amount) adaptedData.paid_amount = invoiceData.paid_amount;
+      if (invoiceData.remaining_amount) adaptedData.remaining_amount = invoiceData.remaining_amount;
       if (invoiceData.currency) adaptedData.currency = invoiceData.currency;
       if (invoiceData.notes) adaptedData.notes = invoiceData.notes;
-      if (invoiceData.payment_terms) adaptedData.payment_method = invoiceData.payment_terms;
-      if (invoiceData.payment_date) adaptedData.payment_date = invoiceData.payment_date;
+      if (invoiceData.payment_terms) adaptedData.payment_terms = invoiceData.payment_terms; // Nume coloană actualizat
       
       const updatedData = adaptedData;
 

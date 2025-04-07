@@ -97,7 +97,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     // Convertim datele în format valid pentru client
     const formattedInvoice = {
       ...invoice,
-      total_amount: invoice.amount, // Asigurăm compatibilitatea cu frontend-ul
+      // Nu mai e nevoie de conversie, total_amount este deja numele corect al coloanei
       issue_date: ensureDate(invoice.issue_date),
       due_date: ensureDate(invoice.due_date)
     };
