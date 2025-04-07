@@ -52,7 +52,8 @@ import {
   Clock,
   User,
   UserCircle,
-  Loader2
+  Loader2,
+  Check
 } from "lucide-react";
 import { Task } from "@shared/schema";
 
