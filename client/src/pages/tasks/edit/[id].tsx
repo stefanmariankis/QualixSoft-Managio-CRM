@@ -43,17 +43,17 @@ export default function TaskEditPage() {
   const [estimatedHours, setEstimatedHours] = useState("");
 
   // Obține task-ul
-  const { data: task, isLoading: taskLoading } = useQuery({
+  const { data: task, isLoading: taskLoading } = useQuery<{ task: any }>({
     queryKey: [`/api/tasks/${id}`],
   });
 
   // Obține proiectele
-  const { data: projects } = useQuery({
+  const { data: projects = [] } = useQuery<any[]>({
     queryKey: ["/api/projects"],
   });
 
   // Obține utilizatorii
-  const { data: users } = useQuery({
+  const { data: users = [] } = useQuery<any[]>({
     queryKey: ["/api/users/organization"],
   });
 

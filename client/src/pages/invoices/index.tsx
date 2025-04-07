@@ -271,22 +271,22 @@ export default function InvoicesPage() {
   };
   
   // Obține lista de facturi de la server
-  const { data: invoices, isLoading, error } = useQuery({
+  const { data: invoices = [], isLoading, error } = useQuery<any[]>({
     queryKey: ["/api/invoices"],
   });
   
   // Obține lista de clienți pentru filtrare și afișare
-  const { data: clients, isLoading: isClientsLoading } = useQuery({
+  const { data: clients = [], isLoading: isClientsLoading } = useQuery<any[]>({
     queryKey: ["/api/clients"],
   });
   
   // Obține lista de proiecte pentru afișare
-  const { data: projects, isLoading: isProjectsLoading } = useQuery({
+  const { data: projects = [], isLoading: isProjectsLoading } = useQuery<any[]>({
     queryKey: ["/api/projects"],
   });
 
   // Filtrare facturi
-  const filteredInvoices = invoices ? invoices.filter(invoice => {
+  const filteredInvoices = invoices.filter((invoice: any) => {
     // Filtrare după termen de căutare
     const matchesSearch = 
       invoice.invoice_number.toLowerCase().includes(searchTerm.toLowerCase());
@@ -298,7 +298,7 @@ export default function InvoicesPage() {
     const matchesClient = filterClient === "toate" || invoice.client_id.toString() === filterClient;
     
     return matchesSearch && matchesStatus && matchesClient;
-  }) : [];
+  });
 
   const getStatusBadgeColors = (status: string) => {
     switch(status) {
@@ -321,14 +321,14 @@ export default function InvoicesPage() {
 
   const getClientName = (clientId: number) => {
     if (!clients) return `Client ${clientId}`;
-    const client = clients.find(c => c.id === clientId);
+    const client = clients.find((c: any) => c.id === clientId);
     return client ? (client.name || client.company_name) : `Client ${clientId}`;
   };
 
   const getProjectName = (projectId: number | null) => {
     if (projectId === null) return "-";
     if (!projects) return `Proiect ${projectId}`;
-    const project = projects.find(p => p.id === projectId);
+    const project = projects.find((p: any) => p.id === projectId);
     return project ? project.name : `Proiect ${projectId}`;
   };
 
@@ -463,8 +463,8 @@ export default function InvoicesPage() {
                         ) : projects && projects.length > 0 ? (
                           // Filtrăm proiectele pentru a afișa doar cele ale clientului selectat
                           projects
-                            .filter(project => !selectedClient || project.client_id === parseInt(selectedClient))
-                            .map(project => (
+                            .filter((project: any) => !selectedClient || project.client_id === parseInt(selectedClient))
+                            .map((project: any) => (
                               <SelectItem key={project.id} value={project.id.toString()}>
                                 {project.name}
                               </SelectItem>
@@ -766,7 +766,7 @@ export default function InvoicesPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredInvoices.map((invoice) => (
+                      filteredInvoices.map((invoice: any) => (
                         <TableRow key={invoice.id}>
                           <TableCell className="font-medium">
                             <Link href={`/invoices/${invoice.id}`} className="hover:underline">

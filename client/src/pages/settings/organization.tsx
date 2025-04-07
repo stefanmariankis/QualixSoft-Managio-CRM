@@ -43,7 +43,7 @@ export default function OrganizationSettingsPage() {
   const [activeTab, setActiveTab] = useState("general");
 
   // Obține detaliile organizației
-  const { data: organization, isLoading } = useQuery({
+  const { data: organization, isLoading } = useQuery<any>({
     queryKey: ["/api/organization"],
   });
 

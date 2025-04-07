@@ -1,0 +1,975 @@
+client/src/pages/settings/organization.tsx:122:37 - error TS2559: Type 'string[]' has no properties in common with type 'InvalidateQueryFilters'.
+
+122       queryClient.invalidateQueries(["/api/organization"]);
+                                        ~~~~~~~~~~~~~~~~~~~~~
+
+client/src/pages/tasks/[id].tsx:436:47 - error TS2322: Type '"warning"' is not assignable to type '"default" | "destructive" | null | undefined'.
+
+436                       <Alert className="mt-4" variant="warning">
+                                                  ~~~~~~~
+
+  client/src/components/ui/alert.tsx:10:7
+     10       variant: {
+              ~~~~~~~~~~
+     11         default: "bg-background text-foreground",
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ...
+     13           "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     14       },
+        ~~~~~~~
+    The expected type comes from property 'variant' which is declared here on type 'IntrinsicAttributes & HTMLAttributes<HTMLDivElement> & VariantProps<(props?: (ConfigVariants<{ variant: { default: string; destructive: string; }; }> & ClassProp) | undefined) => string> & RefAttributes<...>'
+
+client/src/pages/tasks/edit/[id].tsx:62:22 - error TS2339: Property 'task' does not exist on type '{}'.
+
+62     if (task && task.task) {
+                        ~~~~
+
+client/src/pages/tasks/edit/[id].tsx:63:21 - error TS2339: Property 'task' does not exist on type '{}'.
+
+63       setTitle(task.task.title || "");
+                       ~~~~
+
+client/src/pages/tasks/edit/[id].tsx:64:27 - error TS2339: Property 'task' does not exist on type '{}'.
+
+64       setDescription(task.task.description || "");
+                             ~~~~
+
+client/src/pages/tasks/edit/[id].tsx:65:22 - error TS2339: Property 'task' does not exist on type '{}'.
+
+65       setStatus(task.task.status || "");
+                        ~~~~
+
+client/src/pages/tasks/edit/[id].tsx:66:24 - error TS2339: Property 'task' does not exist on type '{}'.
+
+66       setPriority(task.task.priority || "");
+                          ~~~~
+
+client/src/pages/tasks/edit/[id].tsx:67:25 - error TS2339: Property 'task' does not exist on type '{}'.
+
+67       setProjectId(task.task.project_id?.toString() || "");
+                           ~~~~
+
+client/src/pages/tasks/edit/[id].tsx:68:26 - error TS2339: Property 'task' does not exist on type '{}'.
+
+68       setAssigneeId(task.task.assignee_id?.toString() || "");
+                            ~~~~
+
+client/src/pages/tasks/edit/[id].tsx:71:16 - error TS2339: Property 'task' does not exist on type '{}'.
+
+71       if (task.task.due_date) {
+                  ~~~~
+
+client/src/pages/tasks/edit/[id].tsx:72:36 - error TS2339: Property 'task' does not exist on type '{}'.
+
+72         const date = new Date(task.task.due_date);
+                                      ~~~~
+
+client/src/pages/tasks/edit/[id].tsx:81:30 - error TS2339: Property 'task' does not exist on type '{}'.
+
+81       setEstimatedHours(task.task.estimated_hours?.toString() || "");
+                                ~~~~
+
+client/src/pages/tasks/edit/[id].tsx:155:22 - error TS2339: Property 'task' does not exist on type '{}'.
+
+155   if (!task || !task.task) {
+                         ~~~~
+
+client/src/pages/tasks/edit/[id].tsx:219:43 - error TS2339: Property 'length' does not exist on type '{}'.
+
+219                     {projects && projects.length > 0 ? (
+                                              ~~~~~~
+
+client/src/pages/tasks/edit/[id].tsx:220:32 - error TS2339: Property 'map' does not exist on type '{}'.
+
+220                       projects.map((project: any) => (
+                                   ~~~
+
+client/src/pages/tasks/edit/[id].tsx:285:41 - error TS2339: Property 'length' does not exist on type '{}'.
+
+285                         {users && users.length > 0 ? (
+                                            ~~~~~~
+
+client/src/pages/tasks/edit/[id].tsx:286:33 - error TS2339: Property 'map' does not exist on type '{}'.
+
+286                           users.map((u: any) => (
+                                    ~~~
+
+client/src/pages/tasks/edit/[id].tsx:338:31 - error TS2339: Property 'task' does not exist on type '{}'.
+
+338                   value={task.task.spent_hours || "0"}
+                                  ~~~~
+
+client/src/pages/tasks/index.tsx:90:39 - error TS2339: Property 'filter' does not exist on type '{}'.
+
+90   const filteredTasks = tasks ? tasks.filter(task => {
+                                         ~~~~~~
+
+client/src/pages/tasks/index.tsx:90:46 - error TS7006: Parameter 'task' implicitly has an 'any' type.
+
+90   const filteredTasks = tasks ? tasks.filter(task => {
+                                                ~~~~
+
+client/src/pages/tasks/index.tsx:144:30 - error TS2339: Property 'find' does not exist on type '{}'.
+
+144     const project = projects.find(p => p.id === projectId);
+                                 ~~~~
+
+client/src/pages/tasks/index.tsx:144:35 - error TS7006: Parameter 'p' implicitly has an 'any' type.
+
+144     const project = projects.find(p => p.id === projectId);
+                                      ~
+
+client/src/pages/tasks/index.tsx:151:24 - error TS2339: Property 'find' does not exist on type '{}'.
+
+151     const user = users.find(u => u.id === assigneeId);
+                           ~~~~
+
+client/src/pages/tasks/index.tsx:151:29 - error TS7006: Parameter 'u' implicitly has an 'any' type.
+
+151     const user = users.find(u => u.id === assigneeId);
+                                ~
+
+client/src/pages/tasks/index.tsx:263:35 - error TS2339: Property 'length' does not exist on type '{}'.
+
+263                   {users && users.length > 0 ? (
+                                      ~~~~~~
+
+client/src/pages/tasks/index.tsx:264:27 - error TS2339: Property 'map' does not exist on type '{}'.
+
+264                     users.map((u: any) => (
+                              ~~~
+
+client/src/pages/tasks/index.tsx:344:47 - error TS2339: Property 'length' does not exist on type '{}'.
+
+344                         {projects && projects.length > 0 ? (
+                                                  ~~~~~~
+
+client/src/pages/tasks/index.tsx:345:36 - error TS2339: Property 'map' does not exist on type '{}'.
+
+345                           projects.map(project => (
+                                       ~~~
+
+client/src/pages/tasks/index.tsx:345:40 - error TS7006: Parameter 'project' implicitly has an 'any' type.
+
+345                           projects.map(project => (
+                                           ~~~~~~~
+
+client/src/pages/tasks/index.tsx:366:41 - error TS2339: Property 'length' does not exist on type '{}'.
+
+366                         {users && users.length > 0 ? (
+                                            ~~~~~~
+
+client/src/pages/tasks/index.tsx:367:33 - error TS2339: Property 'map' does not exist on type '{}'.
+
+367                           users.map(user => (
+                                    ~~~
+
+client/src/pages/tasks/index.tsx:367:37 - error TS7006: Parameter 'user' implicitly has an 'any' type.
+
+367                           users.map(user => (
+                                        ~~~~
+
+client/src/pages/tasks/index.tsx:386:41 - error TS2339: Property 'length' does not exist on type '{}'.
+
+386                         {tasks && tasks.length > 0 ? (
+                                            ~~~~~~
+
+client/src/pages/tasks/index.tsx:387:33 - error TS2339: Property 'map' does not exist on type '{}'.
+
+387                           tasks.map(task => (
+                                    ~~~
+
+client/src/pages/tasks/index.tsx:387:37 - error TS7006: Parameter 'task' implicitly has an 'any' type.
+
+387                           tasks.map(task => (
+                                        ~~~~
+
+client/src/pages/tasks/index.tsx:508:47 - error TS2339: Property 'length' does not exist on type '{}'.
+
+508                         {projects && projects.length > 0 ? (
+                                                  ~~~~~~
+
+client/src/pages/tasks/index.tsx:509:36 - error TS2339: Property 'map' does not exist on type '{}'.
+
+509                           projects.map(project => (
+                                       ~~~
+
+client/src/pages/tasks/index.tsx:509:40 - error TS7006: Parameter 'project' implicitly has an 'any' type.
+
+509                           projects.map(project => (
+                                           ~~~~~~~
+
+client/src/pages/tasks/index.tsx:534:41 - error TS2339: Property 'length' does not exist on type '{}'.
+
+534                         {users && users.length > 0 ? (
+                                            ~~~~~~
+
+client/src/pages/tasks/index.tsx:535:33 - error TS2339: Property 'map' does not exist on type '{}'.
+
+535                           users.map(user => (
+                                    ~~~
+
+client/src/pages/tasks/index.tsx:535:37 - error TS7006: Parameter 'user' implicitly has an 'any' type.
+
+535                           users.map(user => (
+                                        ~~~~
+
+client/src/pages/tasks/index.tsx:577:42 - error TS7006: Parameter 'task' implicitly has an 'any' type.
+
+577                       filteredTasks.map((task) => (
+                                             ~~~~
+
+client/src/pages/team/[id].tsx:76:29 - error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+
+76   const memberId = parseInt(id);
+                               ~~
+
+client/src/pages/team/[id].tsx:107:28 - error TS2339: Property 'first_name' does not exist on type '{}'.
+
+107         first_name: member.first_name,
+                               ~~~~~~~~~~
+
+client/src/pages/team/[id].tsx:108:27 - error TS2339: Property 'last_name' does not exist on type '{}'.
+
+108         last_name: member.last_name,
+                              ~~~~~~~~~
+
+client/src/pages/team/[id].tsx:109:23 - error TS2339: Property 'email' does not exist on type '{}'.
+
+109         email: member.email,
+                          ~~~~~
+
+client/src/pages/team/[id].tsx:110:23 - error TS2339: Property 'phone' does not exist on type '{}'.
+
+110         phone: member.phone || "",
+                          ~~~~~
+
+client/src/pages/team/[id].tsx:111:22 - error TS2339: Property 'role' does not exist on type '{}'.
+
+111         role: member.role,
+                         ~~~~
+
+client/src/pages/team/[id].tsx:112:26 - error TS2339: Property 'position' does not exist on type '{}'.
+
+112         position: member.position || "",
+                             ~~~~~~~~
+
+client/src/pages/team/[id].tsx:113:21 - error TS2339: Property 'bio' does not exist on type '{}'.
+
+113         bio: member.bio || "",
+                        ~~~
+
+client/src/pages/team/[id].tsx:114:29 - error TS2339: Property 'hourly_rate' does not exist on type '{}'.
+
+114         hourly_rate: member.hourly_rate || 0,
+                                ~~~~~~~~~~~
+
+client/src/pages/team/[id].tsx:115:27 - error TS2339: Property 'is_active' does not exist on type '{}'.
+
+115         is_active: member.is_active,
+                              ~~~~~~~~~
+
+client/src/pages/team/[id].tsx:166:39 - error TS2559: Type 'string[]' has no properties in common with type 'InvalidateQueryFilters'.
+
+166         queryClient.invalidateQueries([`/api/team/${memberId}`]);
+                                          ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+client/src/pages/team/[id].tsx:229:34 - error TS2339: Property 'first_name' does not exist on type '{}'.
+
+229   const userInitials = `${member.first_name.charAt(0)}${member.last_name.charAt(0)}`;
+                                     ~~~~~~~~~~
+
+client/src/pages/team/[id].tsx:229:64 - error TS2339: Property 'last_name' does not exist on type '{}'.
+
+229   const userInitials = `${member.first_name.charAt(0)}${member.last_name.charAt(0)}`;
+                                                                   ~~~~~~~~~
+
+client/src/pages/team/[id].tsx:265:73 - error TS2339: Property 'first_name' does not exist on type '{}'.
+
+265                     Sunteți sigur că doriți să ștergeți membrul {member.first_name} {member.last_name}? Această acțiune este ireversibilă.
+                                                                            ~~~~~~~~~~
+
+client/src/pages/team/[id].tsx:265:93 - error TS2339: Property 'last_name' does not exist on type '{}'.
+
+265                     Sunteți sigur că doriți să ștergeți membrul {member.first_name} {member.last_name}? Această acțiune este ireversibilă.
+                                                                                                ~~~~~~~~~
+
+client/src/pages/team/[id].tsx:266:49 - error TS2339: Property 'length' does not exist on type '{}'.
+
+266                     {departments && departments.length > 0 && (
+                                                    ~~~~~~
+
+client/src/pages/team/[id].tsx:268:75 - error TS2339: Property 'length' does not exist on type '{}'.
+
+268                         Atenție! Acest membru face parte din {departments.length} departament(e). Ștergerea lui va afecta structura departamentelor.
+                                                                              ~~~~~~
+
+client/src/pages/team/[id].tsx:477:52 - error TS2339: Property 'avatar' does not exist on type '{}'.
+
+477                           <AvatarImage src={member.avatar || ''} alt={`${member.first_name} ${member.last_name}`} />
+                                                       ~~~~~~
+
+client/src/pages/team/[id].tsx:477:81 - error TS2339: Property 'first_name' does not exist on type '{}'.
+
+477                           <AvatarImage src={member.avatar || ''} alt={`${member.first_name} ${member.last_name}`} />
+                                                                                    ~~~~~~~~~~
+
+client/src/pages/team/[id].tsx:477:102 - error TS2339: Property 'last_name' does not exist on type '{}'.
+
+477                           <AvatarImage src={member.avatar || ''} alt={`${member.first_name} ${member.last_name}`} />
+                                                                                                         ~~~~~~~~~
+
+client/src/pages/team/[id].tsx:481:42 - error TS2339: Property 'first_name' does not exist on type '{}'.
+
+481                       <CardTitle>{member.first_name} {member.last_name}</CardTitle>
+                                             ~~~~~~~~~~
+
+client/src/pages/team/[id].tsx:481:62 - error TS2339: Property 'last_name' does not exist on type '{}'.
+
+481                       <CardTitle>{member.first_name} {member.last_name}</CardTitle>
+                                                                 ~~~~~~~~~
+
+client/src/pages/team/[id].tsx:483:68 - error TS2339: Property 'role' does not exist on type '{}'.
+
+483                         <Badge className={getRoleBadgeColor(member.role)}>
+                                                                       ~~~~
+
+client/src/pages/team/[id].tsx:484:48 - error TS2339: Property 'role' does not exist on type '{}'.
+
+484                           {getRoleLabel(member.role)}
+                                                   ~~~~
+
+client/src/pages/team/[id].tsx:486:33 - error TS2339: Property 'position' does not exist on type '{}'.
+
+486                         {member.position && (
+                                    ~~~~~~~~
+
+client/src/pages/team/[id].tsx:487:61 - error TS2339: Property 'position' does not exist on type '{}'.
+
+487                           <span className="text-sm">{member.position}</span>
+                                                                ~~~~~~~~
+
+client/src/pages/team/[id].tsx:495:41 - error TS2339: Property 'email' does not exist on type '{}'.
+
+495                           <span>{member.email}</span>
+                                            ~~~~~
+
+client/src/pages/team/[id].tsx:497:33 - error TS2339: Property 'phone' does not exist on type '{}'.
+
+497                         {member.phone && (
+                                    ~~~~~
+
+client/src/pages/team/[id].tsx:500:43 - error TS2339: Property 'phone' does not exist on type '{}'.
+
+500                             <span>{member.phone}</span>
+                                              ~~~~~
+
+client/src/pages/team/[id].tsx:505:41 - error TS2339: Property 'hourly_rate' does not exist on type '{}'.
+
+505                           <span>{member.hourly_rate ? `${member.hourly_rate} RON/oră` : 'Rată orară nespecificată'}</span>
+                                            ~~~~~~~~~~~
+
+client/src/pages/team/[id].tsx:505:65 - error TS2339: Property 'hourly_rate' does not exist on type '{}'.
+
+505                           <span>{member.hourly_rate ? `${member.hourly_rate} RON/oră` : 'Rată orară nespecificată'}</span>
+                                                                    ~~~~~~~~~~~
+
+client/src/pages/team/[id].tsx:508:35 - error TS2339: Property 'is_active' does not exist on type '{}'.
+
+508                           {member.is_active ? (
+                                      ~~~~~~~~~
+
+client/src/pages/team/[id].tsx:530:31 - error TS2339: Property 'bio' does not exist on type '{}'.
+
+530                       {member.bio ? (
+                                  ~~~
+
+client/src/pages/team/[id].tsx:532:35 - error TS2339: Property 'bio' does not exist on type '{}'.
+
+532                           {member.bio}
+                                      ~~~
+
+client/src/pages/team/[id].tsx:551:26 - error TS2304: Cannot find name 'Plus'.
+
+551                         <Plus className="mr-2 h-4 w-4" />
+                             ~~~~
+
+client/src/pages/team/[id].tsx:564:52 - error TS2339: Property 'length' does not exist on type '{}'.
+
+564                     ) : departments && departments.length > 0 ? (
+                                                       ~~~~~~
+
+client/src/pages/team/[id].tsx:566:38 - error TS2339: Property 'map' does not exist on type '{}'.
+
+566                         {departments.map((dep: any) => (
+                                         ~~~
+
+client/src/pages/team/[id].tsx:579:34 - error TS2304: Cannot find name 'Link'.
+
+579                                 <Link href={`/departments/${dep.department_id}`}>
+                                     ~~~~
+
+client/src/pages/team/[id].tsx:581:35 - error TS2304: Cannot find name 'Link'.
+
+581                                 </Link>
+                                      ~~~~
+
+client/src/pages/team/index.tsx:73:40 - error TS2339: Property 'has_departments' does not exist on type 'Organization'.
+
+73   const hasDepartments = organization?.has_departments ?? false;
+                                          ~~~~~~~~~~~~~~~
+
+client/src/pages/team/index.tsx:356:31 - error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
+
+356                               {departments && Array.isArray(departments) && departments.map((dept: Department) => (
+                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+357                                 <SelectItem key={dept.id} value={String(dept.id)}>
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+...
+359                                 </SelectItem>
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+360                               ))}
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:20:39 - error TS2551: Property 'getAutomationsByOrganization' does not exist on type 'DatabaseStorage'. Did you mean 'getTasksByOrganization'?
+
+20     const automations = await storage.getAutomationsByOrganization(req.user.organization_id);
+                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  server/storage.ts:1394:9
+    1394   async getTasksByOrganization(organizationId: number): Promise<Task[]> {
+                 ~~~~~~~~~~~~~~~~~~~~~~
+    'getTasksByOrganization' is declared here.
+
+server/api/automations.ts:24:34 - error TS2551: Property 'getAutomationLogsByOrganization' does not exist on type 'DatabaseStorage'. Did you mean 'getActivityLogsByOrganization'?
+
+24       const logs = await storage.getAutomationLogsByOrganization(req.user.organization_id, 100);
+                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  server/storage.ts:2014:9
+    2014   async getActivityLogsByOrganization(
+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    'getActivityLogsByOrganization' is declared here.
+
+server/api/automations.ts:26:47 - error TS7006: Parameter 'acc' implicitly has an 'any' type.
+
+26       const logsByAutomationId = logs.reduce((acc, log) => {
+                                                 ~~~
+
+server/api/automations.ts:26:52 - error TS7006: Parameter 'log' implicitly has an 'any' type.
+
+26       const logsByAutomationId = logs.reduce((acc, log) => {
+                                                      ~~~
+
+server/api/automations.ts:35:51 - error TS7006: Parameter 'automation' implicitly has an 'any' type.
+
+35       const automationsWithLogs = automations.map(automation => ({
+                                                     ~~~~~~~~~~
+
+server/api/automations.ts:79:38 - error TS2339: Property 'getAutomation' does not exist on type 'DatabaseStorage'.
+
+79     const automation = await storage.getAutomation(id);
+                                        ~~~~~~~~~~~~~
+
+server/api/automations.ts:92:36 - error TS2339: Property 'getAutomationTriggersByAutomationId' does not exist on type 'DatabaseStorage'.
+
+92     const triggers = await storage.getAutomationTriggersByAutomationId(id);
+                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:93:35 - error TS2339: Property 'getAutomationActionsByAutomationId' does not exist on type 'DatabaseStorage'.
+
+93     const actions = await storage.getAutomationActionsByAutomationId(id);
+                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:94:32 - error TS2339: Property 'getAutomationLogsByAutomationId' does not exist on type 'DatabaseStorage'.
+
+94     const logs = await storage.getAutomationLogsByAutomationId(id, 20);
+                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:147:41 - error TS2339: Property 'createAutomation' does not exist on type 'DatabaseStorage'.
+
+147     const newAutomation = await storage.createAutomation(automationData);
+                                            ~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:153:23 - error TS2339: Property 'createAutomationTrigger' does not exist on type 'DatabaseStorage'.
+
+153         await storage.createAutomationTrigger({
+                          ~~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:166:23 - error TS2339: Property 'createAutomationAction' does not exist on type 'DatabaseStorage'.
+
+166         await storage.createAutomationAction({
+                          ~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:176:45 - error TS2339: Property 'getAutomation' does not exist on type 'DatabaseStorage'.
+
+176     const createdAutomation = await storage.getAutomation(newAutomation.id);
+                                                ~~~~~~~~~~~~~
+
+server/api/automations.ts:177:36 - error TS2339: Property 'getAutomationTriggersByAutomationId' does not exist on type 'DatabaseStorage'.
+
+177     const triggers = await storage.getAutomationTriggersByAutomationId(newAutomation.id);
+                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:178:35 - error TS2339: Property 'getAutomationActionsByAutomationId' does not exist on type 'DatabaseStorage'.
+
+178     const actions = await storage.getAutomationActionsByAutomationId(newAutomation.id);
+                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:206:38 - error TS2339: Property 'getAutomation' does not exist on type 'DatabaseStorage'.
+
+206     const automation = await storage.getAutomation(id);
+                                         ~~~~~~~~~~~~~
+
+server/api/automations.ts:240:45 - error TS2339: Property 'updateAutomation' does not exist on type 'DatabaseStorage'.
+
+240     const updatedAutomation = await storage.updateAutomation(id, updateData);
+                                                ~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:245:46 - error TS2339: Property 'getAutomationTriggersByAutomationId' does not exist on type 'DatabaseStorage'.
+
+245       const existingTriggers = await storage.getAutomationTriggersByAutomationId(id);
+                                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:247:23 - error TS2339: Property 'deleteAutomationTrigger' does not exist on type 'DatabaseStorage'.
+
+247         await storage.deleteAutomationTrigger(trigger.id);
+                          ~~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:253:23 - error TS2339: Property 'createAutomationTrigger' does not exist on type 'DatabaseStorage'.
+
+253         await storage.createAutomationTrigger({
+                          ~~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:265:45 - error TS2339: Property 'getAutomationActionsByAutomationId' does not exist on type 'DatabaseStorage'.
+
+265       const existingActions = await storage.getAutomationActionsByAutomationId(id);
+                                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:267:23 - error TS2339: Property 'deleteAutomationAction' does not exist on type 'DatabaseStorage'.
+
+267         await storage.deleteAutomationAction(action.id);
+                          ~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:273:23 - error TS2339: Property 'createAutomationAction' does not exist on type 'DatabaseStorage'.
+
+273         await storage.createAutomationAction({
+                          ~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:283:47 - error TS2339: Property 'getAutomation' does not exist on type 'DatabaseStorage'.
+
+283     const refreshedAutomation = await storage.getAutomation(id);
+                                                  ~~~~~~~~~~~~~
+
+server/api/automations.ts:284:36 - error TS2339: Property 'getAutomationTriggersByAutomationId' does not exist on type 'DatabaseStorage'.
+
+284     const triggers = await storage.getAutomationTriggersByAutomationId(id);
+                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:285:35 - error TS2339: Property 'getAutomationActionsByAutomationId' does not exist on type 'DatabaseStorage'.
+
+285     const actions = await storage.getAutomationActionsByAutomationId(id);
+                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:313:38 - error TS2339: Property 'getAutomation' does not exist on type 'DatabaseStorage'.
+
+313     const automation = await storage.getAutomation(id);
+                                         ~~~~~~~~~~~~~
+
+server/api/automations.ts:323:35 - error TS2339: Property 'deleteAutomation' does not exist on type 'DatabaseStorage'.
+
+323     const deleted = await storage.deleteAutomation(id);
+                                      ~~~~~~~~~~~~~~~~
+
+server/api/automations.ts:354:32 - error TS2551: Property 'getAutomationLogsByOrganization' does not exist on type 'DatabaseStorage'. Did you mean 'getActivityLogsByOrganization'?
+
+354     const logs = await storage.getAutomationLogsByOrganization(req.user.organization_id, limit);
+                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  server/storage.ts:2014:9
+    2014   async getActivityLogsByOrganization(
+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    'getActivityLogsByOrganization' is declared here.
+
+server/api/automations.ts:357:39 - error TS2551: Property 'getAutomationsByOrganization' does not exist on type 'DatabaseStorage'. Did you mean 'getTasksByOrganization'?
+
+357     const automations = await storage.getAutomationsByOrganization(req.user.organization_id);
+                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  server/storage.ts:1394:9
+    1394   async getTasksByOrganization(organizationId: number): Promise<Task[]> {
+                 ~~~~~~~~~~~~~~~~~~~~~~
+    'getTasksByOrganization' is declared here.
+
+server/api/clients.ts:106:7 - error TS2353: Object literal may only specify known properties, and 'created_at' does not exist in type 'InsertActivityLog'.
+
+106       created_at: new Date(),
+          ~~~~~~~~~~
+
+server/api/clients.ts:144:7 - error TS2353: Object literal may only specify known properties, and 'created_at' does not exist in type 'InsertActivityLog'.
+
+144       created_at: new Date(),
+          ~~~~~~~~~~
+
+server/api/clients.ts:192:9 - error TS2353: Object literal may only specify known properties, and 'created_at' does not exist in type 'InsertActivityLog'.
+
+192         created_at: new Date(),
+            ~~~~~~~~~~
+
+server/api/invoices.ts:249:67 - error TS2345: Argument of type '{ status?: "cancelled" | "draft" | "sent" | "viewed" | "paid" | "overdue" | undefined; notes?: string | null | undefined; client_id?: number | undefined; due_date?: string | Date | undefined; ... 12 more ...; payment_terms?: string | ... 1 more ... | undefined; }' is not assignable to parameter of type 'Partial<Invoice>'.
+  Types of property 'issue_date' are incompatible.
+    Type 'string | Date | undefined' is not assignable to type 'Date | undefined'.
+      Type 'string' is not assignable to type 'Date'.
+
+249     const updatedInvoice = await storage.updateInvoice(invoiceId, validationResult.data);
+                                                                      ~~~~~~~~~~~~~~~~~~~~~
+
+server/api/tasks.ts:201:11 - error TS7034: Variable 'comments' implicitly has type 'any[]' in some locations where its type cannot be determined.
+
+201     const comments = []; // Într-o implementare reală, apelăm storage.getCommentsByEntity('task', taskId)
+              ~~~~~~~~
+
+server/api/tasks.ts:205:11 - error TS7034: Variable 'attachments' implicitly has type 'any[]' in some locations where its type cannot be determined.
+
+205     const attachments = []; // Într-o implementare reală, apelăm storage.getAttachmentsByEntity('task', taskId)
+              ~~~~~~~~~~~
+
+server/api/tasks.ts:218:37 - error TS2339: Property 'assignee_id' does not exist on type 'Task'.
+
+218       const isAssignedToUser = task.assignee_id === userId;
+                                        ~~~~~~~~~~~
+
+server/api/tasks.ts:235:7 - error TS7005: Variable 'comments' implicitly has an 'any[]' type.
+
+235       comments,
+          ~~~~~~~~
+
+server/api/tasks.ts:236:7 - error TS7005: Variable 'attachments' implicitly has an 'any[]' type.
+
+236       attachments,
+          ~~~~~~~~~~~
+
+server/api/tasks.ts:342:34 - error TS2339: Property 'assignee_id' does not exist on type 'Task'.
+
+342         assignee_id: createdTask.assignee_id
+                                     ~~~~~~~~~~~
+
+server/api/tasks.ts:344:7 - error TS2353: Object literal may only specify known properties, and 'created_at' does not exist in type 'InsertActivityLog'.
+
+344       created_at: new Date(),
+          ~~~~~~~~~~
+
+server/api/tasks.ts:389:63 - error TS2339: Property 'assignee_id' does not exist on type 'Task'.
+
+389     if (req.body.assignee_id && req.body.assignee_id !== task.assignee_id) {
+                                                                  ~~~~~~~~~~~
+
+server/api/tasks.ts:453:7 - error TS2353: Object literal may only specify known properties, and 'created_at' does not exist in type 'InsertActivityLog'.
+
+453       created_at: new Date(),
+          ~~~~~~~~~~
+
+server/api/tasks.ts:508:9 - error TS2353: Object literal may only specify known properties, and 'created_at' does not exist in type 'InsertActivityLog'.
+
+508         created_at: new Date(),
+            ~~~~~~~~~~
+
+server/api/tasks.ts:582:7 - error TS2353: Object literal may only specify known properties, and 'created_at' does not exist in type 'InsertActivityLog'.
+
+582       created_at: new Date(),
+          ~~~~~~~~~~
+
+server/continue_migration.ts:679:30 - error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ client_history_metrics: string; client_insights: string; client_notes: string; client_portal_activity_logs: string; client_portal_feedbacks: string; client_portal_notifications: string; ... 34 more ...; user_profiles: string; }'.
+  No index signature with a parameter of type 'string' was found on type '{ client_history_metrics: string; client_insights: string; client_notes: string; client_portal_activity_logs: string; client_portal_feedbacks: string; client_portal_notifications: string; ... 34 more ...; user_profiles: string; }'.
+
+679       const createTableSQL = tableScripts[tableName];
+                                 ~~~~~~~~~~~~~~~~~~~~~~~
+
+server/routes.ts:693:19 - error TS2339: Property 'entity_name' does not exist on type 'ActivityLog'.
+
+693               log.entity_name || `${log.entity_type} #${log.entity_id}`,
+                      ~~~~~~~~~~~
+
+server/routes.ts:742:46 - error TS2367: This comparison appears to be unintentional because the types '"not_started" | "on_hold" | "completed" | "cancelled"' and '"active"' have no overlap.
+
+742         (p) => p.status === "in_progress" || p.status === "active",
+                                                 ~~~~~~~~~~~~~~~~~~~~~
+
+server/routes.ts:843:14 - error TS7053: Element implicitly has an 'any' type because expression of type '"not_started" | "in_progress" | "on_hold" | "completed" | "cancelled"' can't be used to index type '{}'.
+  Property 'not_started' does not exist on type '{}'.
+
+843         if (!acc[status]) {
+                 ~~~~~~~~~~~
+
+server/routes.ts:844:11 - error TS7053: Element implicitly has an 'any' type because expression of type '"not_started" | "in_progress" | "on_hold" | "completed" | "cancelled"' can't be used to index type '{}'.
+  Property 'not_started' does not exist on type '{}'.
+
+844           acc[status] = 0;
+              ~~~~~~~~~~~
+
+server/routes.ts:846:9 - error TS7053: Element implicitly has an 'any' type because expression of type '"not_started" | "in_progress" | "on_hold" | "completed" | "cancelled"' can't be used to index type '{}'.
+  Property 'not_started' does not exist on type '{}'.
+
+846         acc[status]++;
+            ~~~~~~~~~~~
+
+server/routes.ts:853:17 - error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ in_progress: string; active: string; completed: string; on_hold: string; pending: string; cancelled: string; archived: string; }'.
+  No index signature with a parameter of type 'string' was found on type '{ in_progress: string; active: string; completed: string; on_hold: string; pending: string; cancelled: string; archived: string; }'.
+
+853           name: statusNames[status] || status,
+                    ~~~~~~~~~~~~~~~~~~~
+
+server/routes.ts:855:18 - error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ in_progress: string; active: string; completed: string; on_hold: string; pending: string; cancelled: string; archived: string; }'.
+  No index signature with a parameter of type 'string' was found on type '{ in_progress: string; active: string; completed: string; on_hold: string; pending: string; cancelled: string; archived: string; }'.
+
+855           color: statusColors[status] || "#94a3b8",
+                     ~~~~~~~~~~~~~~~~~~~~
+
+server/routes.ts:924:9 - error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+
+924         monthlySummary[monthKey] = {
+            ~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/routes.ts:942:13 - error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+
+942         if (monthlySummary[monthKey]) {
+                ~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/routes.ts:947:13 - error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+
+947             monthlySummary[monthKey].paid += amount;
+                ~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/routes.ts:952:13 - error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+
+952             monthlySummary[monthKey].overdue += amount;
+                ~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/routes.ts:954:13 - error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+
+954             monthlySummary[monthKey].unpaid += amount;
+                ~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/routes.ts:961:13 - error TS18046: 'a' is of type 'unknown'.
+
+961         if (a.year !== b.year) return a.year - b.year;
+                ~
+
+server/routes.ts:961:24 - error TS18046: 'b' is of type 'unknown'.
+
+961         if (a.year !== b.year) return a.year - b.year;
+                           ~
+
+server/routes.ts:961:39 - error TS18046: 'a' is of type 'unknown'.
+
+961         if (a.year !== b.year) return a.year - b.year;
+                                          ~
+
+server/routes.ts:961:48 - error TS18046: 'b' is of type 'unknown'.
+
+961         if (a.year !== b.year) return a.year - b.year;
+                                                   ~
+
+server/routes.ts:962:16 - error TS18046: 'a' is of type 'unknown'.
+
+962         return a.month - b.month;
+                   ~
+
+server/routes.ts:962:26 - error TS18046: 'b' is of type 'unknown'.
+
+962         return a.month - b.month;
+                             ~
+
+server/routes.ts:996:9 - error TS7053: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{}'.
+  No index signature with a parameter of type 'number' was found on type '{}'.
+
+996         map[project.id] = project;
+            ~~~~~~~~~~~~~~~
+
+server/routes.ts:1023:38 - error TS2345: Argument of type 'Date | null | undefined' is not assignable to parameter of type 'string | null | undefined'.
+  Type 'Date' is not assignable to type 'string'.
+
+1023             const dueDate = safeDate(task.due_date);
+                                          ~~~~~~~~~~~~~
+
+server/routes.ts:1033:34 - error TS2345: Argument of type 'Date | null | undefined' is not assignable to parameter of type 'string | null | undefined'.
+  Type 'Date' is not assignable to type 'string'.
+
+1033           const dateA = safeDate(a.due_date);
+                                      ~~~~~~~~~~
+
+server/routes.ts:1034:34 - error TS2345: Argument of type 'Date | null | undefined' is not assignable to parameter of type 'string | null | undefined'.
+  Type 'Date' is not assignable to type 'string'.
+
+1034           const dateB = safeDate(b.due_date);
+                                      ~~~~~~~~~~
+
+server/routes.ts:1065:25 - error TS7053: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{}'.
+  No index signature with a parameter of type 'number' was found on type '{}'.
+
+1065         const project = projectsMap[task.project_id];
+                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/routes.ts:1071:29 - error TS7053: Element implicitly has an 'any' type because expression of type '"not_started" | "in_progress" | "on_hold" | "completed" | "cancelled" | "under_review"' can't be used to index type '{ not_started: string; in_progress: string; on_hold: string; completed: string; cancelled: string; delayed: string; }'.
+  Property 'under_review' does not exist on type '{ not_started: string; in_progress: string; on_hold: string; completed: string; cancelled: string; delayed: string; }'.
+
+1071         let displayStatus = statusTranslations[task.status] || task.status;
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/routes.ts:1089:26 - error TS2339: Property 'progress' does not exist on type 'Task'.
+
+1089           progress: task.progress || 0,
+                              ~~~~~~~~
+
+server/routes.ts:1121:9 - error TS2367: This comparison appears to be unintentional because the types '"super_admin" | "ceo" | "manager" | "director" | "employee" | "client"' and '"admin"' have no overlap.
+
+1121         user.role === "admin" ||
+             ~~~~~~~~~~~~~~~~~~~~~
+
+server/routes.ts:1125:9 - error TS2322: Type 'TimeLog[][]' is not assignable to type 'TimeLog[]'.
+  Type 'TimeLog[]' is missing the following properties from type 'TimeLog': id, organization_id, user_id, project_id, and 5 more.
+
+1125         timeLogs = await Promise.all(
+             ~~~~~~~~
+
+server/routes.ts:1162:20 - error TS2339: Property 'start_time' does not exist on type 'TimeLog'.
+
+1162           if (!log.start_time) return;
+                        ~~~~~~~~~~
+
+server/routes.ts:1165:40 - error TS2339: Property 'start_time' does not exist on type 'TimeLog'.
+
+1165           const logDate = new Date(log.start_time);
+                                            ~~~~~~~~~~
+
+server/routes.ts:1173:40 - error TS2339: Property 'duration' does not exist on type 'TimeLog'.
+
+1173             const durationHours = (log.duration || 0) / 60; // conversia din minute în ore
+                                            ~~~~~~~~
+
+server/routes.ts:1178:21 - error TS2339: Property 'billable' does not exist on type 'TimeLog'.
+
+1178             if (log.billable) {
+                         ~~~~~~~~
+
+server/routes.ts:1194:16 - error TS2790: The operand of a 'delete' operator must be optional.
+
+1194         delete day.fullDate;
+                    ~~~~~~~~~~~~
+
+server/routes.ts:1231:9 - error TS7053: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{}'.
+  No index signature with a parameter of type 'number' was found on type '{}'.
+
+1231         map[project.id] = project;
+             ~~~~~~~~~~~~~~~
+
+server/routes.ts:1254:36 - error TS2345: Argument of type 'Date | null | undefined' is not assignable to parameter of type 'string | null | undefined'.
+  Type 'Date' is not assignable to type 'string'.
+
+1254           const dueDate = safeDate(task.due_date);
+                                        ~~~~~~~~~~~~~
+
+server/routes.ts:1262:27 - error TS7053: Element implicitly has an 'any' type because expression of type 'number' can't be used to index type '{}'.
+  No index signature with a parameter of type 'number' was found on type '{}'.
+
+1262           const project = projectsMap[task.project_id];
+                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/routes.ts:1273:33 - error TS2769: No overload matches this call.
+  Overload 1 of 4, '(value: string | number | Date): Date', gave the following error.
+    Argument of type 'Date | null | undefined' is not assignable to parameter of type 'string | number | Date'.
+      Type 'undefined' is not assignable to type 'string | number | Date'.
+  Overload 2 of 4, '(value: string | number): Date', gave the following error.
+    Argument of type 'Date | null | undefined' is not assignable to parameter of type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+
+1273             startDate: new Date(task.due_date),
+                                     ~~~~~~~~~~~~~
+
+
+server/routes.ts:1292:36 - error TS2345: Argument of type 'Date' is not assignable to parameter of type 'string'.
+
+1292           const dueDate = safeDate(invoice.due_date);
+                                        ~~~~~~~~~~~~~~~~
+
+server/routes.ts:1341:11 - error TS18046: 'error' is of type 'unknown'.
+
+1341           error.message,
+               ~~~~~
+
+server/storage.ts:223:14 - error TS2420: Class 'DatabaseStorage' incorrectly implements interface 'IStorage'.
+  Type 'DatabaseStorage' is missing the following properties from type 'IStorage': getAutomation, getAutomationsByOrganization, createAutomation, updateAutomation, and 15 more.
+
+223 export class DatabaseStorage implements IStorage {
+                 ~~~~~~~~~~~~~~~
+
+server/storage.ts:520:13 - error TS2322: Type 'string' is not assignable to type '"super_admin" | "ceo" | "manager" | "director" | "employee" | "client" | undefined'.
+
+520             role: userRole, // Folosim rolul mapat
+                ~~~~
+
+  shared/schema.ts:100:3
+    100   role?: (typeof userRoles)[number];
+          ~~~~
+    The expected type comes from property 'role' which is declared here on type 'InsertUser'
+
+server/storage.ts:2112:34 - error TS2339: Property 'action_type' does not exist on type 'InsertActivityLog'.
+
+2112         action_type: activityLog.action_type,
+                                      ~~~~~~~~~~~
+
+server/storage.ts:2113:9 - error TS2353: Object literal may only specify known properties, and 'action_details' does not exist in type 'ActivityLog'.
+
+2113         action_details: activityLog.action_details,
+             ~~~~~~~~~~~~~~
+
+server/storage.ts:2113:37 - error TS2339: Property 'action_details' does not exist on type 'InsertActivityLog'.
+
+2113         action_details: activityLog.action_details,
+                                         ~~~~~~~~~~~~~~
+
+server/storage.ts:2121:14 - error TS2420: Class 'MemStorage' incorrectly implements interface 'IStorage'.
+  Type 'MemStorage' is missing the following properties from type 'IStorage': getOrganizationById, updateOrganizationStructure, getProjectsForUser, getTask, and 25 more.
+
+2121 export class MemStorage implements IStorage {
+                  ~~~~~~~~~~
+
+server/storage.ts:2240:11 - error TS2741: Property 'has_departments' is missing in type '{ id: number; name: string; slug: string; logo: string | null; organization_type: "freelancer" | "agency" | "company"; subscription_plan: "trial" | "basic" | "pro" | "pro_yearly"; trial_expires_at: Date | null; ... 4 more ...; updated_at: Date; }' but required in type 'Organization'.
+
+2240     const newOrg: Organization = {
+               ~~~~~~
+
+  shared/schema.ts:116:3
+    116   has_departments: boolean; // Flag pentru activarea departamentelor
+          ~~~~~~~~~~~~~~~
+    'has_departments' is declared here.
+
+server/storage.ts:2652:13 - error TS2740: Type '{ trigger_types: any[]; action_types: any[]; execution_count: number; last_execution_status: any; last_execution_time: any; }' is missing the following properties from type 'Automation': id, organization_id, name, description, and 5 more.
+
+2652       const automation: Automation = {
+                 ~~~~~~~~~~
+
+server/storage.ts:2726:15 - error TS2740: Type '{ trigger_types: any[]; action_types: any[]; execution_count: number; last_execution_status: any; last_execution_time: any; }' is missing the following properties from type 'Automation': id, organization_id, name, description, and 5 more.
+
+2726         const automation: Automation = {
+                   ~~~~~~~~~~
+
+server/utils/email.ts:10:20 - error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+
+10   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+server/vite.ts:39:5 - error TS2322: Type '{ middlewareMode: boolean; hmr: { server: Server<typeof IncomingMessage, typeof ServerResponse>; }; allowedHosts: boolean; }' is not assignable to type 'ServerOptions'.
+  Types of property 'allowedHosts' are incompatible.
+    Type 'boolean' is not assignable to type 'true | string[] | undefined'.
+
+39     server: serverOptions,
+       ~~~~~~
