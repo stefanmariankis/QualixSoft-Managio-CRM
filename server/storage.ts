@@ -1342,10 +1342,22 @@ export class DatabaseStorage implements IStorage {
   async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
     try {
       const now = new Date();
+      // Adaptăm datele pentru a se potrivi cu structura tabelului din baza de date
       const invoiceData = {
-        ...invoice,
-        paid_amount: invoice.paid_amount ?? 0,
-        remaining_amount: invoice.remaining_amount ?? invoice.total_amount,
+        client_id: invoice.client_id,
+        project_id: invoice.project_id,
+        organization_id: invoice.organization_id,
+        created_by: invoice.created_by,
+        invoice_number: invoice.invoice_number,
+        issue_date: invoice.issue_date,
+        due_date: invoice.due_date,
+        status: invoice.status,
+        amount: invoice.total_amount, // Folosim total_amount pentru amount 
+        tax_amount: invoice.tax_amount,
+        currency: invoice.currency,
+        notes: invoice.notes,
+        payment_method: invoice.payment_terms, // Folosim payment_terms pentru payment_method
+        payment_date: invoice.payment_date,
         created_at: now,
         updated_at: now,
       };
@@ -1376,11 +1388,27 @@ export class DatabaseStorage implements IStorage {
       if (Object.keys(invoiceData).length === 0) {
         return await this.getInvoice(id);
       }
-
-      const updatedData = {
-        ...invoiceData,
+      
+      // Adaptăm datele pentru structura bazei de date
+      const adaptedData: any = {
         updated_at: new Date(),
       };
+      
+      // Mapăm doar câmpurile care există în baza de date
+      if (invoiceData.client_id) adaptedData.client_id = invoiceData.client_id;
+      if (invoiceData.project_id) adaptedData.project_id = invoiceData.project_id;
+      if (invoiceData.invoice_number) adaptedData.invoice_number = invoiceData.invoice_number;
+      if (invoiceData.issue_date) adaptedData.issue_date = invoiceData.issue_date;
+      if (invoiceData.due_date) adaptedData.due_date = invoiceData.due_date;
+      if (invoiceData.status) adaptedData.status = invoiceData.status;
+      if (invoiceData.total_amount) adaptedData.amount = invoiceData.total_amount;
+      if (invoiceData.tax_amount) adaptedData.tax_amount = invoiceData.tax_amount;
+      if (invoiceData.currency) adaptedData.currency = invoiceData.currency;
+      if (invoiceData.notes) adaptedData.notes = invoiceData.notes;
+      if (invoiceData.payment_terms) adaptedData.payment_method = invoiceData.payment_terms;
+      if (invoiceData.payment_date) adaptedData.payment_date = invoiceData.payment_date;
+      
+      const updatedData = adaptedData;
 
       const result = await db`
         UPDATE invoices
