@@ -78,7 +78,7 @@ export default function DepartmentsPage() {
             Activați această funcționalitate din setările organizației pentru a putea gestiona departamentele.
           </p>
           <Button asChild>
-            <Link href="/settings/organization">
+            <Link href="/settings">
               Mergi la setările organizației
             </Link>
           </Button>
