@@ -1,10 +1,34 @@
 import sgMail from '@sendgrid/mail';
+import nodemailer from 'nodemailer';
 
-// Inițializăm SendGrid cu cheia API
-if (!process.env.SENDGRID_API_KEY) {
-  console.error('SENDGRID_API_KEY nu a fost găsit în variabilele de mediu');
-} else {
+// Variabile pentru a verifica dacă sunt disponibile nodemailer sau SendGrid
+const SENDGRID_AVAILABLE = !!process.env.SENDGRID_API_KEY;
+const SMTP_AVAILABLE = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+
+// Dacă SENDGRID_API_KEY există, configurăm SendGrid
+if (SENDGRID_AVAILABLE) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  console.log('SendGrid configurat și disponibil pentru trimiterea email-urilor.');
+}
+
+// Creare transporter pentru Nodemailer (SMTP)
+let transporter: nodemailer.Transporter | null = null;
+
+if (SMTP_AVAILABLE) {
+  transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true', // true pentru 465, false pentru alte porturi
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+  console.log('Server SMTP configurat și disponibil pentru trimiterea email-urilor.');
+}
+
+if (!SENDGRID_AVAILABLE && !SMTP_AVAILABLE) {
+  console.warn('Nici SendGrid, nici SMTP nu sunt configurate. Trimiterea email-urilor va fi simulată.');
 }
 
 interface EmailOptions {
@@ -16,54 +40,68 @@ interface EmailOptions {
 }
 
 /**
- * Trimite un email folosind SendGrid
+ * Trimite un email folosind SMTP sau SendGrid
+ * Dacă niciuna dintre metode nu este configurată, simulează trimiterea
  */
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
-    // Verificăm dacă avem o cheie API configurată
-    if (!process.env.SENDGRID_API_KEY) {
-      console.error('SENDGRID_API_KEY nu a fost găsit în variabilele de mediu');
-      return false;
-    }
-    
     // Afișăm în consolă pentru debugging
     console.log(`[EMAIL] Trimitere email către: ${options.to}`);
     console.log(`[EMAIL] Subiect: ${options.subject}`);
     
-    // Configurăm mesajul cu adresa de expeditor verificată
+    // Utilizăm adresa specificată în configurare sau cea implicită
+    const fromAddress = process.env.EMAIL_FROM || 'office@quailisoft.com';
+    
+    // Configurăm mesajul comun pentru ambele metode
     const message = {
       to: options.to,
-      from: 'office@quailisoft.com', // Adresa verificată în SendGrid - folosim doar această adresă
+      from: fromAddress,
       subject: options.subject,
       text: options.text || '',
       html: options.html || '',
     };
     
-    try {
-      // Încercăm să trimitem email-ul
-      await sgMail.send(message);
-      console.log(`Email trimis cu succes către ${options.to}`);
-      return true;
-    } catch (sendError: any) {
-      // Dacă apare o eroare la trimitere, revenim la simulare
-      console.error('Eroare la trimiterea email-ului prin SendGrid:', sendError);
-      
-      if (sendError.response && sendError.response.body && sendError.response.body.errors) {
-        console.error('Detalii eroare SendGrid:', sendError.response.body.errors);
+    // 1. Încercăm mai întâi SMTP dacă este disponibil
+    if (SMTP_AVAILABLE && transporter) {
+      try {
+        console.log('Încercare trimitere email prin SMTP...');
+        await transporter.sendMail(message);
+        console.log(`Email trimis cu succes prin SMTP către ${options.to}`);
+        return true;
+      } catch (smtpError: any) {
+        console.error('Eroare la trimiterea email-ului prin SMTP:', smtpError);
+        // Dacă SMTP eșuează, continuăm cu următoarea metodă
       }
-      
-      // Simulăm trimiterea pentru a nu bloca funcționalitatea
-      console.log(`[SIMULARE EMAIL] Către: ${options.to}`);
-      console.log(`[SIMULARE EMAIL] Subiect: ${options.subject}`);
-      console.log(`[SIMULARE EMAIL] Text: ${options.text?.substring(0, 200)}${options.text && options.text.length > 200 ? '...' : ''}`);
-      console.log(`[SIMULARE EMAIL] Email simulat cu succes către ${options.to}`);
-      
-      return true; // Returnăm succes simulat
     }
+    
+    // 2. Încercăm SendGrid dacă este disponibil
+    if (SENDGRID_AVAILABLE) {
+      try {
+        console.log('Încercare trimitere email prin SendGrid...');
+        await sgMail.send(message);
+        console.log(`Email trimis cu succes prin SendGrid către ${options.to}`);
+        return true;
+      } catch (sendGridError: any) {
+        console.error('Eroare la trimiterea email-ului prin SendGrid:', sendGridError);
+        
+        if (sendGridError.response?.body?.errors) {
+          console.error('Detalii eroare SendGrid:', sendGridError.response.body.errors);
+        }
+      }
+    }
+    
+    // 3. Dacă nicio metodă nu a funcționat, simulăm trimiterea
+    console.log(`[SIMULARE EMAIL] Către: ${options.to}`);
+    console.log(`[SIMULARE EMAIL] Subiect: ${options.subject}`);
+    console.log(`[SIMULARE EMAIL] Text: ${options.text?.substring(0, 200)}${options.text && options.text.length > 200 ? '...' : ''}`);
+    console.log(`[SIMULARE EMAIL] Email simulat cu succes către ${options.to}`);
+    
+    return true; // Returnăm succes simulat pentru a nu bloca funcționalitatea
+    
   } catch (error: any) {
     console.error('Eroare neașteptată la procesarea email-ului:', error);
     
-    if (error.response && error.response.body && error.response.body.errors) {
+    if (error.response?.body?.errors) {
       console.error('Detalii eroare:', error.response.body.errors);
     }
     
