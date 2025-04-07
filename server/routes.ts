@@ -623,40 +623,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
       }
 
-      // Obține utilizatorii din tabela users
-      const users = await storage.getUsersByOrganization(req.user.organization_id);
-      
       // Obține membrii echipei din tabela team_members
       const teamMembers = await storage.getTeamMembersByOrganization(req.user.organization_id);
       
-      // Combinăm cele două liste și eliminăm duplicatele
-      const allUsers = [...users];
+      // Transformăm datele pentru a avea un format uniform cu firstName și lastName
+      const formattedMembers = teamMembers.map(member => ({
+        id: member.user_id || member.id, // Folosim user_id dacă există, altfel ID-ul membrului
+        firstName: member.first_name,
+        lastName: member.last_name,
+        email: member.email,
+        role: member.role,
+        organization_id: member.organization_id
+      }));
       
-      // Adăugăm membrii echipei care nu sunt deja în lista de utilizatori
-      for (const member of teamMembers) {
-        // Verificăm dacă membrul nu există deja în lista de utilizatori
-        const exists = users.some(user => 
-          member.user_id === user.id || 
-          member.email === user.email
-        );
-        
-        if (!exists) {
-          // Transformăm membrul echipei în format de utilizator pentru a putea fi folosit în dropdown
-          allUsers.push({
-            id: member.id,
-            email: member.email,
-            first_name: member.first_name,
-            last_name: member.last_name,
-            role: member.role,
-            organization_id: member.organization_id,
-            is_team_member: true // Marcăm că este membru al echipei, nu utilizator cu acces direct
-          });
-        }
-      }
+      console.log(`API /users/organization: Returnăm ${formattedMembers.length} membri ai echipei pentru asignarea task-urilor`);
       
-      console.log(`API /users/organization: Returnăm ${allUsers.length} utilizatori (${users.length} utilizatori + ${teamMembers.length} membri echipă)`);
-      
-      return res.status(200).json(allUsers);
+      return res.status(200).json(formattedMembers);
     } catch (error: any) {
       console.error("Eroare la obținerea utilizatorilor organizației:", error);
       return res.status(500).json({

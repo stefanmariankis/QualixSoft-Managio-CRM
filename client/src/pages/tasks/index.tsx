@@ -277,26 +277,19 @@ export default function TasksPage() {
             </Button>
           </div>
           <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowAssignModal(false)}
-              disabled={updateTaskMutation.isPending}
-            >
-              Anulează
-            </Button>
-            <Button
-              onClick={() => setShowAssignModal(false)}
-              disabled={updateTaskMutation.isPending}
-            >
-              {updateTaskMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Se actualizează...
-                </>
-              ) : (
-                "Închide"
-              )}
-            </Button>
+            {updateTaskMutation.isPending ? (
+              <Button disabled>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Se actualizează...
+              </Button>
+            ) : (
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAssignModal(false)}
+              >
+                Închide
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
