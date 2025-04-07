@@ -44,11 +44,16 @@ export interface IStorage {
 
   // Organization operations
   getOrganization(id: number): Promise<Organization | undefined>;
+  getOrganizationById(id: number): Promise<Organization | undefined>;
   getOrganizationBySlug(slug: string): Promise<Organization | undefined>;
   createOrganization(organization: InsertOrganization): Promise<Organization>;
   updateOrganization(
     id: number,
     organizationData: Partial<Organization>,
+  ): Promise<Organization | undefined>;
+  updateOrganizationStructure(
+    id: number,
+    structureData: { has_departments: boolean },
   ): Promise<Organization | undefined>;
 
   // Client operations
@@ -732,6 +737,10 @@ export class DatabaseStorage implements IStorage {
       return undefined;
     }
   }
+  
+  async getOrganizationById(id: number): Promise<Organization | undefined> {
+    return this.getOrganization(id);
+  }
 
   async getOrganizationBySlug(slug: string): Promise<Organization | undefined> {
     try {
@@ -813,6 +822,31 @@ export class DatabaseStorage implements IStorage {
       return result[0] as Organization;
     } catch (error) {
       console.error("Eroare la actualizarea organizației:", error);
+      return undefined;
+    }
+  }
+  
+  async updateOrganizationStructure(
+    id: number,
+    structureData: { has_departments: boolean },
+  ): Promise<Organization | undefined> {
+    try {
+      const result = await db`
+        UPDATE organizations
+        SET 
+          has_departments = ${structureData.has_departments},
+          updated_at = ${new Date()}
+        WHERE id = ${id}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as Organization;
+    } catch (error) {
+      console.error("Eroare la actualizarea structurii organizației:", error);
       return undefined;
     }
   }
