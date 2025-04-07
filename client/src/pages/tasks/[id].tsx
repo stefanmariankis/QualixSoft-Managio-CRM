@@ -536,10 +536,30 @@ export default function TaskDetails() {
                       {getInitials(task.assignee_name)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="text-lg font-semibold">{task.assignee_name}</div>
+                  <div className="text-lg font-semibold flex items-center">
+                    {task.assignee_name}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="ml-2"
+                      onClick={() => setLocation(`/tasks/edit/${task.id}`)}
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               ) : (
-                <div className="text-lg font-semibold text-muted-foreground">Nealocat</div>
+                <div className="text-lg font-semibold text-muted-foreground flex items-center">
+                  Nealocat
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="ml-2"
+                    onClick={() => setLocation(`/tasks/edit/${task.id}`)}
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               )}
               <div className="flex mt-2 items-center">
                 <Badge variant="outline" className={getPriorityColor(task.priority)}>{task.priority}</Badge>

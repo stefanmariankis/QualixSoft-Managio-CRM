@@ -493,9 +493,20 @@ export default function TasksPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center space-x-1">
+                            <div className="flex items-center space-x-2">
                               <User className="h-3.5 w-3.5 text-muted-foreground" />
                               <span>{getAssigneeName(task.assigned_to)}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-6 w-6 p-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setLocation(`/tasks/edit/${task.id}`);
+                                }}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
                             </div>
                           </TableCell>
                           <TableCell>

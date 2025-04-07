@@ -1426,7 +1426,7 @@ export class DatabaseStorage implements IStorage {
           SELECT t.* FROM tasks t
           LEFT JOIN projects p ON t.project_id = p.id
           WHERE t.organization_id = ${organizationId}
-            AND (t.assigned_to = ${userId} OR p.manager_id = ${userId})
+            AND (t.assignee_id = ${userId} OR p.manager_id = ${userId})
           ORDER BY t.due_date ASC NULLS LAST, t.priority DESC, t.title
         `;
         return result as unknown as Task[];
@@ -1436,7 +1436,7 @@ export class DatabaseStorage implements IStorage {
       const result = await db`
         SELECT * FROM tasks
         WHERE organization_id = ${organizationId}
-          AND assigned_to = ${userId}
+          AND assignee_id = ${userId}
         ORDER BY due_date ASC NULLS LAST, priority DESC, title
       `;
       

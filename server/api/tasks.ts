@@ -214,7 +214,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
     if (req.user.role !== 'ceo' && req.user.role !== 'super_admin') {
       // Pentru alte roluri verificăm dacă task-ul este asignat utilizatorului
       // sau dacă utilizatorul este manager al proiectului asociat
-      const isAssignedToUser = task.assigned_to === userId;
+      const isAssignedToUser = task.assignee_id === userId;
       const isProjectManager = project.manager_id === userId;
       
       if (!isAssignedToUser && !isProjectManager) {
@@ -274,7 +274,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     }
     
     // Verifică regulile de asignare a task-urilor
-    if (req.body.assigned_to) {
+    if (req.body.assignee_id) {
       // Verifică permisiunile utilizatorului de a asigna task-uri
       const userRole = req.user.role;
       
@@ -292,7 +292,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
           }
           
           // Verificăm dacă persoana asignată aparține organizației
-          const assignedUser = await storage.getUser(req.body.assigned_to);
+          const assignedUser = await storage.getUser(req.body.assignee_id);
           if (!assignedUser || assignedUser.organizationId !== req.user.organization_id) {
             return res.status(404).json({ 
               message: 'Utilizatorul căruia doriți să asignați task-ul nu a fost găsit' 
@@ -309,7 +309,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
           }
         } else {
           // Angajații obișnuiți pot crea task-uri doar pentru ei înșiși
-          if (req.body.assigned_to !== userId) {
+          if (req.body.assignee_id !== userId) {
             return res.status(403).json({ 
               message: 'Nu aveți permisiunea de a crea task-uri pentru alți utilizatori' 
             });
@@ -384,8 +384,8 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Task negăsit' });
     }
     
-    // Verificăm dacă se dorește schimbarea persoanei asignate (assigned_to)
-    if (req.body.assigned_to && req.body.assigned_to !== task.assigned_to) {
+    // Verificăm dacă se dorește schimbarea persoanei asignate (assignee_id)
+    if (req.body.assignee_id && req.body.assignee_id !== task.assignee_id) {
       // Verifică permisiunile utilizatorului de a asigna task-uri
       const userRole = req.user.role;
       
@@ -408,7 +408,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response) => {
           
           // Verificăm dacă persoana asignată aparține de departamentul managerului sau este în echipa proiectului
           // Obținem utilizatorul căruia se dorește asignarea
-          const assignedUser = await storage.getUser(req.body.assigned_to);
+          const assignedUser = await storage.getUser(req.body.assignee_id);
           if (!assignedUser || assignedUser.organizationId !== req.user.organization_id) {
             return res.status(404).json({ message: 'Utilizatorul căruia doriți să asignați task-ul nu a fost găsit' });
           }
