@@ -277,7 +277,7 @@ export default function TaskEditPage() {
                     <SelectValue placeholder="Selectează utilizator" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Neasignat</SelectItem>
+                    <SelectItem value="null">Neasignat</SelectItem>
                     {users && users.length > 0 ? (
                       users.map((user: any) => (
                         <SelectItem key={user.id} value={user.id.toString()}>
