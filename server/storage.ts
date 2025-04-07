@@ -14,6 +14,8 @@ import {
   InsertInvoice,
   InvoiceItem,
   InsertInvoiceItem,
+  InvoicePayment,
+  InsertInvoicePayment,
   TimeLog,
   InsertTimeLog,
   ActivityLog,

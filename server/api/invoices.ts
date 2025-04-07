@@ -6,7 +6,8 @@ import {
   invoiceSchema, 
   invoiceStatusOptions,
   type Invoice, 
-  type InsertInvoice 
+  type InsertInvoice,
+  type InsertInvoicePayment
 } from '@shared/schema';
 import { z } from 'zod';
 
@@ -373,6 +374,71 @@ router.get("/summary", requireAuth, async (req: Request, res: Response) => {
     console.error("Eroare la obținerea rezumatului facturilor:", error);
     res.status(error instanceof ApiError ? error.statusCode : 500).json({ 
       message: error instanceof Error ? error.message : "Eroare la obținerea rezumatului facturilor"
+    });
+  }
+});
+
+// Adăugare plată pentru o factură
+router.post("/:id/payments", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { user } = req;
+    const invoiceId = parseInt(req.params.id);
+    
+    if (isNaN(invoiceId)) {
+      throw new ApiError("ID factură invalid", 400);
+    }
+
+    // Verificăm dacă factura există
+    const invoice = await storage.getInvoice(invoiceId);
+    if (!invoice) {
+      throw new NotFoundError("Factura nu a fost găsită");
+    }
+
+    // Verificăm dacă utilizatorul are acces la această factură
+    if (invoice.organization_id !== user.organization_id) {
+      throw new ApiError("Nu aveți acces la această factură", 403);
+    }
+
+    // Verificăm datele plății
+    const { amount, payment_method, reference, notes } = req.body;
+    
+    if (!amount || typeof amount !== 'number' || amount <= 0) {
+      throw new ApiError("Suma plății trebuie să fie un număr pozitiv", 400);
+    }
+    
+    if (!payment_method) {
+      throw new ApiError("Metoda de plată este obligatorie", 400);
+    }
+
+    // Creăm plata
+    const paymentData = {
+      invoice_id: invoiceId,
+      amount,
+      payment_method,
+      reference: reference || null,
+      notes: notes || null,
+      payment_date: new Date(),
+      created_by: user.id
+    };
+
+    const payment = await storage.createInvoicePayment(paymentData);
+
+    // Înregistrăm activitatea
+    await storage.createActivityLog({
+      organization_id: user.organization_id,
+      user_id: user.id,
+      entity_type: "invoice_payment",
+      entity_id: payment.id,
+      action: "create",
+      metadata: { invoice_id: invoiceId, amount }
+    });
+
+    // Returnăm plata creată
+    res.status(200).json(payment);
+  } catch (error) {
+    console.error("Eroare la adăugarea plății:", error);
+    res.status(error instanceof ApiError ? error.statusCode : 500).json({ 
+      message: error instanceof Error ? error.message : "Eroare la adăugarea plății"
     });
   }
 });
