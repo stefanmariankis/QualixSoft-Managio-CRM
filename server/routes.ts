@@ -614,6 +614,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // --- Routes pentru utilizatori ---
+  
+  // Obține toți utilizatorii din organizație
+  app.get("/api/users/organization", requireAuth, async (req, res) => {
+    try {
+      if (!req.user?.organization_id) {
+        return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
+      }
+
+      const users = await storage.getUsersByOrganization(req.user.organization_id);
+      return res.status(200).json(users);
+    } catch (error: any) {
+      console.error("Eroare la obținerea utilizatorilor organizației:", error);
+      return res.status(500).json({
+        message: "Eroare internă de server",
+        error: error.message || "Eroare necunoscută",
+      });
+    }
+  });
+
   // --- Routes pentru dashboard ---
 
   // Activity Log
