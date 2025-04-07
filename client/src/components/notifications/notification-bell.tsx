@@ -1,19 +1,23 @@
 import { useState, useEffect, useRef } from "react";
-import { Bell, X } from "lucide-react";
+import { Bell, Check, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NotificationList } from "./notification-list";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { 
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 
 export function NotificationBell() {
-  const { notifications, isLoading } = useNotifications();
+  const { notifications, isLoading, markAllAsRead, deleteNotification, deleteAllNotifications } = useNotifications();
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const [animate, setAnimate] = useState(false);
@@ -50,35 +54,43 @@ export function NotificationBell() {
     prevUnreadCountRef.current = unreadCount;
   }, [unreadCount, isLoading]);
 
-  // Funcție pentru a manipula deschiderea și închiderea popover-ului
-  const handleOpenChange = (newOpen: boolean) => {
-    setOpen(newOpen);
-    if (newOpen) {
-      // Declanșăm animația doar când deschidem
-      triggerAnimation();
+  // Handler pentru a marca toate notificările ca citite
+  const handleMarkAllAsRead = () => {
+    markAllAsRead();
+  };
+  
+  // Handler pentru a șterge toate notificările
+  const handleDeleteAll = () => {
+    if (notifications && notifications.length > 0) {
+      deleteAllNotifications();
     }
   };
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
         <Button 
           variant="ghost" 
           size="icon" 
-          className="relative cursor-pointer w-12 h-12 p-0 sm:w-10 sm:h-10"
+          className="relative cursor-pointer w-14 h-14 p-0 sm:w-12 sm:h-12 rounded-full hover:bg-accent active:scale-95 transition-all" 
+          onClick={() => {
+            if (!open) {
+              triggerAnimation();
+            }
+          }}
           aria-label="Arată notificările"
         >
           <Bell 
             className={cn(
-              "h-5 w-5 transition-all", 
+              "h-6 w-6 transition-all",
               animate && "animate-bell text-primary"
-            )} 
+            )}
           />
           {!isLoading && unreadCount > 0 && (
             <Badge
               variant="destructive"
               className={cn(
-                "absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs",
+                "absolute -top-1 -right-1 h-6 w-6 flex items-center justify-center p-0 text-xs",
                 animate && "animate-badge"
               )}
             >
@@ -86,26 +98,56 @@ export function NotificationBell() {
             </Badge>
           )}
         </Button>
-      </PopoverTrigger>
+      </DialogTrigger>
       
-      <PopoverContent 
-        className="w-[380px] p-4 max-w-[90vw] z-50"
-        align="end"
-        sideOffset={8}
-      >
-        <div className="relative">
-          {/* Buton de închidere */}
-          <button 
-            className="absolute top-0 right-0 p-2 text-muted-foreground hover:text-foreground" 
-            onClick={() => setOpen(false)}
-            aria-label="Închide notificările"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between">
+            <span>Notificări</span>
+            <div className="flex items-center space-x-2">
+              <Badge variant="outline" className="ml-2">
+                {unreadCount} necitite
+              </Badge>
+            </div>
+          </DialogTitle>
+        </DialogHeader>
+        
+        <Separator className="my-2" />
+        
+        <div className="flex-1 overflow-hidden">
           <NotificationList onClose={() => setOpen(false)} />
         </div>
-      </PopoverContent>
-    </Popover>
+        
+        <Separator className="my-2" />
+        
+        <DialogFooter className="flex justify-between sm:justify-between">
+          <div className="flex space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleDeleteAll}
+              disabled={notifications?.length === 0}
+              className="flex items-center"
+            >
+              <Trash2 className="mr-1 h-4 w-4" />
+              <span className="hidden sm:inline">Șterge toate</span>
+              <span className="sm:hidden">Șterge</span>
+            </Button>
+          </div>
+          
+          <Button 
+            variant="default" 
+            size="sm"
+            onClick={handleMarkAllAsRead}
+            disabled={unreadCount === 0}
+            className="flex items-center"
+          >
+            <Check className="mr-1 h-4 w-4" />
+            <span className="hidden sm:inline">Marchează toate ca citite</span>
+            <span className="sm:hidden">Citite</span>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

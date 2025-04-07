@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
 import { ro } from "date-fns/locale";
-import { AlertTriangle, Bell, Check, Info, Megaphone, Package, Trash2, Users, X } from "lucide-react";
+import { AlertTriangle, Bell, Check, Info, Megaphone, Package, Trash2, Users } from "lucide-react";
 import { Notification } from "@shared/schema";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
@@ -16,7 +16,7 @@ interface NotificationListProps {
 }
 
 export function NotificationList({ onClose }: NotificationListProps) {
-  const { notifications, isLoading, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
+  const { notifications, isLoading, markAsRead, deleteNotification } = useNotifications();
   const [expandedNotification, setExpandedNotification] = useState<number | null>(null);
 
   const handleMarkAsRead = (id: number) => {
@@ -26,10 +26,6 @@ export function NotificationList({ onClose }: NotificationListProps) {
   const handleDelete = (id: number) => {
     deleteNotification(id);
   };
-  
-  const handleMarkAllAsRead = () => {
-    markAllAsRead();
-  };
 
   // Grupează notificările după dacă sunt citite sau nu
   const unreadNotifications = notifications?.filter(notification => !notification.read_at) || [];
@@ -38,17 +34,7 @@ export function NotificationList({ onClose }: NotificationListProps) {
   if (isLoading) {
     return (
       <div className="space-y-4 p-2">
-        {[1, 2, 3].map((i) => (
-          <Card key={i} className="p-3">
-            <div className="flex items-start gap-3">
-              <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
-              <div className="flex-1 space-y-2">
-                <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
-                <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
-              </div>
-            </div>
-          </Card>
-        ))}
+        <NotificationSkeletons count={3} />
       </div>
     );
   }
@@ -82,10 +68,15 @@ export function NotificationList({ onClose }: NotificationListProps) {
 
   return (
     <div className="space-y-4">
-      <ScrollArea className="h-[400px] pr-4">
+      <ScrollArea className="h-[450px] pr-4">
         {unreadNotifications.length > 0 && (
           <div className="space-y-3">
-            <h3 className="font-medium text-sm px-1">Necitite</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-sm px-1">Necitite</h3>
+              <Badge variant="outline" className="text-xs px-2 py-0">
+                {unreadNotifications.length}
+              </Badge>
+            </div>
             {unreadNotifications.map((notification) => (
               <NotificationItem
                 key={notification.id}
@@ -100,7 +91,12 @@ export function NotificationList({ onClose }: NotificationListProps) {
 
         {readNotifications.length > 0 && (
           <div className="space-y-3 mt-4">
-            <h3 className="font-medium text-sm px-1 text-muted-foreground">Citite</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-sm px-1 text-muted-foreground">Citite</h3>
+              <Badge variant="outline" className="text-xs text-muted-foreground px-2 py-0">
+                {readNotifications.length}
+              </Badge>
+            </div>
             {readNotifications.map((notification) => (
               <NotificationItem
                 key={notification.id}
@@ -113,19 +109,6 @@ export function NotificationList({ onClose }: NotificationListProps) {
           </div>
         )}
       </ScrollArea>
-
-      {notifications.length > 0 && (
-        <div className="flex justify-end pt-2 border-t">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleMarkAllAsRead}
-            disabled={unreadNotifications.length === 0}
-          >
-            Marchează toate ca citite
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
@@ -181,6 +164,10 @@ function NotificationItem({ notification, onMarkAsRead, onDelete, onClose }: Not
   };
 
   const linkToEntity = () => {
+    if (!notification.read_at) {
+      onMarkAsRead(notification.id);
+    }
+    
     if (onClose) onClose();
     
     // Implementarea navigării către entitatea asociată notificării
@@ -214,7 +201,7 @@ function NotificationItem({ notification, onMarkAsRead, onDelete, onClose }: Not
   };
   
   return (
-    <Card className={`relative overflow-hidden ${!notification.read_at ? 'border-l-primary border-l-4' : ''}`}>
+    <Card className={`relative overflow-hidden hover:bg-accent/10 transition-all cursor-pointer ${!notification.read_at ? 'border-l-primary border-l-4' : ''}`}>
       <div className={`absolute inset-0 w-1 ${getPriorityClass(notification.priority)}`}></div>
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
@@ -222,8 +209,8 @@ function NotificationItem({ notification, onMarkAsRead, onDelete, onClose }: Not
             {getIcon()}
           </div>
           
-          <div className="flex-1 min-w-0">
-            <div className="cursor-pointer" onClick={linkToEntity}>
+          <div className="flex-1 min-w-0" onClick={linkToEntity}>
+            <div>
               <h4 className="font-medium text-sm mb-1">{notification.title}</h4>
               <p className="text-sm text-muted-foreground line-clamp-2">{notification.message}</p>
             </div>
@@ -241,8 +228,11 @@ function NotificationItem({ notification, onMarkAsRead, onDelete, onClose }: Not
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-7 w-7"
-                      onClick={() => onMarkAsRead(notification.id)}
+                      className="h-7 w-7 hover:bg-accent"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMarkAsRead(notification.id);
+                      }}
                     >
                       <Check className="h-4 w-4" />
                       <span className="sr-only">Marchează ca citit</span>
@@ -259,8 +249,11 @@ function NotificationItem({ notification, onMarkAsRead, onDelete, onClose }: Not
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-7 w-7"
-                    onClick={() => onDelete(notification.id)}
+                    className="h-7 w-7 hover:bg-destructive/10 hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(notification.id);
+                    }}
                   >
                     <Trash2 className="h-4 w-4" />
                     <span className="sr-only">Șterge notificarea</span>

@@ -13,6 +13,7 @@ interface NotificationsContextProps {
   markAsRead: (id: number) => void;
   markAllAsRead: () => void;
   deleteNotification: (id: number) => void;
+  deleteAllNotifications: () => void;
   updatePreferences: (data: Partial<NotificationPreference>) => void;
 }
 
@@ -148,6 +149,29 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       });
     },
   });
+  
+  // Mutație pentru a șterge toate notificările
+  const deleteAllNotificationsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/notifications/delete-all");
+      if (!res.ok) throw new Error("Nu s-au putut șterge toate notificările");
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      toast({
+        title: "Toate notificările au fost șterse",
+        description: "Notificările au fost șterse cu succes",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Eroare",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   // Oferă contextul pentru notificări
   const contextValue: NotificationsContextProps = {
@@ -158,6 +182,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
     markAsRead: (id: number) => markAsReadMutation.mutate(id),
     markAllAsRead: () => markAllAsReadMutation.mutate(),
     deleteNotification: (id: number) => deleteNotificationMutation.mutate(id),
+    deleteAllNotifications: () => deleteAllNotificationsMutation.mutate(),
     updatePreferences: (data: Partial<NotificationPreference>) => updatePreferencesMutation.mutate(data),
   };
 
