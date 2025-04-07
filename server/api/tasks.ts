@@ -273,6 +273,52 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       }
     }
     
+    // Verifică regulile de asignare a task-urilor
+    if (req.body.assigned_to) {
+      // Verifică permisiunile utilizatorului de a asigna task-uri
+      const userRole = req.user.role;
+      
+      // Dacă utilizatorul nu este CEO sau super_admin, verificăm regulile suplimentare
+      if (userRole !== 'ceo' && userRole !== 'super_admin') {
+        // Verificăm dacă utilizatorul este managerul proiectului
+        const isProjectManager = project.manager_id === userId;
+        
+        // Managerul proiectului poate asigna task-uri doar persoanelor din echipa lui
+        if (userRole === 'manager') {
+          if (!isProjectManager) {
+            return res.status(403).json({ 
+              message: 'Doar managerul proiectului poate asigna task-uri în cadrul acestui proiect' 
+            });
+          }
+          
+          // Verificăm dacă persoana asignată aparține organizației
+          const assignedUser = await storage.getUser(req.body.assigned_to);
+          if (!assignedUser || assignedUser.organizationId !== req.user.organization_id) {
+            return res.status(404).json({ 
+              message: 'Utilizatorul căruia doriți să asignați task-ul nu a fost găsit' 
+            });
+          }
+          
+          // Implementare pentru a verifica dacă utilizatorul este în departamentul managerului
+          // Această logică ar trebui extinsă în funcție de cerințele specifice și structura bazei de date
+          // Deocamdată verificăm doar dacă utilizatorul aparține organizației
+          if (assignedUser.organizationId !== req.user.organization_id) {
+            return res.status(403).json({ 
+              message: 'Nu puteți asigna task-uri unui utilizator care nu face parte din organizație' 
+            });
+          }
+        } else {
+          // Angajații obișnuiți pot crea task-uri doar pentru ei înșiși
+          if (req.body.assigned_to !== userId) {
+            return res.status(403).json({ 
+              message: 'Nu aveți permisiunea de a crea task-uri pentru alți utilizatori' 
+            });
+          }
+        }
+      }
+      // CEO și super_admin pot asigna orice task oricui din organizație
+    }
+    
     const newTask = {
       ...req.body,
       organization_id: req.user!.organization_id,
@@ -336,6 +382,50 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response) => {
     
     if (!task || task.organization_id !== req.user!.organization_id) {
       return res.status(404).json({ message: 'Task negăsit' });
+    }
+    
+    // Verificăm dacă se dorește schimbarea persoanei asignate (assigned_to)
+    if (req.body.assigned_to && req.body.assigned_to !== task.assigned_to) {
+      // Verifică permisiunile utilizatorului de a asigna task-uri
+      const userRole = req.user.role;
+      
+      // Dacă utilizatorul nu este CEO sau super_admin, verificăm regulile suplimentare
+      if (userRole !== 'ceo' && userRole !== 'super_admin') {
+        // Obținem proiectul asociat task-ului pentru a verifica rolul utilizatorului în cadrul proiectului
+        const project = await storage.getProject(task.project_id);
+        if (!project) {
+          return res.status(404).json({ message: 'Proiectul asociat task-ului nu a fost găsit' });
+        }
+        
+        // Verificăm dacă utilizatorul curent este managerul proiectului
+        const isProjectManager = project.manager_id === userId;
+        
+        // Managerul proiectului poate asigna task-uri doar persoanelor din echipa lui
+        if (userRole === 'manager') {
+          if (!isProjectManager) {
+            return res.status(403).json({ message: 'Doar managerul proiectului poate asigna task-uri în cadrul acestui proiect' });
+          }
+          
+          // Verificăm dacă persoana asignată aparține de departamentul managerului sau este în echipa proiectului
+          // Obținem utilizatorul căruia se dorește asignarea
+          const assignedUser = await storage.getUser(req.body.assigned_to);
+          if (!assignedUser || assignedUser.organizationId !== req.user.organization_id) {
+            return res.status(404).json({ message: 'Utilizatorul căruia doriți să asignați task-ul nu a fost găsit' });
+          }
+          
+          // Verificăm dacă utilizatorul este parte din proiect
+          // Această implementare ar trebui extinsă cu o verificare mai complexă care să verifice membrii echipei proiectului
+          // Sau un departament anume dacă este cazul
+          // Deocamdată verificăm doar dacă utilizatorul aparține organizației
+          if (assignedUser.organizationId !== req.user.organization_id) {
+            return res.status(403).json({ message: 'Nu puteți asigna task-uri unui utilizator care nu face parte din organizație' });
+          }
+        } else {
+          // Angajații obișnuiți nu pot asigna task-uri altora
+          return res.status(403).json({ message: 'Nu aveți permisiunea de a asigna task-uri altor utilizatori' });
+        }
+      }
+      // CEO și super_admin pot asigna orice task oricui din organizație
     }
     
     // Dacă se schimbă project_id, verifică dacă noul proiect există și este în organizația utilizatorului
