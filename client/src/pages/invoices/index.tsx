@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link, useLocation } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -67,6 +67,26 @@ interface InvoiceItem {
 }
 
 export default function InvoicesPage() {
+  // Obține parametrii din URL
+  const [location, setLocation] = useLocation();
+  
+  // Funcție pentru parsarea parametrilor din URL
+  function parseSearchParams() {
+    const searchParams = new URLSearchParams(window.location.search);
+    const clientId = searchParams.get('clientId');
+    return { clientId };
+  }
+  
+  // Efect pentru setarea clientului din URL
+  useEffect(() => {
+    const { clientId } = parseSearchParams();
+    if (clientId) {
+      setSelectedClient(clientId);
+      // Deschidem automat dialogul pentru factură nouă
+      setDialogOpen(true);
+    }
+  }, [location]);
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("toate");
   const [filterClient, setFilterClient] = useState("toate");
@@ -118,6 +138,39 @@ export default function InvoicesPage() {
     resetInvoiceForm();
   };
   
+  // Utilizăm queryClient pentru a invalida queryurile după adăugarea unei facturi noi
+  const queryClient = useQueryClient();
+  
+  // Mutația pentru salvarea facturii
+  const createInvoiceMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'A apărut o eroare la salvarea facturii');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidăm queryul pentru a reîncărca datele
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      closeDialog();
+      // Afișăm un mesaj de succes
+      alert("Factura a fost salvată cu succes!");
+    },
+    onError: (error) => {
+      alert(`Eroare la salvarea facturii: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+    }
+  });
+
   // Salvează factura - trimite datele către server
   const saveInvoice = async () => {
     // Verificare date obligatorii
@@ -148,7 +201,7 @@ export default function InvoicesPage() {
       discount_rate: discountRate,
       discount_amount: discountAmount,
       total_amount: total,
-      status: "draft",
+      status: "sent", // Schimbat de la "draft" la "sent"
       items: invoiceItems.map(item => ({
         description: item.description,
         quantity: item.quantity,
@@ -157,17 +210,9 @@ export default function InvoicesPage() {
       }))
     };
     
-    // Afișează obiectul care ar fi trimis (pentru debugging)
+    // Trimitem factura către server
     console.log("Salvare factură:", invoice);
-    
-    // Aici ar trebui să implementăm trimiterea efectivă către server
-    // TODO: Implementează mutația pentru salvarea facturii
-    
-    // Închide dialogul și resetează formularul
-    closeDialog();
-    
-    // Afișează un mesaj de succes
-    alert("Factura a fost salvată ca schiță!");
+    createInvoiceMutation.mutate(invoice);
   };
   
   // Adaugă un element nou la factură
@@ -349,7 +394,7 @@ export default function InvoicesPage() {
               Gestionează facturile și urmărește plățile
             </p>
           </div>
-          <Dialog>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button className="flex items-center gap-1">
                 <Plus size={16} />
