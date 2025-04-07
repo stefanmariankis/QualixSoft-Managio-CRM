@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -50,18 +53,83 @@ import {
   HelpCircle,
   DollarSign
 } from "lucide-react";
-import { TeamMember, teamMemberRoles } from "@shared/schema";
+import { TeamMember, TeamMemberFormData, teamMemberRoles, teamMemberSchema } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function TeamPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("toate");
+  const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { organization } = useAuth();
+
+  // Verifică dacă organizația are departamente activate
+  const hasDepartments = organization?.has_departments ?? false;
 
   // Apel API real către server
   const { data: teamMembers, isLoading, refetch } = useQuery({
     queryKey: ["/api/team"],
   });
+
+  // Obține departamente dacă e cazul
+  const { data: departments } = useQuery({
+    queryKey: ["/api/departments"],
+    enabled: hasDepartments, // Nu face query dacă departamentele nu sunt activate
+  });
+
+  // Formular de adăugare membru nou
+  const form = useForm<TeamMemberFormData>({
+    resolver: zodResolver(teamMemberSchema),
+    defaultValues: {
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone: "",
+      role: "employee",
+      position: "",
+      bio: "",
+      hourly_rate: 0,
+      is_active: true,
+    },
+  });
+
+  // Mutație pentru adăugare membru nou
+  const addMemberMutation = useMutation({
+    mutationFn: async (formData: TeamMemberFormData) => {
+      const res = await apiRequest("POST", "/api/team", formData);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "A apărut o eroare la adăugarea membrului");
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Succes",
+        description: "Membrul a fost adăugat cu succes în echipă",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/team"] });
+      setAddMemberDialogOpen(false);
+      form.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Eroare",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handler pentru submit
+  const onSubmit = (data: TeamMemberFormData) => {
+    addMemberMutation.mutate(data);
+  };
 
   // Filtrare membrii echipei
   const filteredMembers = teamMembers && Array.isArray(teamMembers)
@@ -120,25 +188,204 @@ export default function TeamPage() {
               Gestionează membrii echipei și colaboratorii
             </p>
           </div>
-          <Dialog>
+          <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" /> Adaugă membru
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[525px]">
               <DialogHeader>
                 <DialogTitle>Adaugă membru nou</DialogTitle>
                 <DialogDescription>
                   Completează informațiile pentru a adăuga un membru nou în echipă.
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                {/* Form pentru adăugare membru va fi implementat aici */}
-                <p className="text-sm text-muted-foreground">
-                  Implementarea formularului va fi disponibilă curând.
-                </p>
-              </div>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="first_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Prenume *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Prenume" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="last_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nume *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Nume" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email *</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="Email" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Telefon</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Telefon" {...field} value={field.value || ''} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="role"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rol *</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Alege rolul" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {teamMemberRoles.map(role => (
+                                <SelectItem key={role} value={role}>
+                                  {getRoleLabel(role)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="position"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Poziție</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Poziție" {...field} value={field.value || ''} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={form.control}
+                    name="hourly_rate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Rată orară (opțional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            placeholder="0"
+                            {...field}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                              field.onChange(value);
+                            }}
+                            value={field.value === null || field.value === undefined ? '' : field.value}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Suma în RON per oră de lucru
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="bio"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Biografie</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Scurtă descriere a membrului echipei"
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="is_active"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                          <FormLabel>Status activ</FormLabel>
+                          <FormDescription>
+                            Marchează ca inactiv pentru a dezactiva temporar contul
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <DialogFooter>
+                    <Button 
+                      type="submit" 
+                      disabled={addMemberMutation.isPending}
+                    >
+                      {addMemberMutation.isPending ? (
+                        <>
+                          <span className="animate-spin mr-2">◌</span>
+                          Se adaugă...
+                        </>
+                      ) : (
+                        "Adaugă membru"
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
             </DialogContent>
           </Dialog>
         </div>
