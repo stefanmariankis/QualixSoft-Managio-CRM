@@ -99,8 +99,8 @@ export default function TasksPage() {
     
     // Filtrare după persoana asignată
     const matchesAssignee = filterAssignee === "toate" || 
-                            (filterAssignee === "neasignat" && task.assigned_to === null) ||
-                            (task.assigned_to && task.assigned_to.toString() === filterAssignee);
+                            (filterAssignee === "neasignat" && task.assignee_id === null) ||
+                            (task.assignee_id && task.assignee_id.toString() === filterAssignee);
     
     return matchesSearch && matchesStatus && matchesProject && matchesAssignee;
   }) : [];
@@ -601,7 +601,7 @@ export default function TasksPage() {
                           <TableCell>
                             <div className="flex items-center space-x-2">
                               <User className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span>{getAssigneeName(task.assigned_to)}</span>
+                              <span>{getAssigneeName(task.assignee_id)}</span>
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
