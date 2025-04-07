@@ -53,13 +53,14 @@ import {
   HelpCircle,
   DollarSign
 } from "lucide-react";
-import { TeamMember, TeamMemberFormData, teamMemberRoles, teamMemberSchema } from "@shared/schema";
+import { Department, TeamMember, TeamMemberFormData, teamMemberRoles, teamMemberSchema } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { z } from "zod";
 
 export default function TeamPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -83,8 +84,10 @@ export default function TeamPage() {
   });
 
   // Formular de adăugare membru nou
-  const form = useForm<TeamMemberFormData>({
-    resolver: zodResolver(teamMemberSchema),
+  const form = useForm<TeamMemberFormData & { department_id?: number }>({
+    resolver: zodResolver(teamMemberSchema.extend({
+      department_id: z.number().optional()
+    })),
     defaultValues: {
       first_name: "",
       last_name: "",
@@ -95,12 +98,13 @@ export default function TeamPage() {
       bio: "",
       hourly_rate: 0,
       is_active: true,
+      department_id: undefined,
     },
   });
 
   // Mutație pentru adăugare membru nou
   const addMemberMutation = useMutation({
-    mutationFn: async (formData: TeamMemberFormData) => {
+    mutationFn: async (formData: TeamMemberFormData & { department_id?: number }) => {
       const res = await apiRequest("POST", "/api/team", formData);
       if (!res.ok) {
         const errorData = await res.json();
@@ -127,7 +131,7 @@ export default function TeamPage() {
   });
 
   // Handler pentru submit
-  const onSubmit = (data: TeamMemberFormData) => {
+  const onSubmit = (data: TeamMemberFormData & { department_id?: number }) => {
     addMemberMutation.mutate(data);
   };
 
@@ -329,6 +333,41 @@ export default function TeamPage() {
                       </FormItem>
                     )}
                   />
+                  
+                  {/* Selectorul de departament - apare doar dacă organizația are departamente activate */}
+                  {hasDepartments && (
+                    <FormField
+                      control={form.control}
+                      name="department_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Departament</FormLabel>
+                          <Select
+                            onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                            value={field.value ? String(field.value) : undefined}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Alege departamentul" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">Fără departament</SelectItem>
+                              {departments && Array.isArray(departments) && departments.map((dept: Department) => (
+                                <SelectItem key={dept.id} value={String(dept.id)}>
+                                  {dept.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Selectează un departament pentru acest membru (opțional)
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   
                   <FormField
                     control={form.control}
