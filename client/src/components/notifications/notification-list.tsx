@@ -100,16 +100,36 @@ export function NotificationList({ onClose }: NotificationListProps) {
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => {
-              notifications.forEach((notification) => {
-                if (!notification.read_at) {
-                  markAsRead(notification.id);
+            onClick={async () => {
+              try {
+                const response = await fetch('/api/notifications/read-all', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                });
+                
+                if (response.ok) {
+                  // Invalidăm cache-ul pentru a obține cele mai recente notificări
+                  window.location.reload();
+                  toast({
+                    title: "Toate notificările au fost marcate ca citite",
+                    description: `${unreadNotifications.length} notificări au fost actualizate`,
+                  });
+                } else {
+                  toast({
+                    title: "Eroare",
+                    description: "Nu s-au putut marca toate notificările ca citite",
+                    variant: "destructive",
+                  });
                 }
-              });
-              toast({
-                title: "Toate notificările au fost marcate ca citite",
-                description: `${unreadNotifications.length} notificări au fost actualizate`,
-              });
+              } catch (error) {
+                toast({
+                  title: "Eroare",
+                  description: "Nu s-au putut marca toate notificările ca citite",
+                  variant: "destructive",
+                });
+              }
             }}
             disabled={unreadNotifications.length === 0}
           >

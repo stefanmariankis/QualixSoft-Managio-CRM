@@ -52,7 +52,7 @@ router.get('/unread/count', requireAuth, async (req, res, next) => {
 });
 
 // Marchează o notificare ca citită
-router.patch('/:id/read', requireAuth, async (req, res, next) => {
+router.post('/:id/read', requireAuth, async (req, res, next) => {
   try {
     const notificationId = parseInt(req.params.id);
     const userId = req.user!.id;
@@ -75,7 +75,7 @@ router.patch('/:id/read', requireAuth, async (req, res, next) => {
 });
 
 // Marchează toate notificările ca citite
-router.patch('/read-all', requireAuth, async (req, res, next) => {
+router.post('/read-all', requireAuth, async (req, res, next) => {
   try {
     const userId = req.user!.id;
     await storage.markAllNotificationsAsRead(userId);

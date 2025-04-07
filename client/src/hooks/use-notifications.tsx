@@ -105,7 +105,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   // Mutație pentru a actualiza preferințele de notificări
   const updatePreferencesMutation = useMutation({
     mutationFn: async (data: Partial<NotificationPreference>) => {
-      const res = await apiRequest("PUT", "/api/notifications/preferences", data);
+      const res = await apiRequest("PATCH", "/api/notifications/preferences", data);
       if (!res.ok) throw new Error("Nu s-au putut actualiza preferințele");
       return await res.json();
     },

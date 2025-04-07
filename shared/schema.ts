@@ -857,11 +857,13 @@ export interface Notification {
   organization_id: number;
   recipient_id: number;
   sender_id?: number | null;
-  type: (typeof notificationTypes)[number];
+  type?: (typeof notificationTypes)[number];
+  notification_type?: string; // Pentru a susține notification_type_new din baza de date
   title: string;
   message: string;
   priority: (typeof notificationPriorities)[number];
   read_status: (typeof notificationReadStatus)[number];
+  read_at?: Date | null; // Adăugat câmpul read_at folosit în componente
   entity_type: string;
   entity_id?: number | null;
   action_url?: string | null;

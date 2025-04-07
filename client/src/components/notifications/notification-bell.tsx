@@ -1,14 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { NotificationList } from "./notification-list";
 import { useNotifications } from "@/hooks/use-notifications";
+import { useToast } from "@/hooks/use-toast";
 
 export function NotificationBell() {
   const { notifications, isLoading } = useNotifications();
   const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+
+  // Verifică dacă notificările sunt încărcate corect
+  useEffect(() => {
+    if (notifications === undefined && !isLoading) {
+      toast({
+        title: "Eroare",
+        description: "Nu s-au putut încărca notificările",
+        variant: "destructive",
+      });
+    }
+  }, [notifications, isLoading, toast]);
 
   // Calculează numărul de notificări necitite
   const unreadCount = notifications?.filter(notification => !notification.read_at).length || 0;

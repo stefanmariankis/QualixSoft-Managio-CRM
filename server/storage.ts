@@ -1838,8 +1838,7 @@ export class DatabaseStorage implements IStorage {
       
       const result = await db`
         SELECT n.*, 
-               u.username as sender_name,
-               u.avatar as sender_avatar,
+               CONCAT(u.first_name, ' ', u.last_name) as sender_name,
                CASE 
                  WHEN n.created_at > NOW() - INTERVAL '24 hours' THEN true 
                  ELSE false 
@@ -1864,8 +1863,7 @@ export class DatabaseStorage implements IStorage {
       
       const result = await db`
         SELECT n.*, 
-               u.username as sender_name,
-               u.avatar as sender_avatar,
+               CONCAT(u.first_name, ' ', u.last_name) as sender_name,
                CASE 
                  WHEN n.created_at > NOW() - INTERVAL '24 hours' THEN true 
                  ELSE false 
@@ -1936,9 +1934,10 @@ export class DatabaseStorage implements IStorage {
   
   async markNotificationAsRead(id: number): Promise<boolean> {
     try {
+      const now = new Date();
       const result = await db`
         UPDATE notifications
-        SET read_status = 'read'
+        SET read_status = 'read', read_at = ${now}
         WHERE id = ${id}
         RETURNING id
       `;
@@ -1952,9 +1951,10 @@ export class DatabaseStorage implements IStorage {
   
   async markAllNotificationsAsRead(userId: number): Promise<boolean> {
     try {
+      const now = new Date();
       const result = await db`
         UPDATE notifications
-        SET read_status = 'read'
+        SET read_status = 'read', read_at = ${now}
         WHERE recipient_id = ${userId}
           AND read_status = 'unread'
         RETURNING id
