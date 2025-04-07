@@ -460,7 +460,7 @@ export default function ClientDetails() {
                 </Button>
                 
                 <Button variant="outline" className="w-full" asChild>
-                  <Link href={`/invoices/new?clientId=${client.id}`}>
+                  <Link href={`/invoices?clientId=${client.id}`}>
                     Creează factură
                   </Link>
                 </Button>
@@ -564,7 +564,7 @@ export default function ClientDetails() {
                 <div className="flex justify-between items-center">
                   <CardTitle>Facturi</CardTitle>
                   <Button asChild size="sm">
-                    <Link href={`/invoices/new?clientId=${client.id}`}>
+                    <Link href={`/invoices?clientId=${client.id}`}>
                       Adaugă factură
                     </Link>
                   </Button>
@@ -579,7 +579,7 @@ export default function ClientDetails() {
                     Nu există încă facturi pentru acest client.
                   </p>
                   <Button className="mt-4" asChild>
-                    <Link href={`/invoices/new?clientId=${client.id}`}>
+                    <Link href={`/invoices?clientId=${client.id}`}>
                       Creează prima factură
                     </Link>
                   </Button>
