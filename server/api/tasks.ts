@@ -73,10 +73,18 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
       console.log(`API - Filtrare task-uri după status:`, statuses);
     }
     
-    // Obține toate task-urile din organizație
+    // Obține task-urile în funcție de rolul utilizatorului
     const organizationId = req.user!.organization_id;
-    console.log(`API - Obținere toate task-urile pentru organizație ID=${organizationId}`);
-    let allTasks = await storage.getTasksByOrganization(organizationId);
+    console.log(`API - Obținere task-uri pentru organizație ID=${organizationId} și utilizator ID=${userId}, rol=${req.user.role}`);
+    
+    let allTasks;
+    // CEO și super_admin văd toate task-urile
+    if (req.user.role === 'ceo' || req.user.role === 'super_admin') {
+      allTasks = await storage.getTasksByOrganization(organizationId);
+    } else {
+      // Ceilalți utilizatori văd doar task-urile la care au acces
+      allTasks = await storage.getTasksForUser(userId, organizationId);
+    }
     
     // Aplicare filtru după status dacă există
     if (statuses && statuses.length > 0) {
@@ -201,6 +209,19 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Proiect negăsit pentru acest task' });
     }
     
+    // Verificare dacă utilizatorul are acces la acest task în funcție de rol
+    // CEO și super_admin au acces la toate task-urile
+    if (req.user.role !== 'ceo' && req.user.role !== 'super_admin') {
+      // Pentru alte roluri verificăm dacă task-ul este asignat utilizatorului
+      // sau dacă utilizatorul este manager al proiectului asociat
+      const isAssignedToUser = task.assigned_to === userId;
+      const isProjectManager = project.manager_id === userId;
+      
+      if (!isAssignedToUser && !isProjectManager) {
+        return res.status(403).json({ message: 'Nu aveți acces la acest task' });
+      }
+    }
+    
     // Obține informații despre client
     const client = await storage.getClient(project.client_id);
     if (!client) {
@@ -238,6 +259,18 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     const project = await storage.getProject(projectId);
     if (!project || project.organization_id !== req.user!.organization_id) {
       return res.status(400).json({ message: 'Proiect invalid sau neautorizat' });
+    }
+    
+    // Verifică dacă utilizatorul are acces la acest proiect în funcție de rol
+    // CEO și super_admin au acces la toate proiectele
+    if (req.user.role !== 'ceo' && req.user.role !== 'super_admin') {
+      // Pentru alte roluri verificăm dacă proiectul este asociat cu utilizatorul
+      const userProjects = await storage.getProjectsForUser(userId, req.user!.organization_id);
+      const hasAccess = userProjects.some(p => p.id === projectId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Nu aveți acces la acest proiect' });
+      }
     }
     
     const newTask = {

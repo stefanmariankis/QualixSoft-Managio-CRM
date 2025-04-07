@@ -75,6 +75,7 @@ export interface IStorage {
   getProject(id: number): Promise<Project | undefined>;
   getProjectsByOrganization(organizationId: number): Promise<Project[]>;
   getProjectsByClient(clientId: number): Promise<Project[]>;
+  getProjectsForUser(userId: number, organizationId: number): Promise<Project[]>;
   createProject(project: InsertProject): Promise<Project>;
   updateProject(
     id: number,
@@ -87,6 +88,7 @@ export interface IStorage {
   getTasksByProject(projectId: number): Promise<Task[]>;
   getTasksByUser(userId: number): Promise<Task[]>;
   getTasksByOrganization(organizationId: number): Promise<Task[]>;
+  getTasksForUser(userId: number, organizationId: number): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: number, taskData: Partial<Task>): Promise<Task | undefined>;
   deleteTask(id: number): Promise<boolean>;
@@ -1186,6 +1188,52 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
   }
+  
+  async getProjectsForUser(userId: number, organizationId: number): Promise<Project[]> {
+    try {
+      // Obținem rolul utilizatorului
+      const user = await this.getUser(userId);
+      if (!user) {
+        console.error(`Nu s-a găsit utilizatorul cu ID-ul ${userId}`);
+        return [];
+      }
+      
+      // CEO și super_admin văd toate proiectele
+      if (user.role === 'ceo' || user.role === 'super_admin') {
+        return this.getProjectsByOrganization(organizationId);
+      }
+      
+      // Pentru manager, angajați și colaboratori, obținem proiectele la care sunt asignați
+      // Managerul vede toate proiectele unde este manager_id
+      if (user.role === 'manager') {
+        const result = await db`
+          SELECT * FROM projects
+          WHERE organization_id = ${organizationId}
+            AND (manager_id = ${userId} OR 
+                id IN (
+                  SELECT project_id FROM tasks 
+                  WHERE assigned_to = ${userId} AND organization_id = ${organizationId}
+                ))
+          ORDER BY start_date DESC, name
+        `;
+        return result as unknown as Project[];
+      }
+      
+      // Angajații și colaboratorii văd doar proiectele cu task-uri asignate lor
+      const result = await db`
+        SELECT DISTINCT p.* FROM projects p
+        JOIN tasks t ON p.id = t.project_id
+        WHERE p.organization_id = ${organizationId}
+          AND t.assigned_to = ${userId}
+        ORDER BY p.start_date DESC, p.name
+      `;
+      
+      return result as unknown as Project[];
+    } catch (error) {
+      console.error("Eroare la obținerea proiectelor pentru utilizator:", error);
+      return [];
+    }
+  }
 
   async getProjectsByClient(clientId: number): Promise<Project[]> {
     try {
@@ -1354,6 +1402,47 @@ export class DatabaseStorage implements IStorage {
       return result as unknown as Task[];
     } catch (error) {
       console.error("Eroare la obținerea task-urilor organizației:", error);
+      return [];
+    }
+  }
+  
+  async getTasksForUser(userId: number, organizationId: number): Promise<Task[]> {
+    try {
+      // Obținem rolul utilizatorului
+      const user = await this.getUser(userId);
+      if (!user) {
+        console.error(`Nu s-a găsit utilizatorul cu ID-ul ${userId}`);
+        return [];
+      }
+      
+      // CEO și super_admin văd toate task-urile
+      if (user.role === 'ceo' || user.role === 'super_admin') {
+        return this.getTasksByOrganization(organizationId);
+      }
+      
+      // Pentru manager, obținem task-urile unde este manager de proiect sau asignat direct
+      if (user.role === 'manager') {
+        const result = await db`
+          SELECT t.* FROM tasks t
+          LEFT JOIN projects p ON t.project_id = p.id
+          WHERE t.organization_id = ${organizationId}
+            AND (t.assigned_to = ${userId} OR p.manager_id = ${userId})
+          ORDER BY t.due_date ASC NULLS LAST, t.priority DESC, t.title
+        `;
+        return result as unknown as Task[];
+      }
+      
+      // Angajații și colaboratorii văd doar task-urile asignate lor
+      const result = await db`
+        SELECT * FROM tasks
+        WHERE organization_id = ${organizationId}
+          AND assigned_to = ${userId}
+        ORDER BY due_date ASC NULLS LAST, priority DESC, title
+      `;
+      
+      return result as unknown as Task[];
+    } catch (error) {
+      console.error("Eroare la obținerea task-urilor pentru utilizator:", error);
       return [];
     }
   }
