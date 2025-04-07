@@ -244,7 +244,7 @@ export default function TasksPage() {
                         <SelectValue placeholder="Selectează utilizator" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Neasignat</SelectItem>
+                        <SelectItem value="unassigned">Neasignat</SelectItem>
                         {users && users.length > 0 ? (
                           users.map(user => (
                             <SelectItem key={user.id} value={user.id.toString()}>
@@ -264,7 +264,7 @@ export default function TasksPage() {
                         <SelectValue placeholder="Fără părinte" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Fără părinte</SelectItem>
+                        <SelectItem value="no-parent">Fără părinte</SelectItem>
                         {tasks && tasks.length > 0 ? (
                           tasks.map(task => (
                             <SelectItem key={task.id} value={task.id.toString()}>
