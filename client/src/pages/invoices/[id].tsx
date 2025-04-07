@@ -53,11 +53,8 @@ type InvoiceItem = {
   description: string;
   quantity: number;
   unit_price: number;
-  tax_rate: number;
-  tax_amount: number;
-  total: number;
-  created_at: string;
-  updated_at: string;
+  total_price: number; // Preț fără TVA
+  order_index?: number;
 };
 
 type Payment = {
@@ -813,23 +810,31 @@ export default function InvoiceDetails() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.description}</TableCell>
-                    <TableCell className="text-right">{item.quantity}</TableCell>
-                    <TableCell className="text-right">{formatAmount(item.unit_price)}</TableCell>
-                    <TableCell className="text-right">
-                      {item.tax_rate > 0 ? (
-                        <>
-                          {item.tax_rate}% ({formatAmount(item.tax_amount)})
-                        </>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">{formatAmount(item.total)}</TableCell>
-                  </TableRow>
-                ))}
+                {items.map((item) => {
+                  // Calculăm valoarea TVA-ului pentru acest articol
+                  const itemTaxRate = invoice.tax_rate || 0;
+                  const itemSubtotal = item.total_price; // Preț fără TVA din baza de date
+                  const itemTaxAmount = (itemSubtotal * itemTaxRate) / 100;
+                  const itemTotal = itemSubtotal + itemTaxAmount;
+                  
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.description}</TableCell>
+                      <TableCell className="text-right">{item.quantity}</TableCell>
+                      <TableCell className="text-right">{formatAmount(item.unit_price)}</TableCell>
+                      <TableCell className="text-right">
+                        {itemTaxRate > 0 ? (
+                          <>
+                            {formatAmount(itemTaxAmount)} <span className="text-xs text-muted-foreground ml-1">({itemTaxRate}%)</span>
+                          </>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">{formatAmount(itemTotal)}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
             

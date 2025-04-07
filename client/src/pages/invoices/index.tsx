@@ -123,6 +123,11 @@ export default function InvoicesPage() {
   const discountAmount = subtotal * (discountRate / 100);
   const total = subtotal + taxAmount - discountAmount;
   
+  // Calculează TVA-ul pentru fiecare element al facturii
+  const getItemTaxAmount = (itemTotal: number) => {
+    return itemTotal * (taxRate / 100);
+  };
+  
   // Resetează formularul
   const resetInvoiceForm = () => {
     setSelectedClient("");
@@ -214,7 +219,7 @@ export default function InvoicesPage() {
         description: item.description,
         quantity: item.quantity,
         unit_price: item.unitPrice,
-        total: item.total
+        total_price: item.total // Trimitem ca total_price conform schemei din baza de date
       }))
     };
     

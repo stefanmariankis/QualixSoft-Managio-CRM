@@ -335,14 +335,14 @@ export interface Invoice {
   updated_at: Date;
 }
 
-// Tipuri pentru InvoiceItem - remove created_at și updated_at deoarece nu există în tabelă
+// Tipuri pentru InvoiceItem - adăugat câmpuri pentru TVA și calculul corect al totalului
 export interface InvoiceItem {
   id: number;
   invoice_id: number;
   description: string;
   quantity: number;
   unit_price: number;
-  total_price: number;
+  total_price: number;  // Prețul fără TVA (subtotal per item)
   order_index?: number;
 }
 
@@ -351,7 +351,7 @@ export interface InsertInvoiceItem {
   description: string;
   quantity: number;
   unit_price: number;
-  total_price: number;
+  total_price: number;  // Prețul fără TVA (subtotal per item)
   order_index?: number;
 }
 
