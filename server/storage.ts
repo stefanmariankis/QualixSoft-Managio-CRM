@@ -91,6 +91,8 @@ export interface IStorage {
   getInvoicesByOrganization(organizationId: number): Promise<Invoice[]>;
   getInvoicesByClient(clientId: number): Promise<Invoice[]>;
   getInvoicesByProject(projectId: number): Promise<Invoice[]>;
+  getInvoiceItems(invoiceId: number): Promise<any[]>;
+  getInvoicePayments(invoiceId: number): Promise<any[]>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
   updateInvoice(
     id: number,
@@ -1335,6 +1337,36 @@ export class DatabaseStorage implements IStorage {
       return result as unknown as Invoice[];
     } catch (error) {
       console.error("Eroare la obținerea facturilor proiectului:", error);
+      return [];
+    }
+  }
+
+  async getInvoiceItems(invoiceId: number): Promise<any[]> {
+    try {
+      const result = await db`
+        SELECT * FROM invoice_items
+        WHERE invoice_id = ${invoiceId}
+        ORDER BY id
+      `;
+
+      return result;
+    } catch (error) {
+      console.error("Eroare la obținerea elementelor facturii:", error);
+      return [];
+    }
+  }
+
+  async getInvoicePayments(invoiceId: number): Promise<any[]> {
+    try {
+      const result = await db`
+        SELECT * FROM invoice_payments
+        WHERE invoice_id = ${invoiceId}
+        ORDER BY payment_date DESC
+      `;
+
+      return result;
+    } catch (error) {
+      console.error("Eroare la obținerea plăților facturii:", error);
       return [];
     }
   }

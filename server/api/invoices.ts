@@ -77,11 +77,17 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
       throw new ApiError("Nu aveți acces la această factură", 403);
     }
 
+    // Obținem elementele facturii și plățile
+    const invoiceItems = await storage.getInvoiceItems(invoiceId);
+    const invoicePayments = await storage.getInvoicePayments(invoiceId);
+
     // Convertim datele în format valid pentru client
     const formattedInvoice = {
       ...invoice,
       issue_date: ensureDate(invoice.issue_date),
       due_date: ensureDate(invoice.due_date),
+      items: invoiceItems,
+      payments: invoicePayments
     };
 
     res.json(formattedInvoice);

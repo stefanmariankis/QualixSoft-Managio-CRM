@@ -68,10 +68,11 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
       return res.status(403).json({ message: 'Nu aveți acces la acest client' });
     }
     
-    // Obține proiectele asociate acestui client
+    // Obține proiectele și facturile asociate acestui client
     const projects = await storage.getProjectsByClient(clientId);
+    const invoices = await storage.getInvoicesByClient(clientId);
     
-    res.json({ client, projects });
+    res.json({ client, projects, invoices });
   } catch (error) {
     console.error('Eroare la obținerea detaliilor clientului:', error);
     res.status(500).json({ message: 'Eroare la obținerea detaliilor clientului' });
