@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,9 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/auth-context";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Plus, 
   Search, 
@@ -47,7 +50,9 @@ import {
   Calendar as CalendarIcon,
   FolderKanban,
   Clock,
-  User
+  User,
+  UserCircle,
+  Loader2
 } from "lucide-react";
 import { Task } from "@shared/schema";
 
@@ -59,6 +64,10 @@ export default function TasksPage() {
   const [filterProject, setFilterProject] = useState("toate");
   const [filterAssignee, setFilterAssignee] = useState("toate");
   const [, setLocation] = useLocation();
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const { toast } = useToast();
+  const { user } = useAuth();
   
   // Obține lista de sarcini din API
   const { data: tasks, isLoading } = useQuery({
@@ -187,8 +196,111 @@ export default function TasksPage() {
     return "";
   };
 
+  // Mutația pentru actualizarea task-ului
+  const updateTaskMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("PATCH", `/api/tasks/${selectedTaskId}`, data);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Eroare la actualizarea sarcinii");
+      }
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Sarcină actualizată",
+        description: "Sarcina a fost actualizată cu succes",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      setShowAssignModal(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Eroare",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handler pentru asignarea task-ului
+  const handleAssignTask = (assigneeId: string | null) => {
+    if (!selectedTaskId) return;
+    
+    updateTaskMutation.mutate({ 
+      assignee_id: assigneeId ? parseInt(assigneeId) : null 
+    });
+  };
+
   return (
     <DashboardLayout>
+      <Dialog open={showAssignModal} onOpenChange={setShowAssignModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Asignează sarcina</DialogTitle>
+            <DialogDescription>
+              Selectează un utilizator pentru a asigna această sarcină
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Asignat către</label>
+              <Select
+                onValueChange={(value) => handleAssignTask(value === "null" ? null : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selectează utilizator" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="null">Neasignat</SelectItem>
+                  {users && users.length > 0 ? (
+                    users.map((u: any) => (
+                      <SelectItem key={u.id} value={u.id.toString()}>
+                        {u.firstName} {u.lastName}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-users" disabled>Nu există utilizatori disponibili</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => handleAssignTask(user?.id?.toString() || null)}
+              disabled={updateTaskMutation.isPending}
+            >
+              <UserCircle className="h-4 w-4 mr-2" />
+              Asignează-mi mie
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAssignModal(false)}
+              disabled={updateTaskMutation.isPending}
+            >
+              Anulează
+            </Button>
+            <Button
+              onClick={() => setShowAssignModal(false)}
+              disabled={updateTaskMutation.isPending}
+            >
+              {updateTaskMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Se actualizează...
+                </>
+              ) : (
+                "Închide"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -503,7 +615,8 @@ export default function TasksPage() {
                                 className="h-6 w-6 p-0"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setLocation(`/tasks/edit/${task.id}`);
+                                  setSelectedTaskId(task.id);
+                                  setShowAssignModal(true);
                                 }}
                               >
                                 <Edit className="h-3 w-3" />
