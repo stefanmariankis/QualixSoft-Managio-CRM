@@ -16,7 +16,7 @@ interface NotificationListProps {
 }
 
 export function NotificationList({ onClose }: NotificationListProps) {
-  const { notifications, isLoading, markAsRead, deleteNotification } = useNotifications();
+  const { notifications, isLoading, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
   const [expandedNotification, setExpandedNotification] = useState<number | null>(null);
 
   const handleMarkAsRead = (id: number) => {
@@ -25,6 +25,10 @@ export function NotificationList({ onClose }: NotificationListProps) {
 
   const handleDelete = (id: number) => {
     deleteNotification(id);
+  };
+  
+  const handleMarkAllAsRead = () => {
+    markAllAsRead();
   };
 
   // Grupează notificările după dacă sunt citite sau nu
@@ -100,37 +104,7 @@ export function NotificationList({ onClose }: NotificationListProps) {
           <Button 
             variant="outline" 
             size="sm"
-            onClick={async () => {
-              try {
-                const response = await fetch('/api/notifications/read-all', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                });
-                
-                if (response.ok) {
-                  // Invalidăm cache-ul pentru a obține cele mai recente notificări
-                  window.location.reload();
-                  toast({
-                    title: "Toate notificările au fost marcate ca citite",
-                    description: `${unreadNotifications.length} notificări au fost actualizate`,
-                  });
-                } else {
-                  toast({
-                    title: "Eroare",
-                    description: "Nu s-au putut marca toate notificările ca citite",
-                    variant: "destructive",
-                  });
-                }
-              } catch (error) {
-                toast({
-                  title: "Eroare",
-                  description: "Nu s-au putut marca toate notificările ca citite",
-                  variant: "destructive",
-                });
-              }
-            }}
+            onClick={handleMarkAllAsRead}
             disabled={unreadNotifications.length === 0}
           >
             Marchează toate ca citite
@@ -151,7 +125,9 @@ interface NotificationItemProps {
 function NotificationItem({ notification, onMarkAsRead, onDelete, onClose }: NotificationItemProps) {
   const priorityColors = {
     high: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+    urgent: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
     medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+    normal: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
     low: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
     info: "bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400"
   };
@@ -217,12 +193,17 @@ function NotificationItem({ notification, onMarkAsRead, onDelete, onClose }: Not
     }
   };
 
+  // Folosim o valoare implicită pentru prioritate în caz că tipul exact nu există în mapare
+  const getPriorityClass = (priority: string) => {
+    return priorityColors[priority as keyof typeof priorityColors] || priorityColors.info;
+  };
+  
   return (
     <Card className={`relative overflow-hidden ${!notification.read_at ? 'border-l-primary border-l-4' : ''}`}>
-      <div className={`absolute inset-0 w-1 ${priorityColors[notification.priority]}`}></div>
+      <div className={`absolute inset-0 w-1 ${getPriorityClass(notification.priority)}`}></div>
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
-          <div className={`rounded-full p-2 ${priorityColors[notification.priority]}`}>
+          <div className={`rounded-full p-2 ${getPriorityClass(notification.priority)}`}>
             {getIcon()}
           </div>
           

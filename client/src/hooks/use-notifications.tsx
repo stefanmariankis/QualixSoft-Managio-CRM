@@ -11,13 +11,14 @@ interface NotificationsContextProps {
   isLoading: boolean;
   isUpdatingPreferences: boolean;
   markAsRead: (id: number) => void;
+  markAllAsRead: () => void;
   deleteNotification: (id: number) => void;
   updatePreferences: (data: Partial<NotificationPreference>) => void;
 }
 
 const NotificationsContext = createContext<NotificationsContextProps | undefined>(undefined);
 
-export function NotificationsProvider({ children }: { children: ReactNode }) {
+export const NotificationsProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -63,7 +64,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   // Mutație pentru a marca o notificare ca citită
   const markAsReadMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("POST", `/api/notifications/${id}/read`);
+      const res = await apiRequest("PATCH", `/api/notifications/${id}/read`);
       if (!res.ok) throw new Error("Nu s-a putut marca notificarea ca citită");
       return id;
     },
@@ -125,6 +126,29 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // Mutație pentru a marca toate notificările ca citite
+  const markAllAsReadMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", "/api/notifications/read-all");
+      if (!res.ok) throw new Error("Nu s-au putut marca toate notificările ca citite");
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      toast({
+        title: "Toate notificările au fost marcate ca citite",
+        description: "Notificările au fost actualizate cu succes",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Eroare",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Oferă contextul pentru notificări
   const contextValue: NotificationsContextProps = {
     notifications,
@@ -132,6 +156,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     isLoading: isLoadingNotifications || isLoadingPreferences,
     isUpdatingPreferences: updatePreferencesMutation.isPending,
     markAsRead: (id: number) => markAsReadMutation.mutate(id),
+    markAllAsRead: () => markAllAsReadMutation.mutate(),
     deleteNotification: (id: number) => deleteNotificationMutation.mutate(id),
     updatePreferences: (data: Partial<NotificationPreference>) => updatePreferencesMutation.mutate(data),
   };
@@ -143,7 +168,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useNotifications() {
+export const useNotifications = () => {
   const context = useContext(NotificationsContext);
   if (context === undefined) {
     throw new Error("useNotifications must be used within a NotificationsProvider");
