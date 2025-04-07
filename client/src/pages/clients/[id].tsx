@@ -146,7 +146,7 @@ export default function ClientDetails() {
     );
   }
   
-  const { client, projects } = data;
+  const { client, projects, invoices } = data;
   
   // Funcție pentru formatarea datelor
   const formatDate = (date: Date | null | undefined) => {
@@ -432,7 +432,7 @@ export default function ClientDetails() {
                 <div className="bg-muted/50 rounded-lg p-4">
                   <h3 className="text-sm font-medium mb-2">Facturi</h3>
                   <div className="flex justify-between items-baseline">
-                    <span className="text-3xl font-bold">--</span>
+                    <span className="text-3xl font-bold">{invoices.length}</span>
                     <Link href={`/invoices?clientId=${client.id}`} className="text-xs text-primary hover:underline">
                       Vezi toate
                     </Link>
@@ -440,15 +440,21 @@ export default function ClientDetails() {
                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                     <div className="flex items-center gap-1">
                       <CheckCircle2 className="h-3 w-3 text-green-500" />
-                      <span>-- Plătite</span>
+                      <span>
+                        {invoices.filter(i => i.status === 'paid').length} Plătite
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <AlertCircle className="h-3 w-3 text-yellow-500" />
-                      <span>-- Neachitate</span>
+                      <span>
+                        {invoices.filter(i => i.status === 'sent').length} Neachitate
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <AlertCircle className="h-3 w-3 text-red-500" />
-                      <span>-- Întârziate</span>
+                      <span>
+                        {invoices.filter(i => i.status === 'overdue').length} Întârziate
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -572,18 +578,76 @@ export default function ClientDetails() {
                 <CardDescription>Toate facturile emise pentru acest client</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <FileText className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
-                  <h3 className="mt-4 text-lg font-medium">Nicio factură</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Nu există încă facturi pentru acest client.
-                  </p>
-                  <Button className="mt-4" asChild>
-                    <Link href={`/invoices?clientId=${client.id}`}>
-                      Creează prima factură
-                    </Link>
-                  </Button>
-                </div>
+                {invoices.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
+                    <h3 className="mt-4 text-lg font-medium">Nicio factură</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Nu există încă facturi pentru acest client.
+                    </p>
+                    <Button className="mt-4" asChild>
+                      <Link href={`/invoices?clientId=${client.id}`}>
+                        Creează prima factură
+                      </Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="pb-2 text-left font-medium">Număr</th>
+                          <th className="pb-2 text-left font-medium">Data emiterii</th>
+                          <th className="pb-2 text-left font-medium">Data scadentă</th>
+                          <th className="pb-2 text-left font-medium">Status</th>
+                          <th className="pb-2 text-right font-medium">Total</th>
+                          <th className="pb-2 text-left font-medium"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoices.map((invoice) => (
+                          <tr key={invoice.id} className="border-b">
+                            <td className="py-3">
+                              <Link href={`/invoices/${invoice.id}`} className="font-medium hover:underline">
+                                {invoice.invoice_number}
+                              </Link>
+                            </td>
+                            <td className="py-3">{formatDate(invoice.issue_date)}</td>
+                            <td className="py-3">{formatDate(invoice.due_date)}</td>
+                            <td className="py-3">
+                              <Badge 
+                                className={
+                                  invoice.status === 'paid' 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : invoice.status === 'overdue' 
+                                      ? 'bg-red-100 text-red-800' 
+                                      : 'bg-yellow-100 text-yellow-800'
+                                }
+                              >
+                                {invoice.status === 'paid' 
+                                  ? 'Plătită' 
+                                  : invoice.status === 'overdue' 
+                                    ? 'Întârziată' 
+                                    : 'Neachitată'
+                                }
+                              </Badge>
+                            </td>
+                            <td className="py-3 text-right">
+                              {new Intl.NumberFormat('ro-RO', { style: 'currency', currency: invoice.currency || 'RON' }).format(invoice.total_amount)}
+                            </td>
+                            <td className="py-3">
+                              <Button variant="ghost" size="icon" asChild>
+                                <Link href={`/invoices/${invoice.id}`}>
+                                  <Edit className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
