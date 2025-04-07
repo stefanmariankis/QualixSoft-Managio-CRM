@@ -20,6 +20,7 @@ const ProjectsPage = lazy(() => import("@/pages/projects/index"));
 const ProjectDetailsPage = lazy(() => import("@/pages/projects/[id]"));
 const TasksPage = lazy(() => import("@/pages/tasks/index"));
 const TaskDetailsPage = lazy(() => import("@/pages/tasks/[id]"));
+const TaskEditPage = lazy(() => import("@/pages/tasks/edit/[id]"));
 const InvoicesPage = lazy(() => import("@/pages/invoices/index"));
 const InvoiceDetailsPage = lazy(() => import("@/pages/invoices/[id]"));
 const CalendarPage = lazy(() => import("@/pages/calendar/index"));
@@ -105,6 +106,10 @@ function Router() {
         
         <ProtectedRoute path="/tasks/:id">
           <TaskDetailsPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/tasks/edit/:id">
+          <TaskEditPage />
         </ProtectedRoute>
         
         <ProtectedRoute path="/invoices">
