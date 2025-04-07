@@ -1342,25 +1342,29 @@ export class DatabaseStorage implements IStorage {
   async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
     try {
       const now = new Date();
+      
+      // Verificăm toate câmpurile și ne asigurăm că au valori definite
       // Adaptăm datele pentru a se potrivi cu structura tabelului din baza de date
-      const invoiceData = {
+      const invoiceData: any = {
         client_id: invoice.client_id,
-        project_id: invoice.project_id,
         organization_id: invoice.organization_id,
         created_by: invoice.created_by,
         invoice_number: invoice.invoice_number,
         issue_date: invoice.issue_date,
         due_date: invoice.due_date,
-        status: invoice.status,
-        amount: invoice.total_amount, // Folosim total_amount pentru amount 
-        tax_amount: invoice.tax_amount,
-        currency: invoice.currency,
-        notes: invoice.notes,
-        payment_method: invoice.payment_terms, // Folosim payment_terms pentru payment_method
-        payment_date: invoice.payment_date,
+        status: invoice.status || 'sent',
+        amount: invoice.total_amount || 0, // Folosim total_amount pentru amount 
+        tax_amount: invoice.tax_amount || 0,
+        currency: invoice.currency || 'RON',
         created_at: now,
         updated_at: now,
       };
+      
+      // Adăugăm doar câmpurile care nu sunt undefined
+      if (invoice.project_id) invoiceData.project_id = invoice.project_id;
+      if (invoice.notes) invoiceData.notes = invoice.notes;
+      if (invoice.payment_terms) invoiceData.payment_method = invoice.payment_terms;
+      if (invoice.payment_date) invoiceData.payment_date = invoice.payment_date;
 
       const result = await db`
         INSERT INTO invoices ${db(invoiceData)}

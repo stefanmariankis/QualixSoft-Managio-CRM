@@ -87,6 +87,12 @@ export default function InvoicesPage() {
     }
   }, [location]);
   
+  // Resetăm proiectul când se schimbă clientul selectat
+  useEffect(() => {
+    // Dacă s-a schimbat clientul, resetăm proiectul la "fără proiect"
+    setSelectedProject("no-project");
+  }, [selectedClient]);
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("toate");
   const [filterClient, setFilterClient] = useState("toate");
@@ -449,11 +455,14 @@ export default function InvoicesPage() {
                         {isProjectsLoading ? (
                           <SelectItem value="loading">Se încarcă...</SelectItem>
                         ) : projects && projects.length > 0 ? (
-                          projects.map(project => (
-                            <SelectItem key={project.id} value={project.id.toString()}>
-                              {project.name}
-                            </SelectItem>
-                          ))
+                          // Filtrăm proiectele pentru a afișa doar cele ale clientului selectat
+                          projects
+                            .filter(project => !selectedClient || project.client_id === parseInt(selectedClient))
+                            .map(project => (
+                              <SelectItem key={project.id} value={project.id.toString()}>
+                                {project.name}
+                              </SelectItem>
+                            ))
                         ) : (
                           <SelectItem value="none">Nu există proiecte</SelectItem>
                         )}
