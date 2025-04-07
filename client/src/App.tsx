@@ -23,6 +23,10 @@ const TaskDetailsPage = lazy(() => import("@/pages/tasks/[id]"));
 const InvoicesPage = lazy(() => import("@/pages/invoices/index"));
 const InvoiceDetailsPage = lazy(() => import("@/pages/invoices/[id]"));
 const CalendarPage = lazy(() => import("@/pages/calendar/index"));
+const TeamPage = lazy(() => import("@/pages/team/index"));
+const TeamMemberDetailsPage = lazy(() => import("@/pages/team/[id]"));
+const DepartmentsPage = lazy(() => import("@/pages/departments/index"));
+const DepartmentDetailsPage = lazy(() => import("@/pages/departments/[id]"));
 
 // Module care vor fi implementate în viitor
 // Module avansate
@@ -125,6 +129,22 @@ function Router() {
         
         <ProtectedRoute path="/calendar">
           <CalendarPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/team">
+          <TeamPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/team/:id">
+          <TeamMemberDetailsPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/departments">
+          <DepartmentsPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/departments/:id">
+          <DepartmentDetailsPage />
         </ProtectedRoute>
         
         <ProtectedRoute path="/settings">

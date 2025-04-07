@@ -16,7 +16,9 @@ import {
   Bell, 
   ChevronLeft, 
   ChevronRight,
-  LogOut
+  LogOut,
+  UserRound,
+  Building2
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -40,12 +42,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }, [isMobile, mobileMenuOpen]);
 
+  // Verificăm dacă organizația are departamente activate
+  const hasDepartments = organization?.has_departments ?? false;
+  
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/clients", label: "Clienți", icon: Users },
     { href: "/projects", label: "Proiecte", icon: FolderKanban },
     { href: "/tasks", label: "Sarcini", icon: FileText },
     { href: "/invoices", label: "Facturi", icon: Receipt },
+    { href: "/team", label: "Echipă", icon: UserRound },
+    // Afișăm link-ul către departamente doar dacă funcționalitatea este activată
+    ...(hasDepartments ? [{ href: "/departments", label: "Departamente", icon: Building2 }] : []),
     { href: "/automations", label: "Automatizări", icon: Gauge },
     { href: "/templates", label: "Template-uri", icon: FileText },
     { href: "/reports", label: "Rapoarte", icon: Gauge },
