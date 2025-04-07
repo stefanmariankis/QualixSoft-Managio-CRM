@@ -70,6 +70,17 @@ export default function InvoicesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("toate");
   const [filterClient, setFilterClient] = useState("toate");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  
+  // State pentru formularul de factură
+  const [selectedClient, setSelectedClient] = useState<string>("");
+  const [selectedProject, setSelectedProject] = useState<string>("no-project");
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dueDate, setDueDate] = useState("");
+  const [currency, setCurrency] = useState("RON");
+  const [paymentTerms, setPaymentTerms] = useState("15 zile");
+  const [notes, setNotes] = useState("");
   
   // State pentru elementele facturii
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([
@@ -84,6 +95,80 @@ export default function InvoicesPage() {
   const taxAmount = subtotal * (taxRate / 100);
   const discountAmount = subtotal * (discountRate / 100);
   const total = subtotal + taxAmount - discountAmount;
+  
+  // Resetează formularul
+  const resetInvoiceForm = () => {
+    setSelectedClient("");
+    setSelectedProject("no-project");
+    setInvoiceNumber("");
+    setIssueDate(new Date().toISOString().split('T')[0]);
+    setDueDate("");
+    setCurrency("RON");
+    setPaymentTerms("15 zile");
+    setNotes("");
+    setInvoiceItems([{ id: 1, description: "", quantity: 1, unitPrice: 0, total: 0 }]);
+    setNextItemId(2);
+    setTaxRate(19);
+    setDiscountRate(0);
+  };
+  
+  // Închide dialogul
+  const closeDialog = () => {
+    setDialogOpen(false);
+    resetInvoiceForm();
+  };
+  
+  // Salvează factura - trimite datele către server
+  const saveInvoice = async () => {
+    // Verificare date obligatorii
+    if (!selectedClient || !invoiceNumber || !issueDate || !dueDate || !currency) {
+      alert("Completați toate câmpurile obligatorii!");
+      return;
+    }
+    
+    // Verificare elemente factură
+    if (invoiceItems.some(item => item.description === "" || item.quantity < 1 || item.unitPrice <= 0)) {
+      alert("Completați corect toate elementele facturii!");
+      return;
+    }
+    
+    // Construiește obiectul factură pentru a fi trimis la server
+    const invoice = {
+      client_id: parseInt(selectedClient),
+      project_id: selectedProject === "no-project" ? null : parseInt(selectedProject),
+      invoice_number: invoiceNumber,
+      issue_date: issueDate,
+      due_date: dueDate,
+      currency: currency,
+      payment_terms: paymentTerms,
+      notes: notes,
+      subtotal: subtotal,
+      tax_rate: taxRate,
+      tax_amount: taxAmount,
+      discount_rate: discountRate,
+      discount_amount: discountAmount,
+      total_amount: total,
+      status: "draft",
+      items: invoiceItems.map(item => ({
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        total: item.total
+      }))
+    };
+    
+    // Afișează obiectul care ar fi trimis (pentru debugging)
+    console.log("Salvare factură:", invoice);
+    
+    // Aici ar trebui să implementăm trimiterea efectivă către server
+    // TODO: Implementează mutația pentru salvarea facturii
+    
+    // Închide dialogul și resetează formularul
+    closeDialog();
+    
+    // Afișează un mesaj de succes
+    alert("Factura a fost salvată ca schiță!");
+  };
   
   // Adaugă un element nou la factură
   const addInvoiceItem = () => {
@@ -282,7 +367,10 @@ export default function InvoicesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label htmlFor="client" className="text-sm font-medium">Client</label>
-                    <Select>
+                    <Select 
+                      value={selectedClient}
+                      onValueChange={setSelectedClient}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Selectează client" />
                       </SelectTrigger>
@@ -303,7 +391,10 @@ export default function InvoicesPage() {
                   </div>
                   <div className="space-y-2">
                     <label htmlFor="project" className="text-sm font-medium">Proiect (opțional)</label>
-                    <Select>
+                    <Select 
+                      value={selectedProject}
+                      onValueChange={setSelectedProject}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Selectează proiect" />
                       </SelectTrigger>
@@ -327,21 +418,39 @@ export default function InvoicesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label htmlFor="invoice_number" className="text-sm font-medium">Număr factură</label>
-                    <Input id="invoice_number" placeholder="INV-2023-001" />
+                    <Input 
+                      id="invoice_number" 
+                      placeholder="INV-2023-001" 
+                      value={invoiceNumber}
+                      onChange={(e) => setInvoiceNumber(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
                     <label htmlFor="issue_date" className="text-sm font-medium">Data emiterii</label>
-                    <Input id="issue_date" type="date" />
+                    <Input 
+                      id="issue_date" 
+                      type="date" 
+                      value={issueDate}
+                      onChange={(e) => setIssueDate(e.target.value)}
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label htmlFor="due_date" className="text-sm font-medium">Data scadentă</label>
-                    <Input id="due_date" type="date" />
+                    <Input 
+                      id="due_date" 
+                      type="date" 
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
                     <label htmlFor="currency" className="text-sm font-medium">Monedă</label>
-                    <Select>
+                    <Select
+                      value={currency}
+                      onValueChange={setCurrency}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Selectează moneda" />
                       </SelectTrigger>
@@ -428,11 +537,21 @@ export default function InvoicesPage() {
                   <div>
                     <div className="space-y-2">
                       <label htmlFor="payment_terms" className="text-sm font-medium">Termeni de plată</label>
-                      <Input id="payment_terms" placeholder="15 zile" />
+                      <Input 
+                        id="payment_terms" 
+                        placeholder="15 zile" 
+                        value={paymentTerms}
+                        onChange={(e) => setPaymentTerms(e.target.value)}
+                      />
                     </div>
                     <div className="space-y-2 mt-4">
                       <label htmlFor="notes" className="text-sm font-medium">Note</label>
-                      <Input id="notes" placeholder="Note factură" />
+                      <Input 
+                        id="notes" 
+                        placeholder="Note factură" 
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                      />
                     </div>
                   </div>
                   
@@ -478,8 +597,8 @@ export default function InvoicesPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline">Anulează</Button>
-                <Button>Salvează factură</Button>
+                <Button variant="outline" onClick={closeDialog}>Anulează</Button>
+                <Button onClick={saveInvoice}>Salvează factură</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
