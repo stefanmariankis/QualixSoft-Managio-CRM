@@ -94,7 +94,8 @@ export interface IStorage {
   getInvoicesByClient(clientId: number): Promise<Invoice[]>;
   getInvoicesByProject(projectId: number): Promise<Invoice[]>;
   getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]>;
-  getInvoicePayments(invoiceId: number): Promise<any[]>;
+  getInvoicePayments(invoiceId: number): Promise<InvoicePayment[]>;
+  createInvoicePayment(payment: InsertInvoicePayment): Promise<InvoicePayment>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
   createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem>;
   updateInvoice(
@@ -1383,25 +1384,119 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getInvoicePayments(invoiceId: number): Promise<any[]> {
+  async getInvoicePayments(invoiceId: number): Promise<InvoicePayment[]> {
     try {
-      // Tabelul invoice_payments nu există încă, așa că returnăm un array gol
-      // Când va fi implementat sistemul de plăți, această funcție va fi actualizată
-      console.log(`Obținere plăți pentru factura ${invoiceId} - tabelul nu există încă, returnăm array gol`);
-      return [];
+      // Verificăm dacă tabelul invoice_payments există
+      const tableExists = await this.tableExists('invoice_payments');
+      if (!tableExists) {
+        // Dacă tabelul nu există, îl vom crea
+        await this.createInvoicePaymentsTable();
+        return []; // Returnăm un array gol dacă tabelul tocmai a fost creat
+      }
       
-      // Implementarea pentru viitor:
-      /*
-      const result = await db`
-        SELECT * FROM invoice_payments
-        WHERE invoice_id = ${invoiceId}
-        ORDER BY payment_date DESC
+      // Acum putem obține plățile asociate facturii
+      const paymentsResult = await db`
+        SELECT p.*, u.first_name || ' ' || u.last_name as created_by_name
+        FROM invoice_payments p
+        LEFT JOIN users u ON p.created_by = u.id
+        WHERE p.invoice_id = ${invoiceId}
+        ORDER BY p.payment_date DESC
       `;
-      return result;
-      */
+      
+      return paymentsResult as unknown as InvoicePayment[];
     } catch (error) {
       console.error("Eroare la obținerea plăților facturii:", error);
       return [];
+    }
+  }
+  
+  async createInvoicePayment(payment: InsertInvoicePayment): Promise<InvoicePayment> {
+    try {
+      // Verificăm dacă tabelul invoice_payments există
+      const tableExists = await this.tableExists('invoice_payments');
+      if (!tableExists) {
+        // Dacă tabelul nu există, îl vom crea
+        await this.createInvoicePaymentsTable();
+      }
+      
+      // Adăugăm datele și ora la obiectul de plată
+      const now = new Date();
+      const paymentData = {
+        ...payment,
+        payment_date: payment.payment_date || now,
+        created_at: now,
+        updated_at: now
+      };
+
+      // Inseram plata în baza de date
+      const result = await db`
+        INSERT INTO invoice_payments ${db(paymentData)}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        throw new Error("Plata a fost creată dar nu a putut fi recuperată");
+      }
+      
+      // Actualizăm factura pentru a reflecta plata
+      const invoice = await this.getInvoice(payment.invoice_id);
+      if (invoice) {
+        const newPaidAmount = (invoice.paid_amount || 0) + payment.amount;
+        const newRemainingAmount = invoice.total_amount - newPaidAmount;
+        const newStatus = newRemainingAmount <= 0 ? 'paid' : invoice.status;
+        
+        // Actualizăm factura cu noile valori
+        await this.updateInvoice(invoice.id, {
+          paid_amount: newPaidAmount,
+          remaining_amount: newRemainingAmount,
+          status: newStatus
+        });
+      }
+
+      return result[0] as InvoicePayment;
+    } catch (error: any) {
+      console.error("Eroare la crearea plății:", error);
+      throw new Error(`Nu s-a putut crea plata: ${error.message || "Eroare necunoscută"}`);
+    }
+  }
+  
+  async createInvoicePaymentsTable(): Promise<void> {
+    try {
+      console.log("Crearea tabelului invoice_payments...");
+      await db`
+        CREATE TABLE IF NOT EXISTS invoice_payments (
+          id SERIAL PRIMARY KEY,
+          invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+          amount NUMERIC(15, 2) NOT NULL,
+          payment_date TIMESTAMP NOT NULL,
+          payment_method VARCHAR(100) NOT NULL,
+          reference TEXT,
+          notes TEXT,
+          created_by INTEGER NOT NULL REFERENCES users(id),
+          created_at TIMESTAMP NOT NULL,
+          updated_at TIMESTAMP NOT NULL
+        )
+      `;
+      console.log("Tabelul invoice_payments a fost creat cu succes");
+    } catch (error) {
+      console.error("Eroare la crearea tabelului invoice_payments:", error);
+      throw error;
+    }
+  }
+  
+  async tableExists(tableName: string): Promise<boolean> {
+    try {
+      const result = await db`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public'
+          AND table_name = ${tableName}
+        )
+      `;
+      return result[0].exists;
+    } catch (error) {
+      console.error(`Eroare la verificarea existenței tabelului ${tableName}:`, error);
+      return false;
     }
   }
 

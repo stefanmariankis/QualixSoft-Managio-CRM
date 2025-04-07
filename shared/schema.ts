@@ -377,6 +377,39 @@ export interface InsertInvoice {
   created_by: number;
 }
 
+// Enums pentru metode de plată
+export const paymentMethodOptions = [
+  "transfer bancar",
+  "card",
+  "numerar",
+  "altele"
+] as const;
+
+// Tipuri pentru InvoicePayment
+export interface InvoicePayment {
+  id: number;
+  invoice_id: number;
+  amount: number;
+  payment_date: Date;
+  payment_method: string;
+  reference?: string | null;
+  notes?: string | null;
+  created_by: number;
+  created_by_name?: string; // Numele utilizatorului care a creat plata (pentru afișare)
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface InsertInvoicePayment {
+  invoice_id: number;
+  amount: number;
+  payment_date: Date;
+  payment_method: string;
+  reference?: string | null;
+  notes?: string | null;
+  created_by: number;
+}
+
 // Tipuri pentru TimeLog
 export interface TimeLog {
   id: number;
@@ -720,6 +753,19 @@ export const invoiceSchema = z.object({
 });
 
 export type InvoiceFormData = z.infer<typeof invoiceSchema>;
+
+// Schema validare plată la factură
+export const invoicePaymentSchema = z.object({
+  amount: z.number().positive({ message: "Suma plătită trebuie să fie un număr pozitiv" }),
+  payment_date: z.date().default(() => new Date()),
+  payment_method: z.enum(paymentMethodOptions as unknown as [string, ...string[]], {
+    errorMap: () => ({ message: "Metodă de plată invalidă" }),
+  }).default("transfer bancar"),
+  reference: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+export type InvoicePaymentFormData = z.infer<typeof invoicePaymentSchema>;
 
 // Schema validare timelog
 export const timeLogSchema = z.object({
