@@ -22,13 +22,15 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, UserCircle } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
 
 export default function TaskEditPage() {
   const params = useParams();
   const { id } = params;
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   
   // State pentru toate câmpurile formularului
   const [title, setTitle] = useState("");
@@ -269,26 +271,40 @@ export default function TaskEditPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label htmlFor="assignee" className="text-sm font-medium">Asignat către</label>
-                <Select 
-                  value={assigneeId} 
-                  onValueChange={setAssigneeId}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selectează utilizator" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="null">Neasignat</SelectItem>
-                    {users && users.length > 0 ? (
-                      users.map((user: any) => (
-                        <SelectItem key={user.id} value={user.id.toString()}>
-                          {user.firstName} {user.lastName}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-users">Nu există utilizatori disponibili</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                <div className="flex space-x-2">
+                  <div className="flex-1">
+                    <Select 
+                      value={assigneeId} 
+                      onValueChange={setAssigneeId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selectează utilizator" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="null">Neasignat</SelectItem>
+                        {users && users.length > 0 ? (
+                          users.map((u: any) => (
+                            <SelectItem key={u.id} value={u.id.toString()}>
+                              {u.firstName} {u.lastName}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-users">Nu există utilizatori disponibili</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 whitespace-nowrap"
+                    onClick={() => setAssigneeId(user?.id.toString() || "")}
+                  >
+                    <UserCircle className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Asignează-mi mie</span>
+                    <span className="inline sm:hidden">Mie</span>
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <label htmlFor="due_date" className="text-sm font-medium">Data finalizare</label>
