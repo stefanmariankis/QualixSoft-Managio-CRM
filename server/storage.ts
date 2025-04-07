@@ -482,14 +482,30 @@ export class DatabaseStorage implements IStorage {
       // Generăm o parolă temporară pentru membru
       const tempPassword = this.generateRandomPassword(10);
       
+      // Asigurăm că toate câmpurile necesare au valori
+      // Extragem doar câmpurile necesare pentru a evita valori nedefinite
       const teamMemberData = {
-        ...teamMember,
+        organization_id: teamMember.organization_id,
+        first_name: teamMember.first_name,
+        last_name: teamMember.last_name,
+        email: teamMember.email,
+        role: teamMember.role,
+        created_by: teamMember.created_by,
+        // Câmpuri opționale cu valori implicite
+        phone: teamMember.phone || null,
+        position: teamMember.position || null,
+        bio: teamMember.bio || null,
+        avatar: teamMember.avatar || null,
+        hourly_rate: teamMember.hourly_rate || null,
+        user_id: teamMember.user_id || null,
         is_active: teamMember.is_active ?? true,
         temp_password: tempPassword,
         password_set: false,
         created_at: now,
         updated_at: now,
       };
+
+      console.log("Date membru echipă pentru inserare:", JSON.stringify(teamMemberData));
 
       const result = await db`
         INSERT INTO team_members ${db(teamMemberData)}
