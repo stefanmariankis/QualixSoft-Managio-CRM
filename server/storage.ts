@@ -1358,13 +1358,20 @@ export class DatabaseStorage implements IStorage {
 
   async getInvoicePayments(invoiceId: number): Promise<any[]> {
     try {
+      // Tabelul invoice_payments nu există încă, așa că returnăm un array gol
+      // Când va fi implementat sistemul de plăți, această funcție va fi actualizată
+      console.log(`Obținere plăți pentru factura ${invoiceId} - tabelul nu există încă, returnăm array gol`);
+      return [];
+      
+      // Implementarea pentru viitor:
+      /*
       const result = await db`
         SELECT * FROM invoice_payments
         WHERE invoice_id = ${invoiceId}
         ORDER BY payment_date DESC
       `;
-
       return result;
+      */
     } catch (error) {
       console.error("Eroare la obținerea plăților facturii:", error);
       return [];

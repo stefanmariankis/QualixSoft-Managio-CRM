@@ -78,19 +78,50 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     }
 
     // Obținem elementele facturii și plățile
-    const invoiceItems = await storage.getInvoiceItems(invoiceId);
-    const invoicePayments = await storage.getInvoicePayments(invoiceId);
-
+    const items = await storage.getInvoiceItems(invoiceId);
+    const payments = await storage.getInvoicePayments(invoiceId);
+    
+    // Obținem informații despre client
+    const client = await storage.getClient(invoice.client_id);
+    if (!client) {
+      throw new NotFoundError("Clientul asociat facturii nu a fost găsit");
+    }
+    
+    // Obținem informații despre proiect (dacă există)
+    let project = null;
+    if (invoice.project_id) {
+      project = await storage.getProject(invoice.project_id);
+      // Nu aruncăm eroare dacă proiectul nu există, doar setăm la null
+    }
+    
     // Convertim datele în format valid pentru client
     const formattedInvoice = {
       ...invoice,
+      total_amount: invoice.amount, // Asigurăm compatibilitatea cu frontend-ul
       issue_date: ensureDate(invoice.issue_date),
-      due_date: ensureDate(invoice.due_date),
-      items: invoiceItems,
-      payments: invoicePayments
+      due_date: ensureDate(invoice.due_date)
     };
 
-    res.json(formattedInvoice);
+    res.json({
+      invoice: formattedInvoice,
+      items,
+      payments,
+      client: {
+        id: client.id,
+        name: client.name,
+        email: client.email,
+        phone: client.phone || '',
+        address: client.address,
+        city: client.city,
+        county: client.county,
+        postal_code: client.postal_code,
+        country: client.country || 'România'
+      },
+      project: project ? {
+        id: project.id,
+        name: project.name
+      } : null
+    });
   } catch (error) {
     console.error("Eroare la obținerea detaliilor facturii:", error);
     res.status(error instanceof ApiError ? error.statusCode : 500).json({ 

@@ -59,6 +59,7 @@ type Client = {
 type ClientDetailsResponse = {
   client: Client;
   projects: Project[];
+  invoices: Invoice[];
 };
 
 export default function ClientDetails() {

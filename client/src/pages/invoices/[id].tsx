@@ -120,7 +120,9 @@ export default function InvoiceDetails() {
         throw new Error('Nu s-au putut încărca detaliile facturii');
       }
       
-      return await response.json();
+      const result = await response.json();
+      console.log("Detalii factură primite:", result);
+      return result;
     }
   });
   
@@ -835,17 +837,35 @@ export default function InvoiceDetails() {
               <div className="w-[300px] space-y-2">
                 <div className="flex justify-between">
                   <span className="text-sm">Subtotal:</span>
-                  <span className="text-sm font-medium">{formatAmount(invoice.amount)}</span>
+                  <span className="text-sm font-medium">{formatAmount(invoice.subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm">TVA:</span>
+                  <span className="text-sm">TVA{invoice.tax_rate ? ` (${invoice.tax_rate}%)` : ''}:</span>
                   <span className="text-sm font-medium">{formatAmount(invoice.tax_amount)}</span>
                 </div>
+                {invoice.discount_amount > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-sm">Discount:</span>
+                    <span className="text-sm font-medium">-{formatAmount(invoice.discount_amount)}</span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between">
                   <span className="text-sm font-medium">Total:</span>
                   <span className="text-sm font-bold">{formatAmount(invoice.total_amount)}</span>
                 </div>
+                {invoice.status !== 'paid' && invoice.paid_amount > 0 && (
+                  <>
+                    <div className="flex justify-between text-green-600">
+                      <span className="text-sm">Plătit:</span>
+                      <span className="text-sm font-medium">{formatAmount(invoice.paid_amount)}</span>
+                    </div>
+                    <div className="flex justify-between text-red-600">
+                      <span className="text-sm">Rămas:</span>
+                      <span className="text-sm font-medium">{formatAmount(invoice.total_amount - invoice.paid_amount)}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
