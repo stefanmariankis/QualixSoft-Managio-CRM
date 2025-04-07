@@ -13,6 +13,7 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const [animate, setAnimate] = useState(false);
+  const [error, setError] = useState(false);
   const prevUnreadCountRef = useRef(0);
   
   // Funcție pentru a testa animația - simulează primirea unei notificări noi
@@ -36,11 +37,14 @@ export function NotificationBell() {
   // Verifică dacă notificările sunt încărcate corect
   useEffect(() => {
     if (notifications === undefined && !isLoading) {
+      setError(true);
       toast({
         title: "Eroare",
         description: "Nu s-au putut încărca notificările",
         variant: "destructive",
       });
+    } else {
+      setError(false);
     }
   }, [notifications, isLoading, toast]);
 
@@ -64,12 +68,24 @@ export function NotificationBell() {
   }, [unreadCount, isLoading]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(newOpen) => {
+      setOpen(newOpen);
+      // Adăugăm o mică animație când se deschide clopoțelul
+      if (newOpen) {
+        triggerAnimation();
+      }
+    }}>
       <PopoverTrigger asChild>
         <Button 
           variant="ghost" 
           size="icon" 
-          className="relative"
+          className="relative cursor-pointer"
+          onClick={() => {
+            // Pe mobile onClick va funcționa mai bine decât onDoubleClick
+            if (!open) {
+              setOpen(true);
+            }
+          }}
           onDoubleClick={handleDoubleClick}
         >
           <Bell 
@@ -94,7 +110,7 @@ export function NotificationBell() {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-[380px] p-4"
+        className="w-[380px] p-4 max-w-[90vw]" // Adăugăm max-width pentru dispozitive mobile
         sideOffset={8}
       >
         <NotificationList onClose={() => setOpen(false)} />

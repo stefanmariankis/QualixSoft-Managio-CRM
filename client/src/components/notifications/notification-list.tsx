@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
 import { ro } from "date-fns/locale";
-import { Bell, Check, Info, Megaphone, Package, Trash2, Users, X } from "lucide-react";
+import { AlertTriangle, Bell, Check, Info, Megaphone, Package, Trash2, Users, X } from "lucide-react";
 import { Notification } from "@shared/schema";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
@@ -53,6 +53,21 @@ export function NotificationList({ onClose }: NotificationListProps) {
     );
   }
 
+  if (notifications === undefined) {
+    return (
+      <div className="flex flex-col items-center justify-center p-6 text-center">
+        <AlertTriangle className="h-10 w-10 text-destructive mb-3" />
+        <h3 className="font-medium text-lg">Eroare la încărcarea notificărilor</h3>
+        <p className="text-muted-foreground text-sm">
+          Nu am putut încărca notificările. Încercați să reîmprospătați pagina.
+        </p>
+        <Button variant="outline" size="sm" className="mt-4" onClick={() => window.location.reload()}>
+          Reîncărcați pagina
+        </Button>
+      </div>
+    );
+  }
+  
   if (!notifications || notifications.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-6 text-center">
