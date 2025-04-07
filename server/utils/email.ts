@@ -26,23 +26,15 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       return false;
     }
     
-    // Simulăm trimiterea email-ului în mediul de dezvoltare
-    // În producție, acest cod va fi înlocuit cu trimiterea reală a email-urilor
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[SIMULARE EMAIL] Către: ${options.to}`);
-      console.log(`[SIMULARE EMAIL] Subiect: ${options.subject}`);
-      console.log(`[SIMULARE EMAIL] Text: ${options.text?.substring(0, 200)}${options.text && options.text.length > 200 ? '...' : ''}`);
-      
-      // Simulăm succesul trimiterii email-ului
-      console.log(`[SIMULARE EMAIL] Email simulat cu succes către ${options.to}`);
-      return true;
-    }
+    // Afișăm în consolă pentru debugging
+    console.log(`[EMAIL] Trimitere email către: ${options.to}`);
+    console.log(`[EMAIL] Subiect: ${options.subject}`);
     
-    // Cod pentru producție - trimitere reală a email-ului prin SendGrid
-    // Notă: SendGrid necesită ca adresa expeditorului să fie verificată
+    // Cod pentru trimitere reală a email-ului prin SendGrid
+    // Folosim o adresă de email verificată
     const message = {
       to: options.to,
-      from: options.from || 'noreply@managio.app', // Trebuie să fie o adresă verificată în SendGrid
+      from: options.from || 'kis.stefan1704@yahoo.com', // Adresă verificată în SendGrid
       subject: options.subject,
       text: options.text || '',
       html: options.html || '',
