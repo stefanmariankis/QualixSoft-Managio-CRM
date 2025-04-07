@@ -58,10 +58,74 @@ import {
 import { Invoice } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 
+interface InvoiceItem {
+  id: number;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
 export default function InvoicesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("toate");
   const [filterClient, setFilterClient] = useState("toate");
+  
+  // State pentru elementele facturii
+  const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([
+    { id: 1, description: "", quantity: 1, unitPrice: 0, total: 0 }
+  ]);
+  const [nextItemId, setNextItemId] = useState(2);
+  const [taxRate, setTaxRate] = useState(19);
+  const [discountRate, setDiscountRate] = useState(0);
+  
+  // Calculează subtotalul, TVA, discount și totalul
+  const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
+  const taxAmount = subtotal * (taxRate / 100);
+  const discountAmount = subtotal * (discountRate / 100);
+  const total = subtotal + taxAmount - discountAmount;
+  
+  // Adaugă un element nou la factură
+  const addInvoiceItem = () => {
+    const newItem: InvoiceItem = { 
+      id: nextItemId, 
+      description: "", 
+      quantity: 1, 
+      unitPrice: 0, 
+      total: 0 
+    };
+    setInvoiceItems([...invoiceItems, newItem]);
+    setNextItemId(nextItemId + 1);
+  };
+  
+  // Șterge un element din factură
+  const removeInvoiceItem = (itemId: number) => {
+    if (invoiceItems.length <= 1) {
+      return; // Păstrează cel puțin un element în factură
+    }
+    setInvoiceItems(invoiceItems.filter(item => item.id !== itemId));
+  };
+  
+  // Actualizează un câmp dintr-un element de factură
+  const updateInvoiceItem = (
+    itemId: number, 
+    field: keyof InvoiceItem, 
+    value: string | number
+  ) => {
+    setInvoiceItems(invoiceItems.map(item => {
+      if (item.id === itemId) {
+        const updatedItem = { ...item, [field]: value };
+        
+        // Recalculează totalul dacă s-a schimbat cantitatea sau prețul unitar
+        if (field === "quantity" || field === "unitPrice") {
+          updatedItem.total = Number(updatedItem.quantity) * Number(updatedItem.unitPrice);
+        }
+        
+        return updatedItem;
+      }
+      return item;
+    }));
+  };
   
   // Obține lista de facturi de la server
   const { data: invoices, isLoading, error } = useQuery({
@@ -292,58 +356,71 @@ export default function InvoicesPage() {
                 <div className="space-y-4 border rounded-md p-4 mb-4">
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-medium">Elemente factură</h4>
-                    <Button type="button" variant="outline" size="sm" className="h-8">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8"
+                      onClick={addInvoiceItem}
+                    >
                       <Plus className="h-3.5 w-3.5 mr-1" />
                       Adaugă element
                     </Button>
                   </div>
                   
                   <div className="space-y-4">
-                    {/* Element factură (repetabil) */}
-                    <div className="grid grid-cols-12 gap-2 items-end border-b pb-3">
-                      <div className="col-span-5 space-y-1">
-                        <label className="text-xs font-medium">Descriere</label>
-                        <Input placeholder="Descriere serviciu/produs" />
+                    {/* Elementele facturii adăugate dinamic */}
+                    {invoiceItems.map((item) => (
+                      <div key={item.id} className="grid grid-cols-12 gap-2 items-end border-b pb-3">
+                        <div className="col-span-5 space-y-1">
+                          <label className="text-xs font-medium">Descriere</label>
+                          <Input 
+                            placeholder="Descriere serviciu/produs" 
+                            value={item.description}
+                            onChange={(e) => updateInvoiceItem(item.id, "description", e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <label className="text-xs font-medium">Cantitate</label>
+                          <Input 
+                            type="number" 
+                            placeholder="1" 
+                            min="1" 
+                            value={item.quantity}
+                            onChange={(e) => updateInvoiceItem(item.id, "quantity", Number(e.target.value))}
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <label className="text-xs font-medium">Preț unitar</label>
+                          <Input 
+                            type="number" 
+                            placeholder="0.00" 
+                            value={item.unitPrice}
+                            onChange={(e) => updateInvoiceItem(item.id, "unitPrice", Number(e.target.value))}
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <label className="text-xs font-medium">Total</label>
+                          <Input 
+                            type="number" 
+                            placeholder="0.00" 
+                            value={item.total} 
+                            readOnly 
+                          />
+                        </div>
+                        <div className="col-span-1 flex justify-center">
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-10 w-10 p-0"
+                            onClick={() => removeInvoiceItem(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="col-span-2 space-y-1">
-                        <label className="text-xs font-medium">Cantitate</label>
-                        <Input type="number" placeholder="1" min="1" />
-                      </div>
-                      <div className="col-span-2 space-y-1">
-                        <label className="text-xs font-medium">Preț unitar</label>
-                        <Input type="number" placeholder="0.00" />
-                      </div>
-                      <div className="col-span-2 space-y-1">
-                        <label className="text-xs font-medium">Total</label>
-                        <Input type="number" placeholder="0.00" readOnly />
-                      </div>
-                      <div className="col-span-1 flex justify-center">
-                        <Button type="button" variant="ghost" size="sm" className="h-10 w-10 p-0">
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    {/* Modelul pentru alte elemente */}
-                    <div className="grid grid-cols-12 gap-2 items-end">
-                      <div className="col-span-5 space-y-1">
-                        <Input placeholder="Descriere serviciu/produs" />
-                      </div>
-                      <div className="col-span-2 space-y-1">
-                        <Input type="number" placeholder="1" min="1" />
-                      </div>
-                      <div className="col-span-2 space-y-1">
-                        <Input type="number" placeholder="0.00" />
-                      </div>
-                      <div className="col-span-2 space-y-1">
-                        <Input type="number" placeholder="0.00" readOnly />
-                      </div>
-                      <div className="col-span-1 flex justify-center">
-                        <Button type="button" variant="ghost" size="sm" className="h-10 w-10 p-0">
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
                 
@@ -362,28 +439,40 @@ export default function InvoicesPage() {
                   <div className="space-y-2 border rounded-md p-4">
                     <div className="flex justify-between py-1">
                       <span className="text-sm">Subtotal:</span>
-                      <span className="text-sm font-medium">0.00 RON</span>
+                      <span className="text-sm font-medium">{subtotal.toFixed(2)} RON</span>
                     </div>
                     <div className="flex justify-between items-center py-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm">TVA:</span>
-                        <Input id="tax_rate" type="number" placeholder="19" className="h-7 w-16 text-sm" />
+                        <Input 
+                          id="tax_rate" 
+                          type="number" 
+                          value={taxRate}
+                          onChange={(e) => setTaxRate(Number(e.target.value))}
+                          className="h-7 w-16 text-sm" 
+                        />
                         <span className="text-sm">%</span>
                       </div>
-                      <span className="text-sm font-medium">0.00 RON</span>
+                      <span className="text-sm font-medium">{taxAmount.toFixed(2)} RON</span>
                     </div>
                     <div className="flex justify-between items-center py-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm">Discount:</span>
-                        <Input id="discount_rate" type="number" placeholder="0" className="h-7 w-16 text-sm" />
+                        <Input 
+                          id="discount_rate" 
+                          type="number" 
+                          value={discountRate}
+                          onChange={(e) => setDiscountRate(Number(e.target.value))}
+                          className="h-7 w-16 text-sm" 
+                        />
                         <span className="text-sm">%</span>
                       </div>
-                      <span className="text-sm font-medium">0.00 RON</span>
+                      <span className="text-sm font-medium">{discountAmount.toFixed(2)} RON</span>
                     </div>
                     <Separator className="my-2" />
                     <div className="flex justify-between py-1">
                       <span className="text-sm font-medium">Total:</span>
-                      <span className="text-sm font-bold">0.00 RON</span>
+                      <span className="text-sm font-bold">{total.toFixed(2)} RON</span>
                     </div>
                   </div>
                 </div>
