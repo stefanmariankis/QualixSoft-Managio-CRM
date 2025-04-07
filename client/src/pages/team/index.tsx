@@ -343,7 +343,7 @@ export default function TeamPage() {
                         <FormItem>
                           <FormLabel>Departament</FormLabel>
                           <Select
-                            onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                            onValueChange={(value) => field.onChange(value === "0" ? undefined : parseInt(value))}
                             value={field.value ? String(field.value) : undefined}
                           >
                             <FormControl>
@@ -352,7 +352,7 @@ export default function TeamPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">Fără departament</SelectItem>
+                              <SelectItem value="0">Fără departament</SelectItem>
                               {departments && Array.isArray(departments) && departments.map((dept: Department) => (
                                 <SelectItem key={dept.id} value={String(dept.id)}>
                                   {dept.name}
