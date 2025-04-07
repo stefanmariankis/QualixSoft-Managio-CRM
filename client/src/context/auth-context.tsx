@@ -12,6 +12,7 @@ interface AuthContextType extends AuthState {
   resetPassword: (email: string) => Promise<void>;
   updateUserData: (data: Partial<User>) => Promise<void>;
   refreshUserData: () => Promise<void>;
+  updateOrganization: (data: Partial<Organization>) => void;
 }
 
 interface AuthResponse {
@@ -340,6 +341,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await refetch();
   };
 
+  const updateOrganization = (data: Partial<Organization>) => {
+    setState(prev => ({
+      ...prev,
+      organization: prev.organization ? { ...prev.organization, ...data } : null
+    }));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -350,6 +358,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         resetPassword,
         updateUserData,
         refreshUserData,
+        updateOrganization,
       }}
     >
       {children}

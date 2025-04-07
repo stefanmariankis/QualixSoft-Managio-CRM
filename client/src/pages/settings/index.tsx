@@ -16,9 +16,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import DashboardLayout from '@/components/layout/dashboard-layout';
+import { useAuth } from "@/context/auth-context";
 
 export default function SettingsPage() {
   const { toast } = useToast();
+  const { updateOrganization } = useAuth();
   const [hasDepartments, setHasDepartments] = useState(false);
   
   // Verifică organizația curentă pentru a afla dacă are departamente activate
@@ -224,15 +226,7 @@ export default function SettingsPage() {
                                 body: JSON.stringify({ has_departments: checked }),
                               }).then(res => {
                                 if (res.ok) {
-                                  // Notificare de succes
-                                  toast({
-                                    title: "Setări actualizate",
-                                    description: checked 
-                                      ? "Departamentele au fost activate cu succes." 
-                                      : "Departamentele au fost dezactivate.",
-                                  });
-                                  // Reîncarcă datele organizației
-                                  queryClient.invalidateQueries({ queryKey: ["/api/organization"] });
+                                  return res.json();
                                 } else {
                                   // Revenim la starea anterioară în caz de eroare
                                   setHasDepartments(!checked);
@@ -241,8 +235,27 @@ export default function SettingsPage() {
                                     description: "Nu s-a putut actualiza structura organizației",
                                     variant: "destructive",
                                   });
+                                  throw new Error("Nu s-a putut actualiza structura organizației");
                                 }
-                              }).catch(error => {
+                              })
+                              .then(data => {
+                                if (data) {
+                                  // Actualizăm starea globală pentru a actualiza sidebar-ul imediat
+                                  updateOrganization({ has_departments: checked });
+                                  
+                                  // Notificare de succes
+                                  toast({
+                                    title: "Setări actualizate",
+                                    description: checked 
+                                      ? "Departamentele au fost activate cu succes." 
+                                      : "Departamentele au fost dezactivate.",
+                                  });
+                                  
+                                  // Reîncarcă datele organizației
+                                  queryClient.invalidateQueries({ queryKey: ["/api/organization"] });
+                                }
+                              })
+                              .catch(error => {
                                 // Revenim la starea anterioară în caz de eroare
                                 setHasDepartments(!checked);
                                 toast({
