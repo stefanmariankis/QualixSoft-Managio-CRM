@@ -616,15 +616,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // --- Routes pentru utilizatori ---
   
-  // Obține toți utilizatorii din organizație
+  // Obține toți utilizatorii din organizație (atât din users cât și din team_members)
   app.get("/api/users/organization", requireAuth, async (req, res) => {
     try {
       if (!req.user?.organization_id) {
         return res.status(401).json({ message: "Neautorizat sau organizație nespecificată" });
       }
 
+      // Obține utilizatorii din tabela users
       const users = await storage.getUsersByOrganization(req.user.organization_id);
-      return res.status(200).json(users);
+      
+      // Obține membrii echipei din tabela team_members
+      const teamMembers = await storage.getTeamMembersByOrganization(req.user.organization_id);
+      
+      // Combinăm cele două liste și eliminăm duplicatele
+      const allUsers = [...users];
+      
+      // Adăugăm membrii echipei care nu sunt deja în lista de utilizatori
+      for (const member of teamMembers) {
+        // Verificăm dacă membrul nu există deja în lista de utilizatori
+        const exists = users.some(user => 
+          member.user_id === user.id || 
+          member.email === user.email
+        );
+        
+        if (!exists) {
+          // Transformăm membrul echipei în format de utilizator pentru a putea fi folosit în dropdown
+          allUsers.push({
+            id: member.id,
+            email: member.email,
+            first_name: member.first_name,
+            last_name: member.last_name,
+            role: member.role,
+            organization_id: member.organization_id,
+            is_team_member: true // Marcăm că este membru al echipei, nu utilizator cu acces direct
+          });
+        }
+      }
+      
+      console.log(`API /users/organization: Returnăm ${allUsers.length} utilizatori (${users.length} utilizatori + ${teamMembers.length} membri echipă)`);
+      
+      return res.status(200).json(allUsers);
     } catch (error: any) {
       console.error("Eroare la obținerea utilizatorilor organizației:", error);
       return res.status(500).json({
