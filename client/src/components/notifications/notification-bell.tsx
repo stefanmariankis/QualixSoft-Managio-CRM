@@ -6,18 +6,11 @@ import { NotificationList } from "./notification-list";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 
 export function NotificationBell() {
-  const { notifications, isLoading, markAllAsRead, deleteNotification, deleteAllNotifications } = useNotifications();
+  const { notifications, isLoading, markAllAsRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const [animate, setAnimate] = useState(false);
@@ -26,22 +19,10 @@ export function NotificationBell() {
   // Funcție pentru a declanșa animația clopoțelului
   const triggerAnimation = () => {
     setAnimate(true);
-    const timer = setTimeout(() => {
+    setTimeout(() => {
       setAnimate(false);
     }, 1000);
-    return () => clearTimeout(timer);
   };
-
-  // Verifică dacă notificările sunt încărcate corect
-  useEffect(() => {
-    if (notifications === undefined && !isLoading) {
-      toast({
-        title: "Eroare",
-        description: "Nu s-au putut încărca notificările",
-        variant: "destructive",
-      });
-    }
-  }, [notifications, isLoading, toast]);
 
   // Calculează numărul de notificări necitite
   const unreadCount = notifications?.filter(notification => !notification.read_at).length || 0;
@@ -59,23 +40,27 @@ export function NotificationBell() {
     markAllAsRead();
   };
   
-  // Handler pentru a șterge toate notificările
+  // Handler pentru a șterge toate notificările - implementare simplificată
   const handleDeleteAll = () => {
-    if (notifications && notifications.length > 0) {
-      deleteAllNotifications();
-    }
+    toast({
+      title: "Acțiune temporar indisponibilă",
+      description: "Ștergerea în masă va fi implementată în curând",
+    });
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button 
           variant="ghost" 
           size="icon" 
           className="relative cursor-pointer w-14 h-14 p-0 sm:w-12 sm:h-12 rounded-full hover:bg-accent active:scale-95 transition-all" 
-          onClick={() => {
+          onClick={(e) => {
+            // Important! Acest lucru împiedică butonul să declanșeze evenimentul de click de două ori
+            e.preventDefault();
             if (!open) {
               triggerAnimation();
+              setOpen(true);
             }
           }}
           aria-label="Arată notificările"
@@ -98,42 +83,40 @@ export function NotificationBell() {
             </Badge>
           )}
         </Button>
-      </DialogTrigger>
+      </SheetTrigger>
       
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
+      <SheetContent side="right" className="sm:max-w-[500px] w-[90vw] overflow-hidden flex flex-col p-0">
+        <SheetHeader className="px-6 pt-6 pb-2">
+          <SheetTitle className="flex items-center justify-between">
             <span>Notificări</span>
             <div className="flex items-center space-x-2">
               <Badge variant="outline" className="ml-2">
                 {unreadCount} necitite
               </Badge>
             </div>
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+        </SheetHeader>
         
         <Separator className="my-2" />
         
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden px-6">
           <NotificationList onClose={() => setOpen(false)} />
         </div>
         
         <Separator className="my-2" />
         
-        <DialogFooter className="flex justify-between sm:justify-between">
-          <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleDeleteAll}
-              disabled={notifications?.length === 0}
-              className="flex items-center"
-            >
-              <Trash2 className="mr-1 h-4 w-4" />
-              <span className="hidden sm:inline">Șterge toate</span>
-              <span className="sm:hidden">Șterge</span>
-            </Button>
-          </div>
+        <SheetFooter className="flex justify-between items-center px-6 py-4">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleDeleteAll}
+            disabled={!notifications?.length}
+            className="flex items-center"
+          >
+            <Trash2 className="mr-1 h-4 w-4" />
+            <span className="hidden sm:inline">Șterge toate</span>
+            <span className="sm:hidden">Șterge</span>
+          </Button>
           
           <Button 
             variant="default" 
@@ -143,11 +126,11 @@ export function NotificationBell() {
             className="flex items-center"
           >
             <Check className="mr-1 h-4 w-4" />
-            <span className="hidden sm:inline">Marchează toate ca citite</span>
+            <span className="hidden sm:inline">Marchează ca citite</span>
             <span className="sm:hidden">Citite</span>
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
