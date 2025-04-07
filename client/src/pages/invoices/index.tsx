@@ -201,6 +201,7 @@ export default function InvoicesPage() {
       discount_rate: discountRate,
       discount_amount: discountAmount,
       total_amount: total,
+      remaining_amount: total, // Adăugat pentru a respecta schema de validare
       status: "sent", // Schimbat de la "draft" la "sent"
       items: invoiceItems.map(item => ({
         description: item.description,
