@@ -33,7 +33,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     // Configurăm mesajul cu adresa de expeditor verificată
     const message = {
       to: options.to,
-      from: options.from || 'office@quailisoft.com', // Adresa verificată în SendGrid
+      from: 'office@quailisoft.com', // Adresa verificată în SendGrid - folosim doar această adresă
       subject: options.subject,
       text: options.text || '',
       html: options.html || '',
