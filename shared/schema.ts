@@ -825,3 +825,118 @@ export const teamMemberSchema = z.object({
 });
 
 export type TeamMemberFormData = z.infer<typeof teamMemberSchema>;
+
+// Enums pentru notificări
+export const notificationTypes = [
+  "task_assigned", 
+  "task_completed", 
+  "task_deadline", 
+  "comment_added", 
+  "project_update", 
+  "invoice_status", 
+  "payment_received", 
+  "team_member_added", 
+  "system_alert"
+] as const;
+
+export const notificationPriorities = [
+  "low", 
+  "normal", 
+  "high", 
+  "urgent"
+] as const;
+
+export const notificationReadStatus = [
+  "unread", 
+  "read"
+] as const;
+
+// Tipuri pentru Notification
+export interface Notification {
+  id: number;
+  organization_id: number;
+  recipient_id: number;
+  sender_id?: number | null;
+  type: (typeof notificationTypes)[number];
+  title: string;
+  message: string;
+  priority: (typeof notificationPriorities)[number];
+  read_status: (typeof notificationReadStatus)[number];
+  entity_type: string;
+  entity_id?: number | null;
+  action_url?: string | null;
+  created_at: Date;
+  expires_at?: Date | null;
+}
+
+export interface InsertNotification {
+  organization_id: number;
+  recipient_id: number;
+  sender_id?: number | null;
+  type: (typeof notificationTypes)[number];
+  title: string;
+  message: string;
+  priority: (typeof notificationPriorities)[number];
+  read_status: (typeof notificationReadStatus)[number];
+  entity_type: string;
+  entity_id?: number | null;
+  action_url?: string | null;
+  expires_at?: Date | null;
+}
+
+// Tipuri pentru NotificationPreference
+export interface NotificationPreference {
+  id: number;
+  user_id: number;
+  email_notifications: boolean;
+  push_notifications: boolean;
+  browser_notifications: boolean;
+  task_assigned: boolean;
+  task_completed: boolean;
+  task_deadline: boolean;
+  comment_added: boolean;
+  project_update: boolean;
+  invoice_status: boolean;
+  payment_received: boolean;
+  team_member_added: boolean;
+  system_alert: boolean;
+  quiet_hours_start?: string | null;
+  quiet_hours_end?: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface InsertNotificationPreference {
+  user_id: number;
+  email_notifications?: boolean;
+  push_notifications?: boolean;
+  browser_notifications?: boolean;
+  task_assigned?: boolean;
+  task_completed?: boolean;
+  task_deadline?: boolean;
+  comment_added?: boolean;
+  project_update?: boolean;
+  invoice_status?: boolean;
+  payment_received?: boolean;
+  team_member_added?: boolean;
+  system_alert?: boolean;
+  quiet_hours_start?: string | null;
+  quiet_hours_end?: string | null;
+}
+
+// Schema pentru validare notificare
+export const notificationSchema = z.object({
+  recipient_id: z.number(),
+  type: z.enum(notificationTypes, {
+    errorMap: () => ({ message: "Tipul notificării este obligatoriu" }),
+  }),
+  title: z.string().min(1, { message: "Titlul este obligatoriu" }),
+  message: z.string().min(1, { message: "Mesajul este obligatoriu" }),
+  priority: z.enum(notificationPriorities).default("normal"),
+  entity_type: z.string().min(1, { message: "Tipul entității este obligatoriu" }),
+  entity_id: z.number().optional().nullable(),
+  action_url: z.string().url({ message: "URL-ul trebuie să fie valid" }).optional().nullable(),
+  expires_at: z.date().optional().nullable()
+});
+
+export type NotificationFormData = z.infer<typeof notificationSchema>;

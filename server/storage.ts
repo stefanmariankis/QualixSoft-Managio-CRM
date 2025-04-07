@@ -35,6 +35,10 @@ import {
   InsertTeamMember,
   DepartmentMember,
   InsertDepartmentMember,
+  Notification,
+  InsertNotification,
+  NotificationPreference,
+  InsertNotificationPreference,
 } from "../shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -60,6 +64,21 @@ export interface IStorage {
     id: number,
     structureData: { has_departments: boolean },
   ): Promise<Organization | undefined>;
+  
+  // Notification operations
+  getNotificationById(id: number): Promise<Notification | undefined>;
+  getNotificationsByUser(userId: number): Promise<Notification[]>;
+  getUnreadNotificationsByUser(userId: number): Promise<Notification[]>;
+  getUnreadNotificationsCount(userId: number): Promise<number>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationAsRead(id: number): Promise<boolean>;
+  markAllNotificationsAsRead(userId: number): Promise<boolean>;
+  deleteNotification(id: number): Promise<boolean>;
+  
+  // Notification preferences operations
+  getNotificationPreferences(userId: number): Promise<NotificationPreference | undefined>;
+  createNotificationPreferences(preferences: InsertNotificationPreference): Promise<NotificationPreference>;
+  updateNotificationPreferences(userId: number, preferences: Partial<NotificationPreference>): Promise<NotificationPreference | undefined>;
 
   // Client operations
   getClient(id: number): Promise<Client | undefined>;
@@ -1723,6 +1742,325 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Eroare la crearea tabelului invoice_payments:", error);
       throw error;
+    }
+  }
+  
+  // Notification operations
+  async checkAndCreateNotificationTables(): Promise<boolean> {
+    try {
+      // Verifică dacă tabelul notifications există
+      const notificationsExists = await this.tableExists('notifications');
+      if (!notificationsExists) {
+        // Creează tabelul dacă nu există
+        await db`
+          CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            organization_id INTEGER NOT NULL,
+            recipient_id INTEGER NOT NULL,
+            sender_id INTEGER,
+            type VARCHAR(50) NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            priority VARCHAR(20) NOT NULL DEFAULT 'normal',
+            read_status VARCHAR(20) NOT NULL DEFAULT 'unread',
+            entity_type VARCHAR(50) NOT NULL,
+            entity_id INTEGER,
+            action_url TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            expires_at TIMESTAMP
+          )
+        `;
+        console.log("Tabelul notifications a fost creat cu succes");
+      }
+      
+      // Verifică dacă tabelul notification_preferences există
+      const preferencesExists = await this.tableExists('notification_preferences');
+      if (!preferencesExists) {
+        // Creează tabelul dacă nu există
+        await db`
+          CREATE TABLE IF NOT EXISTS notification_preferences (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL UNIQUE,
+            email_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+            push_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+            browser_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+            task_assigned BOOLEAN NOT NULL DEFAULT TRUE,
+            task_completed BOOLEAN NOT NULL DEFAULT TRUE,
+            task_deadline BOOLEAN NOT NULL DEFAULT TRUE,
+            comment_added BOOLEAN NOT NULL DEFAULT TRUE,
+            project_update BOOLEAN NOT NULL DEFAULT TRUE,
+            invoice_status BOOLEAN NOT NULL DEFAULT TRUE,
+            payment_received BOOLEAN NOT NULL DEFAULT TRUE,
+            team_member_added BOOLEAN NOT NULL DEFAULT TRUE,
+            system_alert BOOLEAN NOT NULL DEFAULT TRUE,
+            quiet_hours_start VARCHAR(5),
+            quiet_hours_end VARCHAR(5),
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+          )
+        `;
+        console.log("Tabelul notification_preferences a fost creat cu succes");
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Eroare la verificarea/crearea tabelelor pentru notificări:", error);
+      return false;
+    }
+  }
+  
+  async getNotificationById(id: number): Promise<Notification | undefined> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const result = await db`
+        SELECT * FROM notifications
+        WHERE id = ${id}
+        LIMIT 1
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as Notification;
+    } catch (error) {
+      console.error("Eroare la obținerea notificării:", error);
+      return undefined;
+    }
+  }
+  
+  async getNotificationsByUser(userId: number): Promise<Notification[]> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const result = await db`
+        SELECT n.*, 
+               u.username as sender_name,
+               u.avatar as sender_avatar,
+               CASE 
+                 WHEN n.created_at > NOW() - INTERVAL '24 hours' THEN true 
+                 ELSE false 
+               END as is_new
+        FROM notifications n
+        LEFT JOIN users u ON n.sender_id = u.id
+        WHERE n.recipient_id = ${userId}
+        ORDER BY n.created_at DESC
+      `;
+
+      return result as Notification[];
+    } catch (error) {
+      console.error("Eroare la obținerea notificărilor utilizatorului:", error);
+      return [];
+    }
+  }
+  
+  async getUnreadNotificationsByUser(userId: number): Promise<Notification[]> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const result = await db`
+        SELECT n.*, 
+               u.username as sender_name,
+               u.avatar as sender_avatar,
+               CASE 
+                 WHEN n.created_at > NOW() - INTERVAL '24 hours' THEN true 
+                 ELSE false 
+               END as is_new
+        FROM notifications n
+        LEFT JOIN users u ON n.sender_id = u.id
+        WHERE n.recipient_id = ${userId}
+          AND n.read_status = 'unread'
+          AND (n.expires_at IS NULL OR n.expires_at > NOW())
+        ORDER BY n.created_at DESC
+      `;
+
+      return result as Notification[];
+    } catch (error) {
+      console.error("Eroare la obținerea notificărilor necitite ale utilizatorului:", error);
+      return [];
+    }
+  }
+  
+  async getUnreadNotificationsCount(userId: number): Promise<number> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const result = await db`
+        SELECT COUNT(*) as count
+        FROM notifications
+        WHERE recipient_id = ${userId}
+          AND read_status = 'unread'
+          AND (expires_at IS NULL OR expires_at > NOW())
+      `;
+
+      return parseInt(result[0]?.count) || 0;
+    } catch (error) {
+      console.error("Eroare la numărarea notificărilor necitite:", error);
+      return 0;
+    }
+  }
+  
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const now = new Date();
+      const notificationData = {
+        ...notification,
+        created_at: now
+      };
+
+      const result = await db`
+        INSERT INTO notifications ${db(notificationData)}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        throw new Error("Notificarea a fost creată dar nu a putut fi recuperată");
+      }
+
+      return result[0] as Notification;
+    } catch (error: any) {
+      console.error("Eroare la crearea notificării:", error);
+      throw new Error(
+        `Nu s-a putut crea notificarea: ${error.message || "Eroare necunoscută"}`,
+      );
+    }
+  }
+  
+  async markNotificationAsRead(id: number): Promise<boolean> {
+    try {
+      const result = await db`
+        UPDATE notifications
+        SET read_status = 'read'
+        WHERE id = ${id}
+        RETURNING id
+      `;
+
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la marcarea notificării ca citită:", error);
+      return false;
+    }
+  }
+  
+  async markAllNotificationsAsRead(userId: number): Promise<boolean> {
+    try {
+      const result = await db`
+        UPDATE notifications
+        SET read_status = 'read'
+        WHERE recipient_id = ${userId}
+          AND read_status = 'unread'
+        RETURNING id
+      `;
+
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la marcarea tuturor notificărilor ca citite:", error);
+      return false;
+    }
+  }
+  
+  async deleteNotification(id: number): Promise<boolean> {
+    try {
+      const result = await db`
+        DELETE FROM notifications
+        WHERE id = ${id}
+        RETURNING id
+      `;
+
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la ștergerea notificării:", error);
+      return false;
+    }
+  }
+  
+  // Notification preferences operations
+  async getNotificationPreferences(userId: number): Promise<NotificationPreference | undefined> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const result = await db`
+        SELECT * FROM notification_preferences
+        WHERE user_id = ${userId}
+        LIMIT 1
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as NotificationPreference;
+    } catch (error) {
+      console.error("Eroare la obținerea preferințelor de notificare:", error);
+      return undefined;
+    }
+  }
+  
+  async createNotificationPreferences(preferences: InsertNotificationPreference): Promise<NotificationPreference> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const now = new Date();
+      const preferencesData = {
+        ...preferences,
+        created_at: now,
+        updated_at: now
+      };
+
+      const result = await db`
+        INSERT INTO notification_preferences ${db(preferencesData)}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        throw new Error("Preferințele de notificare au fost create dar nu au putut fi recuperate");
+      }
+
+      return result[0] as NotificationPreference;
+    } catch (error: any) {
+      console.error("Eroare la crearea preferințelor de notificare:", error);
+      throw new Error(
+        `Nu s-au putut crea preferințele de notificare: ${error.message || "Eroare necunoscută"}`,
+      );
+    }
+  }
+  
+  async updateNotificationPreferences(userId: number, preferences: Partial<NotificationPreference>): Promise<NotificationPreference | undefined> {
+    try {
+      if (Object.keys(preferences).length === 0) {
+        return await this.getNotificationPreferences(userId);
+      }
+
+      const updatedData = {
+        ...preferences,
+        updated_at: new Date()
+      };
+
+      const result = await db`
+        UPDATE notification_preferences
+        SET ${db(updatedData)}
+        WHERE user_id = ${userId}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as NotificationPreference;
+    } catch (error) {
+      console.error("Eroare la actualizarea preferințelor de notificare:", error);
+      return undefined;
     }
   }
   

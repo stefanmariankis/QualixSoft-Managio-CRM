@@ -48,6 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { departmentsRouter } = await import("./api/departments");
   const { teamRouter } = await import("./api/team");
   const { default: organizationRouter } = await import("./api/organization");
+  const { default: notificationsRouter } = await import("./api/notifications");
   const {
     getAutomations,
     getAutomationById,
@@ -65,6 +66,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/departments", departmentsRouter);
   app.use("/api/team", teamRouter);
   app.use("/api/organization", organizationRouter);
+  app.use("/api/notifications", notificationsRouter);
 
   // Rute pentru automatizări
   app.get("/api/automations", requireAuth, getAutomations);

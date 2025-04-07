@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import { lazy, Suspense, useEffect } from "react";
 import { useAuth } from "./context/auth-context";
 import { AuthProvider } from "./context/auth-context";
+import { NotificationsProvider } from "./hooks/use-notifications";
 import { Loader2 } from "lucide-react";
 import { Redirect } from "wouter";
 
@@ -28,6 +29,7 @@ const TeamPage = lazy(() => import("@/pages/team/index"));
 const TeamMemberDetailsPage = lazy(() => import("@/pages/team/[id]"));
 const DepartmentsPage = lazy(() => import("@/pages/departments/index"));
 const DepartmentDetailsPage = lazy(() => import("@/pages/departments/[id]"));
+const NotificationsPage = lazy(() => import("@/pages/notifications/index"));
 
 // Module care vor fi implementate în viitor
 // Module avansate
@@ -156,6 +158,10 @@ function Router() {
           <SettingsPage />
         </ProtectedRoute>
         
+        <ProtectedRoute path="/notifications">
+          <NotificationsPage />
+        </ProtectedRoute>
+        
         <Route component={NotFound} />
       </Switch>
     </Suspense>
@@ -166,8 +172,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router />
-        <Toaster />
+        <NotificationsProvider>
+          <Router />
+          <Toaster />
+        </NotificationsProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
