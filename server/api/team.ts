@@ -160,7 +160,36 @@ teamRouter.post(
         },
       });
 
-      res.status(201).json(teamMember);
+      // Obținem informațiile despre organizație pentru a le folosi în email
+      const organization = await storage.getOrganization(req.user.organization_id);
+      
+      // Importăm utilitar pentru trimiterea email-urilor
+      const { sendTeamMemberInvitation } = await import('../utils/email');
+      
+      // Trimitem email cu invitație și parola temporară
+      if (teamMember.temp_password) {
+        try {
+          await sendTeamMemberInvitation(
+            teamMember.email,
+            teamMember.first_name,
+            teamMember.last_name,
+            teamMember.temp_password,
+            organization?.name || 'Managio'
+          );
+          console.log(`Email de invitație trimis către ${teamMember.email}`);
+        } catch (emailError) {
+          console.error('Eroare la trimiterea emailului de invitație:', emailError);
+          // Nu oprim procesul dacă email-ul nu poate fi trimis
+        }
+      }
+
+      // Returnăm membrul nou creat împreună cu parola temporară pentru a fi afișată utilizatorului
+      // Aceasta va fi singura dată când parola temporară va fi afișată
+      res.status(201).json({
+        ...teamMember,
+        temp_password_visible: teamMember.temp_password, // Afișăm parola doar la creare
+        email_sent: true // Indicăm că am încercat să trimitem un email
+      });
     } catch (error) {
       next(error);
     }
@@ -295,3 +324,86 @@ teamRouter.delete(
     }
   }
 );
+
+// Autentificare pentru membru echipă
+teamRouter.post(
+  "/auth/login",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        throw new ApiError("Email și parolă sunt obligatorii", 400);
+      }
+      
+      // Verificăm dacă există un membru al echipei cu acest email
+      const teamMember = await storage.getTeamMemberByEmail(email);
+      
+      if (!teamMember) {
+        throw new ApiError("Email sau parolă incorecte", 401);
+      }
+      
+      // Dacă parola nu este cea temporară și nu a fost setată o parolă permanentă
+      // sau dacă parola este cea temporară și a fost deja setată o parolă permanentă
+      if ((password !== teamMember.temp_password && !teamMember.password_set) || 
+          (teamMember.password_set && !teamMember.temp_password)) {
+        throw new ApiError("Email sau parolă incorecte", 401);
+      }
+      
+      // Returnăm informațiile despre membru și dacă trebuie să-și schimbe parola
+      res.json({
+        ...teamMember,
+        must_change_password: !teamMember.password_set
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Schimbare parolă pentru membru echipă la prima autentificare
+teamRouter.post(
+  "/auth/set-password",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id, temp_password, new_password } = req.body;
+      
+      if (!id || !temp_password || !new_password) {
+        throw new ApiError("ID, parola temporară și noua parolă sunt obligatorii", 400);
+      }
+      
+      const teamMember = await storage.getTeamMember(id);
+      
+      if (!teamMember) {
+        throw new ApiError("Membru inexistent", 404);
+      }
+      
+      // Verificăm dacă parola temporară este corectă
+      if (teamMember.temp_password !== temp_password) {
+        throw new ApiError("Parolă temporară incorectă", 401);
+      }
+      
+      // Dacă parola a fost deja setată, nu permitem resetarea
+      if (teamMember.password_set) {
+        throw new ApiError("Parola a fost deja setată", 400);
+      }
+      
+      // Actualizăm datele membrului: setăm flag-ul password_set și ștergem parola temporară
+      const updatedMember = await storage.updateTeamMember(id, {
+        password_set: true,
+        temp_password: null
+      });
+      
+      res.json({ 
+        success: true, 
+        message: "Parola a fost setată cu succes" 
+      });
+      
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Exportăm routerul pentru a putea fi folosit în alte fișiere
+export default teamRouter;

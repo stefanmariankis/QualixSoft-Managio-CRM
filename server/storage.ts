@@ -405,12 +405,88 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async checkAndCreateTeamMembersTable(): Promise<boolean> {
+    try {
+      // Verifică dacă tabelul există
+      const teamMembersExists = await this.tableExists('team_members');
+      if (!teamMembersExists) {
+        // Creează tabelul dacă nu există
+        await db`
+          CREATE TABLE IF NOT EXISTS team_members (
+            id SERIAL PRIMARY KEY,
+            organization_id INTEGER NOT NULL,
+            user_id INTEGER,
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
+            email VARCHAR(255) NOT NULL,
+            phone VARCHAR(50),
+            role VARCHAR(50) NOT NULL,
+            position VARCHAR(100),
+            bio TEXT,
+            avatar VARCHAR(255),
+            hourly_rate NUMERIC(10,2),
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            temp_password VARCHAR(100),
+            password_set BOOLEAN NOT NULL DEFAULT FALSE,
+            created_by INTEGER NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+          )
+        `;
+        console.log("Tabelul team_members a fost creat cu succes");
+        return true;
+      }
+      
+      // Verifică dacă sunt necesare migrări pentru a adăuga coloanele noi
+      const columnsResult = await db`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'team_members' 
+          AND column_name IN ('temp_password', 'password_set')
+      `;
+      
+      // Dacă nu avem aceste coloane, le adăugăm
+      if (columnsResult.length < 2) {
+        const missingColumns = ['temp_password', 'password_set'].filter(
+          col => !columnsResult.some(r => r.column_name === col)
+        );
+        
+        for (const column of missingColumns) {
+          if (column === 'temp_password') {
+            await db`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS temp_password VARCHAR(100)`;
+          } else if (column === 'password_set') {
+            await db`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS password_set BOOLEAN NOT NULL DEFAULT FALSE`;
+          }
+        }
+        
+        console.log("Tabelul team_members a fost actualizat cu coloanele necesare");
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Eroare la verificarea/crearea tabelului team_members:", error);
+      return false;
+    }
+  }
+
   async createTeamMember(teamMember: InsertTeamMember): Promise<TeamMember> {
     try {
+      // Verifică sau creează tabelul team_members înainte de a adăuga un nou membru
+      const tableReady = await this.checkAndCreateTeamMembersTable();
+      if (!tableReady) {
+        throw new Error("Nu s-a putut crea sau verifica tabelul team_members");
+      }
+      
       const now = new Date();
+      
+      // Generăm o parolă temporară pentru membru
+      const tempPassword = this.generateRandomPassword(10);
+      
       const teamMemberData = {
         ...teamMember,
         is_active: teamMember.is_active ?? true,
+        temp_password: tempPassword,
+        password_set: false,
         created_at: now,
         updated_at: now,
       };
@@ -431,6 +507,16 @@ export class DatabaseStorage implements IStorage {
         `Nu s-a putut crea membrul echipei: ${error.message || "Eroare necunoscută"}`,
       );
     }
+  }
+  
+  generateRandomPassword(length: number): string {
+    const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+      const randomIndex = Math.floor(Math.random() * charset.length);
+      password += charset[randomIndex];
+    }
+    return password;
   }
 
   async updateTeamMember(

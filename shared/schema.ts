@@ -612,6 +612,8 @@ export interface TeamMember {
   avatar?: string | null;
   hourly_rate?: number | null;
   is_active: boolean;
+  temp_password?: string | null; // Parola temporară generată la creare
+  password_set: boolean; // Indică dacă utilizatorul și-a setat parola
   created_by: number;
   created_at: Date;
   updated_at: Date;
@@ -630,6 +632,8 @@ export interface InsertTeamMember {
   avatar?: string | null;
   hourly_rate?: number | null;
   is_active?: boolean;
+  temp_password?: string | null;
+  password_set?: boolean;
   created_by: number;
 }
 
