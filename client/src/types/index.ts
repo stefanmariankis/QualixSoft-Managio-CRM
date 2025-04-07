@@ -1,49 +1,34 @@
-export interface User {
-  id: number;
-  email: string;
-  first_name: string | null;
-  last_name: string | null;
-  role: string;
-  organization_id: number | null;
-  created_at: Date | null;
-  updated_at: Date | null;
-  avatar_url?: string | null;
-  position?: string | null;
-  phone?: string | null;
-  skills?: any | null;
-  bio?: string | null;
-  hourly_rate?: number | null;
-}
+/**
+ * Export centralizat al tuturor tipurilor definite în aplicație
+ */
 
-export interface Organization {
-  id: number;
-  name: string;
-  slug: string;
-  logo: string | null;
-  organization_type: 'freelancer' | 'agency' | 'company';
-  subscription_plan: 'trial' | 'basic' | 'pro' | 'pro_yearly';
-  trial_expires_at: Date | null;
-  subscription_started_at: Date | null;
-  subscription_expires_at: Date | null;
-  is_active: boolean;
-  created_at: Date | null;
-  updated_at: Date | null;
-}
+// Export tipuri de bază din fiecare modul
+export * from './common.types';
+export * from './user.types';
+export * from './invoice.types';
 
+// TODO: Completează cu celelalte fișiere de tipuri după ce sunt create:
+// export * from './organization.types';
+// export * from './project.types'; 
+// export * from './client.types';
+// export * from './task.types';
+// export * from './team.types';
+// export * from './department.types';
+// export * from './automation.types';
+// export * from './activity.types';
+
+// Starea de autentificare
 export interface AuthState {
   user: User | null;
+  isLoading: boolean;
+  error: Error | null;
+}
+
+// Starea organizației
+export interface OrganizationState {
   organization: Organization | null;
-  loading: boolean;
-  error: string | null;
+  isLoading: boolean;
+  error: Error | null;
 }
 
-export interface OrganizationData {
-  name: string;
-  type: 'freelancer' | 'agency' | 'company';
-}
-
-export enum PasswordStrength {
-  WEAK = 'weak',
-  MEDIUM = 'medium',
-  STRONG = 'strong'
-}
+// Adaugă aici alte tipuri de stare necesare în aplicație

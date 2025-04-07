@@ -55,10 +55,18 @@ import {
   Send,
   AlertCircle
 } from "lucide-react";
-import { Invoice } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 
-interface InvoiceItem {
+// Importul tipurilor
+import { 
+  Invoice, 
+  Client, 
+  Project,
+  InvoiceStatus 
+} from "@/types";
+
+// Interfață temporară pentru elementele facturii în formular
+interface InvoiceItemForm {
   id: number;
   description: string;
   quantity: number;
@@ -91,7 +99,7 @@ export default function InvoicesPage() {
   const [notes, setNotes] = useState("");
   
   // State pentru elementele facturii
-  const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([
+  const [invoiceItems, setInvoiceItems] = useState<InvoiceItemForm[]>([
     { id: 1, description: "", quantity: 1, unitPrice: 0, total: 0 }
   ]);
   const [nextItemId, setNextItemId] = useState(2);
@@ -230,7 +238,7 @@ export default function InvoicesPage() {
   
   // Adaugă un element nou la factură
   const addInvoiceItem = () => {
-    const newItem: InvoiceItem = { 
+    const newItem: InvoiceItemForm = { 
       id: nextItemId, 
       description: "", 
       quantity: 1, 
@@ -252,7 +260,7 @@ export default function InvoicesPage() {
   // Actualizează un câmp dintr-un element de factură
   const updateInvoiceItem = (
     itemId: number, 
-    field: keyof InvoiceItem, 
+    field: keyof InvoiceItemForm, 
     value: string | number
   ) => {
     setInvoiceItems(invoiceItems.map(item => {
