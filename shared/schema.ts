@@ -335,7 +335,7 @@ export interface Invoice {
   updated_at: Date;
 }
 
-// Tipuri pentru InvoiceItem
+// Tipuri pentru InvoiceItem - remove created_at și updated_at deoarece nu există în tabelă
 export interface InvoiceItem {
   id: number;
   invoice_id: number;
@@ -344,8 +344,6 @@ export interface InvoiceItem {
   unit_price: number;
   total_price: number;
   order_index?: number;
-  created_at: Date;
-  updated_at: Date;
 }
 
 export interface InsertInvoiceItem {

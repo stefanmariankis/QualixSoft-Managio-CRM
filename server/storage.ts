@@ -1361,14 +1361,9 @@ export class DatabaseStorage implements IStorage {
   
   async createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem> {
     try {
-      const now = new Date();
-      
-      // Pregătim datele pentru inserare
-      const itemData = {
-        ...item,
-        created_at: now,
-        updated_at: now,
-      };
+      // Folosim doar datele din parametru, fără a adăuga coloanele created_at și updated_at
+      // care nu există în tabelul invoice_items din baza de date
+      const itemData = { ...item };
 
       const result = await db`
         INSERT INTO invoice_items ${db(itemData)}
