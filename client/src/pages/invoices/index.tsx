@@ -67,32 +67,14 @@ interface InvoiceItem {
 }
 
 export default function InvoicesPage() {
-  // Obține parametrii din URL
-  const [location, setLocation] = useLocation();
-  
   // Funcție pentru parsarea parametrilor din URL
   function parseSearchParams() {
     const searchParams = new URLSearchParams(window.location.search);
     const clientId = searchParams.get('clientId');
     return { clientId };
   }
-  
-  // Efect pentru setarea clientului din URL
-  useEffect(() => {
-    const { clientId } = parseSearchParams();
-    if (clientId) {
-      setSelectedClient(clientId);
-      // Deschidem automat dialogul pentru factură nouă
-      setDialogOpen(true);
-    }
-  }, [location]);
-  
-  // Resetăm proiectul când se schimbă clientul selectat
-  useEffect(() => {
-    // Dacă s-a schimbat clientul, resetăm proiectul la "fără proiect"
-    setSelectedProject("no-project");
-  }, [selectedClient]);
-  
+
+  // State pentru filtrare
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("toate");
   const [filterClient, setFilterClient] = useState("toate");
@@ -115,6 +97,25 @@ export default function InvoicesPage() {
   const [nextItemId, setNextItemId] = useState(2);
   const [taxRate, setTaxRate] = useState(19);
   const [discountRate, setDiscountRate] = useState(0);
+
+  // Obține parametrii din URL
+  const [location, setLocation] = useLocation();
+  
+  // Efect pentru setarea clientului din URL
+  useEffect(() => {
+    const { clientId } = parseSearchParams();
+    if (clientId) {
+      setSelectedClient(clientId);
+      // Deschidem automat dialogul pentru factură nouă
+      setDialogOpen(true);
+    }
+  }, [location]);
+  
+  // Resetăm proiectul când se schimbă clientul selectat
+  useEffect(() => {
+    // Dacă s-a schimbat clientul, resetăm proiectul la "fără proiect"
+    setSelectedProject("no-project");
+  }, [selectedClient]);
   
   // Calculează subtotalul, TVA, discount și totalul
   const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
@@ -780,43 +781,36 @@ export default function InvoicesPage() {
                                 <span>{getProjectName(invoice.project_id)}</span>
                               </div>
                             )}
-                            {!invoice.project_id && <span className="text-muted-foreground">-</span>}
+                          </TableCell>
+                          <TableCell>{formatDate(invoice.issue_date)}</TableCell>
+                          <TableCell className={getDueDateClass(invoice.due_date, invoice.status)}>
+                            {formatDate(invoice.due_date)}
                           </TableCell>
                           <TableCell>
-                            {formatDate(invoice.issue_date)}
+                            {formatCurrency(invoice.total_amount, invoice.currency)}
                           </TableCell>
                           <TableCell>
-                            <span className={getDueDateClass(invoice.due_date, invoice.status)}>
-                              {formatDate(invoice.due_date)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-1">
-                              <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span>{formatCurrency(invoice.total_amount, invoice.currency)}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={getStatusBadgeColors(invoice.status)}
-                            >
-                              {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                            <Badge variant="outline" className={getStatusBadgeColors(invoice.status)}>
+                              {invoice.status === 'draft' && 'Schiță'}
+                              {invoice.status === 'sent' && 'Emisă'}
+                              {invoice.status === 'viewed' && 'Vizualizată'}
+                              {invoice.status === 'paid' && 'Plătită'}
+                              {invoice.status === 'overdue' && 'Restantă'}
+                              {invoice.status === 'cancelled' && 'Anulată'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end space-x-1">
-                              <Button variant="ghost" size="icon" title="Vizualizează">
-                                <Eye className="h-4 w-4" />
+                              <Button variant="ghost" size="icon" asChild>
+                                <Link href={`/invoices/${invoice.id}`}>
+                                  <Eye className="h-4 w-4" />
+                                </Link>
                               </Button>
-                              <Button variant="ghost" size="icon" title="Trimite">
-                                <Send className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" title="Duplică">
+                              <Button variant="ghost" size="icon">
                                 <Copy className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" title="Mai multe">
-                                <MoreVertical className="h-4 w-4" />
+                              <Button variant="ghost" size="icon">
+                                <Send className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
