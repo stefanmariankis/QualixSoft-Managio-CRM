@@ -10,6 +10,12 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+
+  /* Optimizare pentru interacțiuni pe dispozitive touchscreen */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 /* Animații pentru clopoțelul de notificări */
@@ -41,5 +47,22 @@
 
   .animate-badge {
     animation: badge-pulse 0.8s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+  
+  /* Zone mai mari pentru interacțiuni pe mobil */
+  @media (max-width: 640px) {
+    .mobile-tap-target {
+      min-width: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    /* Adăugăm padding pentru a face clopoțelul mai ușor de apăsat pe mobil */
+    .notification-bell-container {
+      padding: 8px;
+      margin: -8px;
+    }
   }
 }
