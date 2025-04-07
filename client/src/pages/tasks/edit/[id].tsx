@@ -1,187 +1,163 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useLocation, Link } from 'wouter';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { useParams, useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ArrowLeft, Calendar as CalendarIcon } from "lucide-react";
-import { format } from 'date-fns';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import DashboardLayout from "@/components/layout/dashboard-layout";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Loader2, ArrowLeft } from "lucide-react";
 
-const taskSchema = z.object({
-  title: z.string().min(3, "Titlul trebuie să aibă cel puțin 3 caractere"),
-  description: z.string().optional().nullable(),
-  status: z.string(),
-  priority: z.string(),
-  due_date: z.date().optional().nullable(),
-  estimated_hours: z.coerce.number().min(0).optional().nullable(),
-  project_id: z.coerce.number(),
-  assignee_id: z.coerce.number().optional().nullable(),
-});
-
-type TaskFormValues = z.infer<typeof taskSchema>;
-
-type Project = {
-  id: number;
-  name: string;
-  organization_id: number;
-  client_id: number;
-  client_name?: string;
-};
-
-type User = {
-  id: number;
-  name: string;
-  role: string;
-  email: string;
-  department_id?: number | null;
-  department_name?: string | null;
-};
-
-export default function EditTask() {
-  const [, setLocation] = useLocation();
-  const params = useParams<{ id: string }>();
-  const taskId = parseInt(params.id);
+export default function TaskEditPage() {
+  const params = useParams();
+  const { id } = params;
+  const [, navigate] = useLocation();
   const { toast } = useToast();
+  
+  // State pentru toate câmpurile formularului
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [status, setStatus] = useState("");
+  const [priority, setPriority] = useState("");
+  const [projectId, setProjectId] = useState<string>("");
+  const [assigneeId, setAssigneeId] = useState<string>("");
+  const [dueDate, setDueDate] = useState("");
+  const [estimatedHours, setEstimatedHours] = useState("");
 
-  // Obține detaliile inițiale ale task-ului
-  const { data: taskData, isLoading: isLoadingTask, error: taskError } = useQuery({
-    queryKey: ['/api/tasks', taskId],
-    queryFn: async () => {
-      const response = await apiRequest('GET', `/api/tasks/${taskId}`);
-      if (!response.ok) {
-        throw new Error('Nu s-au putut încărca detaliile task-ului');
-      }
-      return response.json();
-    }
+  // Obține task-ul
+  const { data: task, isLoading: taskLoading } = useQuery({
+    queryKey: [`/api/tasks/${id}`],
   });
 
-  // Obține lista de proiecte
-  const { data: projects, isLoading: isLoadingProjects } = useQuery<Project[]>({
-    queryKey: ['/api/projects'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/projects');
-      if (!response.ok) {
-        throw new Error('Nu s-au putut încărca proiectele');
-      }
-      return response.json();
-    }
+  // Obține proiectele
+  const { data: projects } = useQuery({
+    queryKey: ["/api/projects"],
   });
 
-  // Obține lista de utilizatori
-  const { data: users, isLoading: isLoadingUsers } = useQuery<User[]>({
-    queryKey: ['/api/users/organization'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/users/organization');
-      if (!response.ok) {
-        throw new Error('Nu s-au putut încărca utilizatorii');
-      }
-      return response.json();
-    }
+  // Obține utilizatorii
+  const { data: users } = useQuery({
+    queryKey: ["/api/users/organization"],
   });
 
-  // Inițializează formularul
-  const form = useForm<TaskFormValues>({
-    resolver: zodResolver(taskSchema),
-    defaultValues: {
-      title: '',
-      description: '',
-      status: 'not_started',
-      priority: 'medium',
-      due_date: null,
-      estimated_hours: null,
-      project_id: 0,
-      assignee_id: null,
-    }
-  });
-
-  // Actualizează valorile implicite când sunt disponibile datele
+  // Populează formul când datele sunt încărcate
   useEffect(() => {
-    if (taskData?.task) {
-      const task = taskData.task;
-      form.reset({
-        title: task.title,
-        description: task.description || '',
-        status: task.status,
-        priority: task.priority,
-        due_date: task.due_date ? new Date(task.due_date) : null,
-        estimated_hours: task.estimated_hours,
-        project_id: task.project_id,
-        assignee_id: task.assignee_id,
-      });
+    if (task && task.task) {
+      setTitle(task.task.title || "");
+      setDescription(task.task.description || "");
+      setStatus(task.task.status || "");
+      setPriority(task.task.priority || "");
+      setProjectId(task.task.project_id?.toString() || "");
+      setAssigneeId(task.task.assignee_id?.toString() || "");
+      
+      // Formatarea datei pentru input-ul de tip date
+      if (task.task.due_date) {
+        const date = new Date(task.task.due_date);
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          setDueDate(`${year}-${month}-${day}`);
+        }
+      }
+      
+      setEstimatedHours(task.task.estimated_hours?.toString() || "");
     }
-  }, [taskData, form]);
+  }, [task]);
+
+  const mappedStatuses = {
+    "not_started": "Neînceput",
+    "in_progress": "În lucru",
+    "under_review": "În verificare",
+    "completed": "Finalizat",
+    "on_hold": "Blocat"
+  };
+
+  const mappedPriorities = {
+    "low": "Scăzută",
+    "medium": "Medie",
+    "high": "Ridicată",
+    "urgent": "Urgentă"
+  };
 
   // Mutația pentru actualizarea task-ului
   const updateTaskMutation = useMutation({
-    mutationFn: async (values: TaskFormValues) => {
-      const response = await apiRequest('PATCH', `/api/tasks/${taskId}`, values);
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("PATCH", `/api/tasks/${id}`, data);
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Nu s-a putut actualiza task-ul');
+        const error = await response.json();
+        throw new Error(error.message || "Eroare la actualizarea sarcinii");
       }
-      return response.json();
+      return await response.json();
     },
     onSuccess: () => {
       toast({
-        title: "Task actualizat",
-        description: "Task-ul a fost actualizat cu succes",
+        title: "Sarcină actualizată",
+        description: "Sarcina a fost actualizată cu succes",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/tasks', taskId] });
-      setLocation('/tasks');
+      queryClient.invalidateQueries({ queryKey: [`/api/tasks/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      navigate(`/tasks/${id}`);
     },
     onError: (error: Error) => {
       toast({
         title: "Eroare",
-        description: error.message || "Nu s-a putut actualiza task-ul",
+        description: error.message,
         variant: "destructive",
       });
-    }
+    },
   });
 
-  // Handler pentru submiterea formularului
-  const onSubmit = (values: TaskFormValues) => {
-    updateTaskMutation.mutate(values);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const taskData = {
+      title,
+      description,
+      status,
+      priority,
+      project_id: projectId ? parseInt(projectId) : undefined,
+      assignee_id: assigneeId ? parseInt(assigneeId) : null,
+      due_date: dueDate || null,
+      estimated_hours: estimatedHours ? parseFloat(estimatedHours) : null,
+    };
+    
+    updateTaskMutation.mutate(taskData);
   };
 
-  // Dacă se încarcă datele, afișăm un loader
-  if (isLoadingTask || isLoadingProjects || isLoadingUsers) {
+  if (taskLoading) {
     return (
       <DashboardLayout>
-        <div className="flex flex-col items-center justify-center min-h-[60vh]">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="mt-4 text-muted-foreground">Se încarcă datele task-ului...</p>
+        <div className="flex items-center justify-center h-full">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </DashboardLayout>
     );
   }
 
-  // Dacă există o eroare, o afișăm
-  if (taskError || !taskData) {
+  if (!task || !task.task) {
     return (
       <DashboardLayout>
-        <div className="flex flex-col items-center justify-center min-h-[60vh]">
-          <Alert className="max-w-md" variant="destructive">
-            <AlertTitle>Eroare</AlertTitle>
-            <AlertDescription>
-              {taskError instanceof Error ? taskError.message : "Nu s-au putut încărca detaliile task-ului"}
-            </AlertDescription>
-          </Alert>
-          <Button variant="outline" className="mt-4" onClick={() => setLocation('/tasks')}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Înapoi la lista de task-uri
+        <div className="flex flex-col items-center justify-center h-full">
+          <h1 className="text-2xl font-bold mb-2">Sarcină negăsită</h1>
+          <p className="text-muted-foreground mb-4">Sarcina pe care încerci să o editezi nu există.</p>
+          <Button asChild>
+            <Link href="/tasks">Înapoi la lista de sarcini</Link>
           </Button>
         </div>
       </DashboardLayout>
@@ -190,260 +166,202 @@ export default function EditTask() {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col space-y-6">
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={() => setLocation(`/tasks/${taskId}`)}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-2xl font-bold tracking-tight">Editare task: {taskData.task.title}</h1>
+      <div className="flex items-center mb-6">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="mr-4"
+          onClick={() => navigate(`/tasks/${id}`)}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Înapoi
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Editare sarcină</h1>
+          <p className="text-muted-foreground">
+            Actualizează informațiile despre sarcină
+          </p>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Detalii task</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Titlu</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Introdu titlul task-ului" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="project_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Proiect</FormLabel>
-                        <Select 
-                          onValueChange={(value) => field.onChange(parseInt(value))}
-                          defaultValue={field.value?.toString()}
-                          value={field.value?.toString()}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selectează proiectul" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {projects?.map(project => (
-                              <SelectItem key={project.id} value={project.id.toString()}>
-                                {project.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selectează statusul" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="not_started">De făcut</SelectItem>
-                            <SelectItem value="in_progress">În lucru</SelectItem>
-                            <SelectItem value="under_review">În verificare</SelectItem>
-                            <SelectItem value="completed">Finalizat</SelectItem>
-                            <SelectItem value="on_hold">Blocat</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Prioritate</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selectează prioritatea" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="low">Scăzută</SelectItem>
-                            <SelectItem value="medium">Medie</SelectItem>
-                            <SelectItem value="high">Ridicată</SelectItem>
-                            <SelectItem value="urgent">Urgentă</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="due_date"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Dată finalizare</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                {field.value ? (
-                                  format(field.value, "PPP")
-                                ) : (
-                                  <span>Alege data</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value || undefined}
-                              onSelect={field.onChange}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="estimated_hours"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Ore estimate</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number"
-                            step="0.5"
-                            min="0"
-                            {...field}
-                            value={field.value || ''}
-                            onChange={(e) => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))}
-                            placeholder="Estimare ore"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="assignee_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Asignat către</FormLabel>
-                        <Select 
-                          onValueChange={(value) => field.onChange(value === '' ? null : parseInt(value))}
-                          defaultValue={field.value?.toString() || ''}
-                          value={field.value?.toString() || ''}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selectează un utilizator" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="">Neasignat</SelectItem>
-                            {users?.map(user => (
-                              <SelectItem key={user.id} value={user.id.toString()}>
-                                {user.name} {user.department_name ? `(${user.department_name})` : ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Descriere</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          {...field}
-                          value={field.value || ''}
-                          placeholder="Descriere task" 
-                          className="min-h-[120px]"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="flex justify-end space-x-4">
-                  <Button
-                    type="button" 
-                    variant="outline"
-                    onClick={() => setLocation(`/tasks/${taskId}`)}
-                  >
-                    Anulare
-                  </Button>
-                  <Button 
-                    type="submit"
-                    disabled={updateTaskMutation.isPending}
-                  >
-                    {updateTaskMutation.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Salvare
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Editare sarcină</CardTitle>
+          <CardDescription>
+            Completează formularul pentru a actualiza sarcina
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label htmlFor="title" className="text-sm font-medium">Titlu sarcină</label>
+                <Input 
+                  id="title" 
+                  value={title} 
+                  onChange={(e) => setTitle(e.target.value)} 
+                  placeholder="Titlu sarcină"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="project" className="text-sm font-medium">Proiect</label>
+                <Select 
+                  value={projectId} 
+                  onValueChange={setProjectId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selectează proiect" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects && projects.length > 0 ? (
+                      projects.map((project: any) => (
+                        <SelectItem key={project.id} value={project.id.toString()}>
+                          {project.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-projects">Nu există proiecte disponibile</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label htmlFor="status" className="text-sm font-medium">Status</label>
+                <Select 
+                  value={status} 
+                  onValueChange={setStatus}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selectează status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_started">Neînceput</SelectItem>
+                    <SelectItem value="in_progress">În lucru</SelectItem>
+                    <SelectItem value="under_review">În verificare</SelectItem>
+                    <SelectItem value="completed">Finalizat</SelectItem>
+                    <SelectItem value="on_hold">Blocat</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="priority" className="text-sm font-medium">Prioritate</label>
+                <Select 
+                  value={priority} 
+                  onValueChange={setPriority}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selectează prioritate" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Scăzută</SelectItem>
+                    <SelectItem value="medium">Medie</SelectItem>
+                    <SelectItem value="high">Ridicată</SelectItem>
+                    <SelectItem value="urgent">Urgentă</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label htmlFor="assignee" className="text-sm font-medium">Asignat către</label>
+                <Select 
+                  value={assigneeId} 
+                  onValueChange={setAssigneeId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selectează utilizator" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Neasignat</SelectItem>
+                    {users && users.length > 0 ? (
+                      users.map((user: any) => (
+                        <SelectItem key={user.id} value={user.id.toString()}>
+                          {user.firstName} {user.lastName}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-users">Nu există utilizatori disponibili</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="due_date" className="text-sm font-medium">Data finalizare</label>
+                <Input 
+                  id="due_date" 
+                  type="date" 
+                  value={dueDate} 
+                  onChange={(e) => setDueDate(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label htmlFor="estimated_hours" className="text-sm font-medium">Ore estimate</label>
+                <Input 
+                  id="estimated_hours" 
+                  type="number" 
+                  value={estimatedHours} 
+                  onChange={(e) => setEstimatedHours(e.target.value)}
+                  placeholder="0"
+                  min="0"
+                  step="0.5"
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="spent_hours" className="text-sm font-medium">Ore înregistrate</label>
+                <Input 
+                  id="spent_hours" 
+                  type="number" 
+                  value={task.task.spent_hours || "0"} 
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="description" className="text-sm font-medium">Descriere</label>
+              <Textarea 
+                id="description" 
+                value={description} 
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Descriere sarcină"
+                className="min-h-32"
+              />
+            </div>
+            
+            <div className="flex justify-end space-x-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => navigate(`/tasks/${id}`)}
+              >
+                Anulează
+              </Button>
+              <Button 
+                type="submit"
+                disabled={updateTaskMutation.isPending}
+              >
+                {updateTaskMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Se actualizează...
+                  </>
+                ) : (
+                  "Salvează modificările"
+                )}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </DashboardLayout>
   );
 }

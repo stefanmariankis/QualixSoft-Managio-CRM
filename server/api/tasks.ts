@@ -187,6 +187,7 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
     
     const task = await storage.getTask(taskId);
     console.log("API - Rezultat căutare task:", task ? `găsit (id=${task.id})` : "negăsit");
+    console.log("API - Task info:", JSON.stringify(task, null, 2));
     
     if (!task || task.organization_id !== req.user!.organization_id) {
       return res.status(404).json({ message: 'Task negăsit' });
@@ -293,7 +294,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
           
           // Verificăm dacă persoana asignată aparține organizației
           const assignedUser = await storage.getUser(req.body.assignee_id);
-          if (!assignedUser || assignedUser.organizationId !== req.user.organization_id) {
+          if (!assignedUser || assignedUser.organization_id !== req.user.organization_id) {
             return res.status(404).json({ 
               message: 'Utilizatorul căruia doriți să asignați task-ul nu a fost găsit' 
             });
@@ -302,7 +303,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
           // Implementare pentru a verifica dacă utilizatorul este în departamentul managerului
           // Această logică ar trebui extinsă în funcție de cerințele specifice și structura bazei de date
           // Deocamdată verificăm doar dacă utilizatorul aparține organizației
-          if (assignedUser.organizationId !== req.user.organization_id) {
+          if (assignedUser.organization_id !== req.user.organization_id) {
             return res.status(403).json({ 
               message: 'Nu puteți asigna task-uri unui utilizator care nu face parte din organizație' 
             });
@@ -409,7 +410,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response) => {
           // Verificăm dacă persoana asignată aparține de departamentul managerului sau este în echipa proiectului
           // Obținem utilizatorul căruia se dorește asignarea
           const assignedUser = await storage.getUser(req.body.assignee_id);
-          if (!assignedUser || assignedUser.organizationId !== req.user.organization_id) {
+          if (!assignedUser || assignedUser.organization_id !== req.user.organization_id) {
             return res.status(404).json({ message: 'Utilizatorul căruia doriți să asignați task-ul nu a fost găsit' });
           }
           
@@ -417,7 +418,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response) => {
           // Această implementare ar trebui extinsă cu o verificare mai complexă care să verifice membrii echipei proiectului
           // Sau un departament anume dacă este cazul
           // Deocamdată verificăm doar dacă utilizatorul aparține organizației
-          if (assignedUser.organizationId !== req.user.organization_id) {
+          if (assignedUser.organization_id !== req.user.organization_id) {
             return res.status(403).json({ message: 'Nu puteți asigna task-uri unui utilizator care nu face parte din organizație' });
           }
         } else {

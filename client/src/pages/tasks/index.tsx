@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,6 +58,7 @@ export default function TasksPage() {
   const [filterStatus, setFilterStatus] = useState("toate");
   const [filterProject, setFilterProject] = useState("toate");
   const [filterAssignee, setFilterAssignee] = useState("toate");
+  const [, setLocation] = useLocation();
   
   // Obține lista de sarcini din API
   const { data: tasks, isLoading } = useQuery({
