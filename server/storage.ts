@@ -489,13 +489,30 @@ export class DatabaseStorage implements IStorage {
         const existingUser = await this.getUserByUsername(teamMember.email);
         
         if (!existingUser) {
+          // Mapăm rolul de membru echipă la un rol de utilizator valid
+          let userRole = "employee"; // Valoare implicită
+          
+          // Mapare între rolurile de membru echipă și rolurile de utilizatori
+          const roleMapping = {
+            "administrator": "super_admin",
+            "manager": "manager",
+            "angajat": "employee",
+            "colaborator": "employee",
+            "asociat": "employee"
+          } as const;
+          
+          // Obținem rolul corespunzător sau folosim valoarea implicită
+          if (teamMember.role && teamMember.role in roleMapping) {
+            userRole = roleMapping[teamMember.role as keyof typeof roleMapping];
+          }
+          
           // Creăm un utilizator nou dacă nu există
           const newUser = await this.createUser({
             email: teamMember.email,
             password: tempPassword, // Folosim aceeași parolă temporară
             firstName: teamMember.first_name,
             lastName: teamMember.last_name,
-            role: teamMember.role,
+            role: userRole, // Folosim rolul mapat
             organizationId: teamMember.organization_id
           });
           
