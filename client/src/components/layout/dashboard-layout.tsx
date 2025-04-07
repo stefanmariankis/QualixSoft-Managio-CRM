@@ -45,9 +45,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   // Verificăm dacă organizația are departamente activate
   const hasDepartments = organization?.has_departments ?? false;
   
+  // Verificăm dacă utilizatorul are rol de CEO pentru a afișa secțiunea Clienți
+  const isCEO = user?.role === 'ceo';
+  
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/clients", label: "Clienți", icon: Users },
+    // Afișăm link-ul către clienți doar dacă utilizatorul are rol de CEO
+    ...(isCEO ? [{ href: "/clients", label: "Clienți", icon: Users }] : []),
     { href: "/projects", label: "Proiecte", icon: FolderKanban },
     { href: "/tasks", label: "Sarcini", icon: FileText },
     { href: "/invoices", label: "Facturi", icon: Receipt },

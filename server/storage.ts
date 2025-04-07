@@ -1,4 +1,5 @@
 import { db } from "./db";
+import bcrypt from "bcryptjs";
 import {
   User,
   InsertUser,
@@ -507,9 +508,11 @@ export class DatabaseStorage implements IStorage {
           }
           
           // Creăm un utilizator nou dacă nu există
+          const hashedPassword = await bcrypt.hash(tempPassword, 10);
+          
           const newUser = await this.createUser({
             email: teamMember.email,
-            password: tempPassword, // Folosim aceeași parolă temporară
+            password: hashedPassword, // Folosim parola temporară criptată cu bcrypt
             firstName: teamMember.first_name,
             lastName: teamMember.last_name,
             role: userRole, // Folosim rolul mapat

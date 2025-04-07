@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +48,7 @@ import {
   AtSign,
   MapPin,
   User,
+  AlertCircle,
   BarChart4,
   Clock
 } from "lucide-react";
@@ -64,6 +65,16 @@ export default function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("toate");
   const [filterIndustry, setFilterIndustry] = useState("toate");
+  const [location, setLocation] = useLocation();
+  const { user } = useQuery({ queryKey: ['/api/me'] }).data || { user: null };
+  
+  // Verifică dacă utilizatorul are rol de CEO
+  useEffect(() => {
+    // Dacă utilizatorul nu are rol de CEO, redirecționează la dashboard
+    if (user && user.role !== 'ceo') {
+      setLocation('/dashboard');
+    }
+  }, [user, setLocation]);
   
   // Apel API real către server
   const { data: clients, isLoading } = useQuery({

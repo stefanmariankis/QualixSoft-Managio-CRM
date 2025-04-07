@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { NotFoundError, ValidationError, ApiError } from "../errors";
 import { teamMemberSchema, InsertTeamMember } from "../../shared/schema";
 import { requireAuth } from "../auth";
+import bcrypt from 'bcryptjs';
 
 /**
  * IMPORTANT: Diferența dintre Users și TeamMembers
@@ -360,17 +361,43 @@ teamRouter.post(
         throw new ApiError("Email sau parolă incorecte", 401);
       }
       
-      // Dacă parola nu este cea temporară și nu a fost setată o parolă permanentă
-      // sau dacă parola este cea temporară și a fost deja setată o parolă permanentă
-      if ((password !== teamMember.temp_password && !teamMember.password_set) || 
-          (teamMember.password_set && !teamMember.temp_password)) {
+      // Verificăm dacă membrul are un cont de utilizator asociat
+      if (teamMember.user_id) {
+        // Obținem detaliile utilizatorului
+        const user = await storage.getUser(teamMember.user_id);
+        
+        if (user) {
+          // Verificăm parola cu bcrypt
+          const isMatch = await bcrypt.compare(password, user.password);
+          
+          if (!isMatch) {
+            throw new ApiError("Email sau parolă incorecte", 401);
+          }
+          
+          // Returnăm informațiile despre membru și dacă trebuie să-și schimbe parola
+          res.json({
+            ...teamMember,
+            must_change_password: !teamMember.password_set
+          });
+          return;
+        }
+      }
+      
+      // Dacă nu există un utilizator asociat sau nu s-a putut verifica parola,
+      // verificăm dacă există o parolă temporară (pentru compatibilitate cu versiuni anterioare)
+      if (!teamMember.temp_password || teamMember.password_set) {
         throw new ApiError("Email sau parolă incorecte", 401);
       }
       
-      // Returnăm informațiile despre membru și dacă trebuie să-și schimbe parola
+      // Verificăm parola temporară
+      if (password !== teamMember.temp_password) {
+        throw new ApiError("Email sau parolă incorecte", 401);
+      }
+      
+      // Returnăm informațiile despre membru și indicăm că trebuie să-și schimbe parola
       res.json({
         ...teamMember,
-        must_change_password: !teamMember.password_set
+        must_change_password: true
       });
     } catch (error) {
       next(error);
@@ -395,6 +422,55 @@ teamRouter.post(
         throw new ApiError("Membru inexistent", 404);
       }
       
+      // Cazul 1: Avem un utilizator asociat cu membrul echipei
+      if (teamMember.user_id) {
+        const user = await storage.getUser(teamMember.user_id);
+        
+        if (user) {
+          // Folosim bcrypt pentru a verifica parola veche și hasha parola nouă
+          
+          // Verificăm parola temporară
+          if (teamMember.temp_password) {
+            // Dacă avem încă parola temporară în baza de date, verificăm dacă este corectă
+            if (teamMember.temp_password !== temp_password) {
+              throw new ApiError("Parolă temporară incorectă", 401);
+            }
+          } else {
+            // Altfel verificăm împotriva parolei stocate a utilizatorului
+            const isMatch = await bcrypt.compare(temp_password, user.password);
+            if (!isMatch) {
+              throw new ApiError("Parolă temporară incorectă", 401);
+            }
+          }
+          
+          // Dacă parola a fost deja setată, nu permitem resetarea
+          if (teamMember.password_set) {
+            throw new ApiError("Parola a fost deja setată", 400);
+          }
+          
+          // Generăm hash pentru parola nouă
+          const hashedPassword = await bcrypt.hash(new_password, 10);
+          
+          // Actualizăm parola utilizatorului
+          await storage.updateUser(teamMember.user_id, {
+            password: hashedPassword
+          });
+          
+          // Actualizăm datele membrului echipei
+          const updatedMember = await storage.updateTeamMember(id, {
+            password_set: true,
+            temp_password: null
+          });
+          
+          res.json({ 
+            success: true, 
+            message: "Parola a fost setată cu succes" 
+          });
+          return;
+        }
+      }
+      
+      // Cazul 2: Nu avem un utilizator asociat (caz mai vechi)
       // Verificăm dacă parola temporară este corectă
       if (teamMember.temp_password !== temp_password) {
         throw new ApiError("Parolă temporară incorectă", 401);

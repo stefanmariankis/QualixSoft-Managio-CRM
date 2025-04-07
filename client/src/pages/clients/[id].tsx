@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, Link } from 'wouter';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -69,6 +69,19 @@ export default function ClientDetails() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  
+  // Obține informații despre utilizatorul autentificat
+  const { data: userData } = useQuery({ 
+    queryKey: ['/api/me'] 
+  });
+  
+  // Verifică dacă utilizatorul are rol de CEO
+  useEffect(() => {
+    // Dacă utilizatorul nu are rol de CEO, redirecționează la dashboard
+    if (userData && userData.user && userData.user.role !== 'ceo') {
+      setLocation('/dashboard');
+    }
+  }, [userData, setLocation]);
   
   // Obținem detaliile clientului
   const { data, isLoading, error } = useQuery<ClientDetailsResponse>({
