@@ -66,6 +66,7 @@ export default function TasksPage() {
   const [, setLocation] = useLocation();
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [selectedTaskAssigneeId, setSelectedTaskAssigneeId] = useState<number | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -227,9 +228,13 @@ export default function TasksPage() {
   const handleAssignTask = (assigneeId: string | null) => {
     if (!selectedTaskId) return;
     
-    updateTaskMutation.mutate({ 
-      assignee_id: assigneeId ? parseInt(assigneeId) : null 
-    });
+    // Dacă selectăm același utilizator care e deja asignat, dezasignăm task-ul
+    const newAssigneeId = assigneeId && parseInt(assigneeId);
+    if (newAssigneeId === selectedTaskAssigneeId) {
+      updateTaskMutation.mutate({ assignee_id: null });
+    } else {
+      updateTaskMutation.mutate({ assignee_id: newAssigneeId });
+    }
   };
 
   return (
@@ -246,6 +251,7 @@ export default function TasksPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Asignat către</label>
               <Select
+                value={selectedTaskAssigneeId?.toString() || "null"}
                 onValueChange={(value) => handleAssignTask(value === "null" ? null : value)}
               >
                 <SelectTrigger>
@@ -255,8 +261,13 @@ export default function TasksPage() {
                   <SelectItem value="null">Neasignat</SelectItem>
                   {users && users.length > 0 ? (
                     users.map((u: any) => (
-                      <SelectItem key={u.id} value={u.id.toString()}>
-                        {u.firstName} {u.lastName}
+                      <SelectItem key={u.id} value={u.id.toString()} className="flex items-center">
+                        <div className="flex items-center justify-between w-full">
+                          <span>{u.firstName} {u.lastName}</span>
+                          {u.id === selectedTaskAssigneeId && (
+                            <Check className="h-4 w-4 ml-2 text-primary" />
+                          )}
+                        </div>
                       </SelectItem>
                     ))
                   ) : (
@@ -270,10 +281,10 @@ export default function TasksPage() {
               variant="outline"
               className="w-full"
               onClick={() => handleAssignTask(user?.id?.toString() || null)}
-              disabled={updateTaskMutation.isPending}
+              disabled={updateTaskMutation.isPending || selectedTaskAssigneeId === user?.id}
             >
               <UserCircle className="h-4 w-4 mr-2" />
-              Asignează-mi mie
+              {selectedTaskAssigneeId === user?.id ? "Deja asignat mie" : "Asignează-mi mie"}
             </Button>
           </div>
           <DialogFooter>
@@ -609,6 +620,7 @@ export default function TasksPage() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedTaskId(task.id);
+                                  setSelectedTaskAssigneeId(task.assignee_id);
                                   setShowAssignModal(true);
                                 }}
                               >
