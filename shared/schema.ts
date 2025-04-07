@@ -13,6 +13,14 @@ export const userRoles = [
   "employee",
   "client",
 ] as const;
+
+export const teamMemberRoles = [
+  "administrator", 
+  "manager", 
+  "angajat", 
+  "colaborator", 
+  "asociat"
+] as const;
 export const subscriptionPlans = [
   "trial",
   "basic",
@@ -105,6 +113,7 @@ export interface Organization {
   subscription_started_at?: Date | null;
   subscription_expires_at?: Date | null;
   is_active: boolean;
+  has_departments: boolean; // Flag pentru activarea departamentelor
   created_at?: Date | null;
   updated_at?: Date | null;
 }
@@ -120,6 +129,7 @@ export interface InsertOrganization {
   subscription_started_at?: Date | null;
   subscription_expires_at?: Date | null;
   is_active?: boolean;
+  has_departments?: boolean;
 }
 
 // Schema pentru validare înregistrare
@@ -514,6 +524,78 @@ export interface InsertActivityLog {
   metadata?: any;
 }
 
+// Tipuri pentru Departament
+export interface Department {
+  id: number;
+  organization_id: number;
+  name: string;
+  description?: string | null;
+  manager_id?: number | null;
+  created_by: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface InsertDepartment {
+  organization_id: number;
+  name: string;
+  description?: string | null;
+  manager_id?: number | null;
+  created_by: number;
+}
+
+// Tipuri pentru membri echipei
+export interface TeamMember {
+  id: number;
+  organization_id: number;
+  user_id?: number | null;  // ID-ul utilizatorului din tabelul users, dacă există
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string | null;
+  role: (typeof teamMemberRoles)[number];
+  position?: string | null;
+  bio?: string | null;
+  avatar?: string | null;
+  hourly_rate?: number | null;
+  is_active: boolean;
+  created_by: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface InsertTeamMember {
+  organization_id: number;
+  user_id?: number | null;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string | null;
+  role: (typeof teamMemberRoles)[number];
+  position?: string | null;
+  bio?: string | null;
+  avatar?: string | null;
+  hourly_rate?: number | null;
+  is_active?: boolean;
+  created_by: number;
+}
+
+// Tipuri pentru asocierea membrilor cu departamente
+export interface DepartmentMember {
+  id: number;
+  department_id: number;
+  team_member_id: number;
+  is_manager: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface InsertDepartmentMember {
+  department_id: number;
+  team_member_id: number;
+  is_manager?: boolean;
+}
+
 // Schema validare client
 export const clientSchema = z.object({
   name: z.string().min(1, { message: "Numele este obligatoriu" }),
@@ -646,3 +728,30 @@ export const automationSchema = z.object({
 });
 
 export type AutomationFormData = z.infer<typeof automationSchema>;
+
+// Schema validare departament
+export const departmentSchema = z.object({
+  name: z.string().min(1, { message: "Numele departamentului este obligatoriu" }),
+  description: z.string().optional().nullable(),
+  manager_id: z.number().optional().nullable(),
+});
+
+export type DepartmentFormData = z.infer<typeof departmentSchema>;
+
+// Schema validare membru echipă
+export const teamMemberSchema = z.object({
+  first_name: z.string().min(1, { message: "Prenumele este obligatoriu" }),
+  last_name: z.string().min(1, { message: "Numele este obligatoriu" }),
+  email: z.string().email({ message: "Adresa de email nu este validă" }),
+  phone: z.string().optional().nullable(),
+  role: z.enum(teamMemberRoles as unknown as [string, ...string[]], {
+    errorMap: () => ({ message: "Rol invalid" }),
+  }),
+  position: z.string().optional().nullable(),
+  bio: z.string().optional().nullable(),
+  avatar: z.string().optional().nullable(),
+  hourly_rate: z.number().nonnegative().optional().nullable(),
+  is_active: z.boolean().default(true),
+});
+
+export type TeamMemberFormData = z.infer<typeof teamMemberSchema>;

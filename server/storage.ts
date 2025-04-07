@@ -24,6 +24,12 @@ import {
   InsertAutomationAction,
   AutomationLog,
   InsertAutomationLog,
+  Department,
+  InsertDepartment,
+  TeamMember,
+  InsertTeamMember,
+  DepartmentMember,
+  InsertDepartmentMember,
 } from "../shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -162,6 +168,38 @@ export interface IStorage {
   ): Promise<AutomationLog[]>;
   createAutomationLog(log: InsertAutomationLog): Promise<AutomationLog>;
 
+  // Department operations
+  getDepartment(id: number): Promise<Department | undefined>;
+  getDepartmentsByOrganization(organizationId: number): Promise<Department[]>;
+  createDepartment(department: InsertDepartment): Promise<Department>;
+  updateDepartment(
+    id: number,
+    departmentData: Partial<Department>,
+  ): Promise<Department | undefined>;
+  deleteDepartment(id: number): Promise<boolean>;
+
+  // TeamMember operations
+  getTeamMember(id: number): Promise<TeamMember | undefined>;
+  getTeamMembersByOrganization(organizationId: number): Promise<TeamMember[]>;
+  getTeamMemberByEmail(email: string): Promise<TeamMember | undefined>;
+  createTeamMember(teamMember: InsertTeamMember): Promise<TeamMember>;
+  updateTeamMember(
+    id: number,
+    teamMemberData: Partial<TeamMember>,
+  ): Promise<TeamMember | undefined>;
+  deleteTeamMember(id: number): Promise<boolean>;
+
+  // DepartmentMember operations
+  getDepartmentMember(id: number): Promise<DepartmentMember | undefined>;
+  getDepartmentMembersByDepartment(departmentId: number): Promise<DepartmentMember[]>;
+  getDepartmentMembersByTeamMember(teamMemberId: number): Promise<DepartmentMember[]>;
+  createDepartmentMember(departmentMember: InsertDepartmentMember): Promise<DepartmentMember>;
+  updateDepartmentMember(
+    id: number,
+    departmentMemberData: Partial<DepartmentMember>,
+  ): Promise<DepartmentMember | undefined>;
+  deleteDepartmentMember(id: number): Promise<boolean>;
+
   // Session store
   sessionStore: session.Store;
 }
@@ -182,6 +220,381 @@ export class DatabaseStorage implements IStorage {
       },
       createTableIfMissing: true,
     });
+  }
+  
+  // Department operations
+  async getDepartment(id: number): Promise<Department | undefined> {
+    try {
+      const result = await db`
+        SELECT * FROM departments
+        WHERE id = ${id}
+        LIMIT 1
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as Department;
+    } catch (error) {
+      console.error("Eroare la obținerea departamentului:", error);
+      return undefined;
+    }
+  }
+
+  async getDepartmentsByOrganization(organizationId: number): Promise<Department[]> {
+    try {
+      const result = await db`
+        SELECT * FROM departments
+        WHERE organization_id = ${organizationId}
+        ORDER BY name
+      `;
+
+      return result as unknown as Department[];
+    } catch (error) {
+      console.error("Eroare la obținerea departamentelor organizației:", error);
+      return [];
+    }
+  }
+
+  async createDepartment(department: InsertDepartment): Promise<Department> {
+    try {
+      const now = new Date();
+      const departmentData = {
+        ...department,
+        created_at: now,
+        updated_at: now,
+      };
+
+      const result = await db`
+        INSERT INTO departments ${db(departmentData)}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        throw new Error("Departamentul a fost creat dar nu a putut fi recuperat");
+      }
+
+      return result[0] as Department;
+    } catch (error: any) {
+      console.error("Eroare la crearea departamentului:", error);
+      throw new Error(
+        `Nu s-a putut crea departamentul: ${error.message || "Eroare necunoscută"}`,
+      );
+    }
+  }
+
+  async updateDepartment(
+    id: number,
+    departmentData: Partial<Department>,
+  ): Promise<Department | undefined> {
+    try {
+      if (Object.keys(departmentData).length === 0) {
+        return await this.getDepartment(id);
+      }
+
+      const updatedData = {
+        ...departmentData,
+        updated_at: new Date(),
+      };
+
+      const result = await db`
+        UPDATE departments
+        SET ${db(updatedData)}
+        WHERE id = ${id}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as Department;
+    } catch (error) {
+      console.error("Eroare la actualizarea departamentului:", error);
+      return undefined;
+    }
+  }
+
+  async deleteDepartment(id: number): Promise<boolean> {
+    try {
+      // Mai întâi ștergem toate relațiile dintre departament și membri
+      await db`
+        DELETE FROM department_members
+        WHERE department_id = ${id}
+      `;
+
+      // Apoi ștergem departamentul
+      const result = await db`
+        DELETE FROM departments
+        WHERE id = ${id}
+        RETURNING id
+      `;
+
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la ștergerea departamentului:", error);
+      return false;
+    }
+  }
+
+  // TeamMember operations
+  async getTeamMember(id: number): Promise<TeamMember | undefined> {
+    try {
+      const result = await db`
+        SELECT * FROM team_members
+        WHERE id = ${id}
+        LIMIT 1
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as TeamMember;
+    } catch (error) {
+      console.error("Eroare la obținerea membrului echipei:", error);
+      return undefined;
+    }
+  }
+
+  async getTeamMembersByOrganization(organizationId: number): Promise<TeamMember[]> {
+    try {
+      const result = await db`
+        SELECT * FROM team_members
+        WHERE organization_id = ${organizationId}
+        ORDER BY first_name, last_name
+      `;
+
+      return result as unknown as TeamMember[];
+    } catch (error) {
+      console.error("Eroare la obținerea membrilor echipei organizației:", error);
+      return [];
+    }
+  }
+
+  async getTeamMemberByEmail(email: string): Promise<TeamMember | undefined> {
+    try {
+      const result = await db`
+        SELECT * FROM team_members
+        WHERE email = ${email}
+        LIMIT 1
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as TeamMember;
+    } catch (error) {
+      console.error("Eroare la obținerea membrului echipei după email:", error);
+      return undefined;
+    }
+  }
+
+  async createTeamMember(teamMember: InsertTeamMember): Promise<TeamMember> {
+    try {
+      const now = new Date();
+      const teamMemberData = {
+        ...teamMember,
+        is_active: teamMember.is_active ?? true,
+        created_at: now,
+        updated_at: now,
+      };
+
+      const result = await db`
+        INSERT INTO team_members ${db(teamMemberData)}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        throw new Error("Membrul echipei a fost creat dar nu a putut fi recuperat");
+      }
+
+      return result[0] as TeamMember;
+    } catch (error: any) {
+      console.error("Eroare la crearea membrului echipei:", error);
+      throw new Error(
+        `Nu s-a putut crea membrul echipei: ${error.message || "Eroare necunoscută"}`,
+      );
+    }
+  }
+
+  async updateTeamMember(
+    id: number,
+    teamMemberData: Partial<TeamMember>,
+  ): Promise<TeamMember | undefined> {
+    try {
+      if (Object.keys(teamMemberData).length === 0) {
+        return await this.getTeamMember(id);
+      }
+
+      const updatedData = {
+        ...teamMemberData,
+        updated_at: new Date(),
+      };
+
+      const result = await db`
+        UPDATE team_members
+        SET ${db(updatedData)}
+        WHERE id = ${id}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as TeamMember;
+    } catch (error) {
+      console.error("Eroare la actualizarea membrului echipei:", error);
+      return undefined;
+    }
+  }
+
+  async deleteTeamMember(id: number): Promise<boolean> {
+    try {
+      // Mai întâi ștergem toate relațiile dintre membru și departamente
+      await db`
+        DELETE FROM department_members
+        WHERE team_member_id = ${id}
+      `;
+
+      // Apoi ștergem membrul echipei
+      const result = await db`
+        DELETE FROM team_members
+        WHERE id = ${id}
+        RETURNING id
+      `;
+
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la ștergerea membrului echipei:", error);
+      return false;
+    }
+  }
+
+  // DepartmentMember operations
+  async getDepartmentMember(id: number): Promise<DepartmentMember | undefined> {
+    try {
+      const result = await db`
+        SELECT * FROM department_members
+        WHERE id = ${id}
+        LIMIT 1
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as DepartmentMember;
+    } catch (error) {
+      console.error("Eroare la obținerea relației departament-membru:", error);
+      return undefined;
+    }
+  }
+
+  async getDepartmentMembersByDepartment(departmentId: number): Promise<DepartmentMember[]> {
+    try {
+      const result = await db`
+        SELECT * FROM department_members
+        WHERE department_id = ${departmentId}
+      `;
+
+      return result as unknown as DepartmentMember[];
+    } catch (error) {
+      console.error("Eroare la obținerea membrilor departamentului:", error);
+      return [];
+    }
+  }
+
+  async getDepartmentMembersByTeamMember(teamMemberId: number): Promise<DepartmentMember[]> {
+    try {
+      const result = await db`
+        SELECT * FROM department_members
+        WHERE team_member_id = ${teamMemberId}
+      `;
+
+      return result as unknown as DepartmentMember[];
+    } catch (error) {
+      console.error("Eroare la obținerea departamentelor membrului:", error);
+      return [];
+    }
+  }
+
+  async createDepartmentMember(departmentMember: InsertDepartmentMember): Promise<DepartmentMember> {
+    try {
+      const now = new Date();
+      const departmentMemberData = {
+        ...departmentMember,
+        is_manager: departmentMember.is_manager ?? false,
+        created_at: now,
+        updated_at: now,
+      };
+
+      const result = await db`
+        INSERT INTO department_members ${db(departmentMemberData)}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        throw new Error("Relația departament-membru a fost creată dar nu a putut fi recuperată");
+      }
+
+      return result[0] as DepartmentMember;
+    } catch (error: any) {
+      console.error("Eroare la crearea relației departament-membru:", error);
+      throw new Error(
+        `Nu s-a putut crea relația departament-membru: ${error.message || "Eroare necunoscută"}`,
+      );
+    }
+  }
+
+  async updateDepartmentMember(
+    id: number,
+    departmentMemberData: Partial<DepartmentMember>,
+  ): Promise<DepartmentMember | undefined> {
+    try {
+      if (Object.keys(departmentMemberData).length === 0) {
+        return await this.getDepartmentMember(id);
+      }
+
+      const updatedData = {
+        ...departmentMemberData,
+        updated_at: new Date(),
+      };
+
+      const result = await db`
+        UPDATE department_members
+        SET ${db(updatedData)}
+        WHERE id = ${id}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as DepartmentMember;
+    } catch (error) {
+      console.error("Eroare la actualizarea relației departament-membru:", error);
+      return undefined;
+    }
+  }
+
+  async deleteDepartmentMember(id: number): Promise<boolean> {
+    try {
+      const result = await db`
+        DELETE FROM department_members
+        WHERE id = ${id}
+        RETURNING id
+      `;
+
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la ștergerea relației departament-membru:", error);
+      return false;
+    }
   }
 
   // User operations
