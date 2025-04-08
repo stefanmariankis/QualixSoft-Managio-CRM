@@ -108,6 +108,63 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// Obține task-urile unui proiect
+router.get('/:id/tasks', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: 'Neautorizat' });
+    }
+    
+    console.log("API - GET /api/projects/:id/tasks - parametru brut:", req.params.id, "tip:", typeof req.params.id);
+    
+    // Convertim explicit parametrul la număr
+    let projectId: number;
+    try {
+      projectId = Number(req.params.id);
+      
+      // Verificăm dacă este un număr valid
+      if (isNaN(projectId) || projectId <= 0 || !Number.isInteger(projectId)) {
+        console.error(`API - ID proiect invalid: ${req.params.id} => ${projectId}`);
+        return res.status(400).json({ message: 'ID proiect invalid' });
+      }
+      
+      console.log("API - ID proiect convertit cu succes:", projectId, "tip:", typeof projectId);
+    } catch (err) {
+      console.error(`API - Eroare la conversie ID proiect: ${req.params.id}`, err);
+      return res.status(400).json({ message: 'ID proiect invalid' });
+    }
+    
+    const project = await storage.getProject(projectId);
+    console.log("API - Rezultat căutare proiect:", project ? `găsit (id=${project.id})` : "negăsit");
+    
+    if (!project || project.organization_id !== req.user!.organization_id) {
+      return res.status(404).json({ message: 'Proiect negăsit' });
+    }
+    
+    // Verificare dacă utilizatorul are acces la acest proiect în funcție de rol
+    // CEO și super_admin au acces la toate proiectele
+    if (req.user.role !== 'ceo' && req.user.role !== 'super_admin') {
+      // Pentru alte roluri verificăm dacă proiectul este asociat cu utilizatorul
+      const userProjects = await storage.getProjectsForUser(userId, req.user!.organization_id);
+      const hasAccess = userProjects.some(p => p.id === projectId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Nu aveți acces la acest proiect' });
+      }
+    }
+    
+    // Obține task-urile asociate acestui proiect
+    const tasks = await storage.getTasksByProject(projectId);
+    console.log(`API - Task-uri găsite pentru proiect ID=${projectId}:`, tasks.length);
+    
+    res.json(tasks);
+  } catch (error) {
+    console.error('Eroare la obținerea task-urilor proiectului:', error);
+    res.status(500).json({ message: 'Eroare la obținerea task-urilor proiectului' });
+  }
+});
+
 // Obține detaliile unui proiect
 router.get('/:id', requireAuth, async (req: Request, res: Response) => {
   try {

@@ -54,8 +54,8 @@ const timeLogSchema = z.object({
     required_error: "Selectați data",
   }),
   duration_minutes: z.number({
-    required_error: "Introduceți numărul de ore",
-  }).min(1, "Durata trebuie să fie mai mare de 0"),
+    required_error: "Introduceți durata în minute",
+  }).min(1, "Durata trebuie să fie mai mare de 0 minute"),
   description: z.string().optional(),
   is_billable: z.boolean().default(true),
 });
@@ -87,12 +87,12 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
 
   // Obține lista de task-uri pentru proiectul selectat
   const { data: tasks, isLoading: isLoadingTasks } = useQuery({
-    queryKey: ["/api/tasks", { project_id: selectedProject }],
+    queryKey: ["/api/projects", selectedProject, "tasks"],
     queryFn: async () => {
       if (!selectedProject) return [];
       const res = await apiRequest(
         "GET",
-        `/api/tasks?project_id=${selectedProject}`
+        `/api/projects/${selectedProject}/tasks`
       );
       if (!res.ok) throw new Error("Nu s-au putut încărca task-urile");
       return await res.json();
@@ -418,7 +418,7 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
                         type="number"
                         step="0.01"
                         min="0.01"
-                        placeholder="Introduceți numărul de ore"
+                        placeholder="Introduceți durata în ore"
                         value={field.value > 0 ? (field.value / 60).toFixed(2) : ""}
                         onChange={(e) => {
                           // Convertim orele în minute (1 oră = 60 minute)
