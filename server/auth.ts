@@ -30,6 +30,7 @@ export function setupAuth(app: Express) {
         secure: process.env.NODE_ENV === "production", // în producție, folosește doar HTTPS
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 săptămână
         httpOnly: true,
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Important pentru cross-domain în producție
       },
     })
   );
