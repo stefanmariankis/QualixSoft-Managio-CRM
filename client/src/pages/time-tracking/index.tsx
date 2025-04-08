@@ -5,7 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Plus, BarChart, AlarmClock, Calendar, Play, Pause, Loader2 } from "lucide-react";
+import { Clock, Plus, BarChart, AlarmClock, Calendar, Play, Pause, Loader2, ExternalLink, Info, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
   Table, 
@@ -17,6 +17,13 @@ import {
 } from "@/components/ui/table";
 import TimeTrackingModal from "@/components/time-tracking/time-tracking-modal";
 import { useTimeTracking } from "@/context/time-tracking-context";
+import { useLocation } from "wouter";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "wouter";
 
@@ -37,6 +44,13 @@ const ActiveTimerCard = () => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
   
+  // Obținem funcția de refetch pentru a actualiza datele după oprirea timerului
+  const { refetch: refetchTimeLogs } = useQuery({
+    queryKey: ['/api/time-logs'],
+    queryFn: () => null,
+    enabled: false,
+  });
+  
   // Handler pentru oprirea timerului cu măsuri de siguranță multiple
   const handleStopTimer = async () => {
     setIsLoading(true);
@@ -54,7 +68,7 @@ const ActiveTimerCard = () => {
       
       // Reîmprospătăm datele tabelei fără a reîncărca pagina
       try {
-        await refetch();
+        await refetchTimeLogs();
       } catch (refetchError) {
         console.error('Eroare la actualizarea datelor:', refetchError);
       }
@@ -300,7 +314,32 @@ export default function TimeTrackingPage() {
                           )}
                         </TableCell>
                         <TableCell>{log.project_name || 'Necunoscut'}</TableCell>
-                        <TableCell>{log.task_title || '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <span>{log.task_title || '-'}</span>
+                            {log.task_id && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-7 w-7"
+                                      asChild
+                                    >
+                                      <Link to={`/tasks/${log.task_id}`}>
+                                        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                                      </Link>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Deschide detalii task</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>{log.description || '-'}</TableCell>
                         <TableCell>{log.user_name || 'Necunoscut'}</TableCell>
                         <TableCell>{formatDuration(log.duration_minutes || 0)}</TableCell>

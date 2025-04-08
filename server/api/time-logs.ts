@@ -94,6 +94,7 @@ router.get("/", requireAuth, async (req: any, res) => {
         ...log,
         project_name: project?.name || 'Necunoscut',
         task_title: task?.title || null,
+        task_id: log.task_id, // Asigurăm că task_id este inclus pentru navigare
         user_name: user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Necunoscut'
       };
     }));
@@ -139,6 +140,7 @@ router.get("/:id", requireAuth, async (req: any, res) => {
       ...timeLog,
       project_name: project?.name || 'Necunoscut',
       task_title: task?.title || null,
+      task_id: timeLog.task_id, // Asigurăm că task_id este inclus pentru navigare
       user_name: user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Necunoscut'
     };
     
