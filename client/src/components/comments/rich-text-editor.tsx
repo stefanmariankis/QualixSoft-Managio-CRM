@@ -84,7 +84,7 @@ export default function RichTextEditor({
     },
     editorProps: {
       attributes: {
-        class: `focus:outline-none prose prose-sm max-w-none ${minHeight ? `min-h-[${minHeight}]` : ''} overflow-y-auto`,
+        class: `focus:outline-none prose prose-sm max-w-none ${minHeight ? `min-h-[${minHeight}]` : ''} overflow-y-auto bg-white p-3 rounded-md`,
         placeholder: placeholder,
       },
     },

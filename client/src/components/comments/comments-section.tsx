@@ -77,6 +77,9 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
       });
       reset();
       setReplyTo(null);
+      setCommentContent('');
+      setUploadedFiles([]);
+      setIsInternal(false);
       queryClient.invalidateQueries({ queryKey: [`/api/${entityType}/${entityId}/comments`] });
     },
     onError: (error: Error) => {
@@ -105,6 +108,9 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
       });
       reset();
       setEditingComment(null);
+      setCommentContent('');
+      setUploadedFiles([]);
+      setIsInternal(false);
       queryClient.invalidateQueries({ queryKey: [`/api/${entityType}/${entityId}/comments`] });
     },
     onError: (error: Error) => {
