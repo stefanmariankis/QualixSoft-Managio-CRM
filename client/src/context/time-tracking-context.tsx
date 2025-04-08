@@ -154,13 +154,16 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
       const durationMinutes = Math.ceil((now.getTime() - timer.startTime.getTime()) / (1000 * 60));
       
       // Trimite cerere către server pentru a înregistra sfârșitul pontajului
+      
       const res = await apiRequest('POST', '/api/time-logs', {
         project_id: timer.projectId,
         task_id: timer.taskId,
+        start_time: timer.startTime?.toISOString(), // Adăugăm startTime pentru constrângerea NOT NULL
+        end_time: now.toISOString(), // Adăugăm end_time calculat
         duration_minutes: durationMinutes,
         description: `Timp înregistrat pentru ${timer.taskName || timer.projectName}`,
         is_billable: true,
-        date: new Date().toISOString().split("T")[0] // format YYYY-MM-DD
+        date: now.toISOString().split("T")[0] // format YYYY-MM-DD
       });
       
       if (!res.ok) {
