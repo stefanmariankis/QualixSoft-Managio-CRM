@@ -118,6 +118,13 @@ export interface IStorage {
   getInvoicesByClient(clientId: number): Promise<Invoice[]>;
   getInvoicesByProject(projectId: number): Promise<Invoice[]>;
   getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]>;
+  
+  // Comment operations
+  getComment(id: number): Promise<Comment | undefined>;
+  getCommentsByEntity(entityType: string, entityId: number): Promise<Comment[]>;
+  createComment(comment: InsertComment): Promise<Comment>;
+  updateComment(id: number, commentData: Partial<Comment>): Promise<Comment | undefined>;
+  deleteComment(id: number): Promise<boolean>;
   getInvoicePayments(invoiceId: number): Promise<InvoicePayment[]>;
   createInvoicePayment(payment: InsertInvoicePayment): Promise<InvoicePayment>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
@@ -2076,6 +2083,205 @@ export class DatabaseStorage implements IStorage {
       return result[0].exists;
     } catch (error) {
       console.error(`Eroare la verificarea existenței tabelului ${tableName}:`, error);
+      return false;
+    }
+  }
+  
+  // Creează tabelul de comentarii dacă nu există
+  async checkAndCreateCommentsTable(): Promise<boolean> {
+    try {
+      const commentsExists = await this.tableExists('comments');
+      if (!commentsExists) {
+        await db`
+          CREATE TABLE IF NOT EXISTS comments (
+            id SERIAL PRIMARY KEY,
+            entity_type VARCHAR(50) NOT NULL,
+            entity_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            parent_id INTEGER,
+            attachment_ids INTEGER[],
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            CONSTRAINT fk_user
+              FOREIGN KEY(user_id) 
+              REFERENCES users(id)
+              ON DELETE CASCADE
+          )
+        `;
+        
+        // Creăm indecșii pentru eficiență
+        await db`CREATE INDEX idx_comments_entity ON comments(entity_type, entity_id)`;
+        await db`CREATE INDEX idx_comments_user ON comments(user_id)`;
+        
+        console.log("Tabelul comments a fost creat cu succes");
+        return true;
+      }
+      return true;
+    } catch (error) {
+      console.error("Eroare la verificarea/crearea tabelului comments:", error);
+      return false;
+    }
+  }
+  
+  // Comment operations
+  async getComment(id: number): Promise<Comment | undefined> {
+    try {
+      // Asigurăm că tabelul există
+      await this.checkAndCreateCommentsTable();
+      
+      const result = await db`
+        SELECT 
+          c.*,
+          CONCAT(u.first_name, ' ', u.last_name) as user_name,
+          u.avatar as user_avatar
+        FROM comments c
+        LEFT JOIN users u ON c.user_id = u.id
+        WHERE c.id = ${id}
+        LIMIT 1
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as unknown as Comment;
+    } catch (error) {
+      console.error("Eroare la obținerea comentariului:", error);
+      return undefined;
+    }
+  }
+
+  async getCommentsByEntity(entityType: string, entityId: number): Promise<Comment[]> {
+    try {
+      // Asigurăm că tabelul există
+      await this.checkAndCreateCommentsTable();
+      
+      const result = await db`
+        SELECT 
+          c.*,
+          CONCAT(u.first_name, ' ', u.last_name) as user_name,
+          u.avatar as user_avatar
+        FROM comments c
+        LEFT JOIN users u ON c.user_id = u.id
+        WHERE c.entity_type = ${entityType} AND c.entity_id = ${entityId}
+        ORDER BY c.created_at DESC
+      `;
+
+      return result as unknown as Comment[];
+    } catch (error) {
+      console.error(`Eroare la obținerea comentariilor pentru ${entityType} cu ID ${entityId}:`, error);
+      return [];
+    }
+  }
+
+  async createComment(comment: InsertComment): Promise<Comment> {
+    try {
+      // Asigurăm că tabelul există
+      await this.checkAndCreateCommentsTable();
+      
+      const now = new Date();
+      const commentData = {
+        entity_type: comment.entity_type,
+        entity_id: comment.entity_id,
+        user_id: comment.user_id,
+        content: comment.content,
+        parent_id: comment.parent_id || null,
+        attachment_ids: comment.attachment_ids || null,
+        created_at: now,
+        updated_at: now
+      };
+
+      const result = await db`
+        INSERT INTO comments ${db(commentData)}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        throw new Error("Comentariul a fost creat dar nu a putut fi recuperat");
+      }
+      
+      // Obținem numele utilizatorului
+      const userData = await db`
+        SELECT CONCAT(first_name, ' ', last_name) as user_name, avatar
+        FROM users
+        WHERE id = ${comment.user_id}
+        LIMIT 1
+      `;
+      
+      const commentWithUserData = {
+        ...result[0],
+        user_name: userData.length > 0 ? userData[0].user_name : 'Utilizator necunoscut',
+        user_avatar: userData.length > 0 ? userData[0].avatar : null
+      };
+
+      return commentWithUserData as unknown as Comment;
+    } catch (error: any) {
+      console.error("Eroare la crearea comentariului:", error);
+      throw new Error(
+        `Nu s-a putut crea comentariul: ${error.message || "Eroare necunoscută"}`,
+      );
+    }
+  }
+
+  async updateComment(id: number, commentData: Partial<Comment>): Promise<Comment | undefined> {
+    try {
+      if (Object.keys(commentData).length === 0) {
+        return await this.getComment(id);
+      }
+
+      const updatedData = {
+        ...commentData,
+        updated_at: new Date(),
+      };
+      
+      // Eliminăm câmpurile care nu sunt în schema bazei de date
+      delete (updatedData as any).user_name;
+      delete (updatedData as any).user_avatar;
+
+      const result = await db`
+        UPDATE comments
+        SET ${db(updatedData)}
+        WHERE id = ${id}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+      
+      // Obținem numele utilizatorului
+      const userData = await db`
+        SELECT CONCAT(first_name, ' ', last_name) as user_name, avatar
+        FROM users
+        WHERE id = ${result[0].user_id}
+        LIMIT 1
+      `;
+      
+      const commentWithUserData = {
+        ...result[0],
+        user_name: userData.length > 0 ? userData[0].user_name : 'Utilizator necunoscut',
+        user_avatar: userData.length > 0 ? userData[0].avatar : null
+      };
+
+      return commentWithUserData as unknown as Comment;
+    } catch (error) {
+      console.error("Eroare la actualizarea comentariului:", error);
+      return undefined;
+    }
+  }
+
+  async deleteComment(id: number): Promise<boolean> {
+    try {
+      const result = await db`
+        DELETE FROM comments
+        WHERE id = ${id}
+        RETURNING id
+      `;
+
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la ștergerea comentariului:", error);
       return false;
     }
   }

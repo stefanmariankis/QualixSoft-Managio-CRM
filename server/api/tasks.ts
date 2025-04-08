@@ -197,8 +197,8 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
     // Obține înregistrările de timp asociate acestui task
     const timeLogs = await storage.getTimeLogsByTask(taskId);
     
-    // Array gol pentru comentarii (tabela există dar nu este implementată funcționalitatea)
-    const comments = [];
+    // Obține comentariile asociate acestui task
+    const comments = await storage.getCommentsByEntity('task', taskId);
     
     // Array gol pentru atașamente (nu este implementată funcționalitatea încă)
     const attachments = [];
@@ -551,29 +551,22 @@ router.post('/:id/comments', requireAuth, async (req: Request, res: Response) =>
       return res.status(404).json({ message: 'Task negăsit' });
     }
     
-    const { content } = req.body;
+    const { content, parent_id } = req.body;
     if (!content || typeof content !== 'string' || content.trim() === '') {
       return res.status(400).json({ message: 'Conținutul comentariului este obligatoriu' });
     }
     
-    // În versiunea actuală funcția nu există, dar ar trebui implementată
-    // const comment = await storage.createComment({
-    //   entity_type: 'task',
-    //   entity_id: taskId,
-    //   user_id: userId,
-    //   content: content.trim(),
-    //   created_at: new Date()
-    // });
+    // Asigurăm că tabela de comentarii există
+    await storage.checkAndCreateCommentsTable();
     
-    // Temporar folosim un ID fix pentru că funcționalitatea de comentarii
-    // va fi implementată complet în viitor
-    const comment = { 
-      id: Date.now(), // folosim timestamp ca ID temporar
-      content,
+    // Creăm comentariul folosind metoda din DatabaseStorage
+    const comment = await storage.createComment({
+      entity_type: 'task',
+      entity_id: taskId,
       user_id: userId,
-      user_name: req.user?.name || 'Utilizator',
-      created_at: new Date().toISOString()
-    };
+      content: content.trim(),
+      parent_id: parent_id || null
+    });
     
     // Adaugă o înregistrare în jurnalul de activitate
     await storage.createActivityLog({
@@ -585,8 +578,7 @@ router.post('/:id/comments', requireAuth, async (req: Request, res: Response) =>
       metadata: { 
         task_title: task.title,
         comment_id: comment.id
-      },
-      created_at: new Date(),
+      }
     });
     
     res.status(201).json(comment);

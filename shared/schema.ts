@@ -410,6 +410,32 @@ export interface InsertInvoicePayment {
   created_by: number;
 }
 
+// Tipuri pentru Comment (Comentarii)
+export interface Comment {
+  id: number;
+  entity_type: string; // 'task', 'project', etc.
+  entity_id: number;
+  user_id: number;
+  content: string;
+  parent_id?: number | null;
+  attachment_ids?: number[] | null;
+  created_at: Date;
+  updated_at: Date;
+  
+  // Câmpuri pentru afișare, nefiind parte din DB
+  user_name?: string;
+  user_avatar?: string | null;
+}
+
+export interface InsertComment {
+  entity_type: string; // 'task', 'project', etc.
+  entity_id: number;
+  user_id: number;
+  content: string;
+  parent_id?: number | null;
+  attachment_ids?: number[] | null;
+}
+
 // Tipuri pentru TimeLog
 export interface TimeLog {
   id: number;

@@ -1375,6 +1375,159 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .json({ error: "Eroare la obținerea evenimentelor apropiate" });
     }
   });
+  
+  // API pentru gestionarea comentariilor
+  // Obține toate comentariile pentru o entitate (task, proiect, etc.)
+  app.get("/api/:entityType/:entityId/comments", async (req, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+      
+      if (!entityType || !entityId) {
+        return res.status(400).json({ error: "Tipul entității și ID-ul sunt obligatorii" });
+      }
+      
+      const entityIdNum = parseInt(entityId);
+      if (isNaN(entityIdNum)) {
+        return res.status(400).json({ error: "ID-ul entității trebuie să fie un număr valid" });
+      }
+      
+      const comments = await storage.getCommentsByEntity(entityType, entityIdNum);
+      res.json(comments);
+    } catch (error) {
+      console.error("Eroare la obținerea comentariilor:", error);
+      res.status(500).json({ error: "Eroare la obținerea comentariilor" });
+    }
+  });
+  
+  // Adaugă un comentariu nou pentru o entitate
+  app.post("/api/:entityType/:entityId/comments", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Trebuie să fiți autentificat pentru a adăuga comentarii" });
+      }
+      
+      const { entityType, entityId } = req.params;
+      const { content, parent_id } = req.body;
+      
+      if (!entityType || !entityId || !content) {
+        return res.status(400).json({ error: "Tipul entității, ID-ul și conținutul sunt obligatorii" });
+      }
+      
+      const entityIdNum = parseInt(entityId);
+      if (isNaN(entityIdNum)) {
+        return res.status(400).json({ error: "ID-ul entității trebuie să fie un număr valid" });
+      }
+      
+      const userId = req.user.id;
+      const organizationId = req.user.organization_id;
+      
+      const newComment = await storage.createComment({
+        entity_type: entityType,
+        entity_id: entityIdNum,
+        user_id: userId,
+        content,
+        parent_id: parent_id || null
+      });
+      
+      // Creare log de activitate
+      await storage.createActivityLog({
+        organization_id: organizationId,
+        user_id: userId,
+        entity_type: entityType,
+        entity_id: entityIdNum,
+        action: "comment_added",
+        metadata: { comment_id: newComment.id }
+      });
+      
+      res.status(201).json(newComment);
+    } catch (error) {
+      console.error("Eroare la adăugarea comentariului:", error);
+      res.status(500).json({ error: "Eroare la adăugarea comentariului" });
+    }
+  });
+  
+  // Actualizează un comentariu existent
+  app.put("/api/comments/:commentId", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Trebuie să fiți autentificat pentru a actualiza comentarii" });
+      }
+      
+      const { commentId } = req.params;
+      const { content } = req.body;
+      
+      if (!commentId || !content) {
+        return res.status(400).json({ error: "ID-ul comentariului și conținutul sunt obligatorii" });
+      }
+      
+      const commentIdNum = parseInt(commentId);
+      if (isNaN(commentIdNum)) {
+        return res.status(400).json({ error: "ID-ul comentariului trebuie să fie un număr valid" });
+      }
+      
+      // Verificăm dacă utilizatorul este autorul comentariului
+      const existingComment = await storage.getComment(commentIdNum);
+      if (!existingComment) {
+        return res.status(404).json({ error: "Comentariul nu a fost găsit" });
+      }
+      
+      const userId = req.user.id;
+      if (existingComment.user_id !== userId && req.user.role !== "super_admin" && req.user.role !== "ceo") {
+        return res.status(403).json({ error: "Nu aveți permisiunea de a actualiza acest comentariu" });
+      }
+      
+      const updatedComment = await storage.updateComment(commentIdNum, { content });
+      if (!updatedComment) {
+        return res.status(404).json({ error: "Comentariul nu a putut fi actualizat" });
+      }
+      
+      res.json(updatedComment);
+    } catch (error) {
+      console.error("Eroare la actualizarea comentariului:", error);
+      res.status(500).json({ error: "Eroare la actualizarea comentariului" });
+    }
+  });
+  
+  // Șterge un comentariu
+  app.delete("/api/comments/:commentId", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Trebuie să fiți autentificat pentru a șterge comentarii" });
+      }
+      
+      const { commentId } = req.params;
+      
+      if (!commentId) {
+        return res.status(400).json({ error: "ID-ul comentariului este obligatoriu" });
+      }
+      
+      const commentIdNum = parseInt(commentId);
+      if (isNaN(commentIdNum)) {
+        return res.status(400).json({ error: "ID-ul comentariului trebuie să fie un număr valid" });
+      }
+      
+      // Verificăm dacă utilizatorul este autorul comentariului
+      const existingComment = await storage.getComment(commentIdNum);
+      if (!existingComment) {
+        return res.status(404).json({ error: "Comentariul nu a fost găsit" });
+      }
+      
+      const userId = req.user.id;
+      if (existingComment.user_id !== userId && req.user.role !== "super_admin" && req.user.role !== "ceo") {
+        return res.status(403).json({ error: "Nu aveți permisiunea de a șterge acest comentariu" });
+      }
+      
+      const success = await storage.deleteComment(commentIdNum);
+      if (!success) {
+        return res.status(500).json({ error: "Comentariul nu a putut fi șters" });
+      }
+      
+      res.status(204).end();
+    } catch (error) {
+      console.error("Eroare la ștergerea comentariului:", error);
+      res.status(500).json({ error: "Eroare la ștergerea comentariului" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
