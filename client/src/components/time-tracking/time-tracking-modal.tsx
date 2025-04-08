@@ -53,9 +53,9 @@ const timeLogSchema = z.object({
   date: z.date({
     required_error: "Selectați data",
   }),
-  hours: z.number({
+  duration_minutes: z.number({
     required_error: "Introduceți numărul de ore",
-  }).min(0.01, "Numărul de ore trebuie să fie mai mare de 0"),
+  }).min(1, "Durata trebuie să fie mai mare de 0"),
   description: z.string().optional(),
   is_billable: z.boolean().default(true),
 });
@@ -107,7 +107,7 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
       project_id: projectId || 0,
       task_id: taskId || null,
       date: new Date(),
-      hours: 0,
+      duration_minutes: 0,
       description: "",
       is_billable: true,
     },
@@ -154,7 +154,7 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
         project_id: projectId || 0,
         task_id: taskId || null,
         date: new Date(),
-        hours: 0,
+        duration_minutes: 0,
         description: "",
         is_billable: true,
       });
@@ -409,7 +409,7 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
             {!isTimer && (
               <FormField
                 control={form.control}
-                name="hours"
+                name="duration_minutes"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Ore</FormLabel>
@@ -419,8 +419,13 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
                         step="0.01"
                         min="0.01"
                         placeholder="Introduceți numărul de ore"
-                        {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                        value={field.value > 0 ? (field.value / 60).toFixed(2) : ""}
+                        onChange={(e) => {
+                          // Convertim orele în minute (1 oră = 60 minute)
+                          const hours = parseFloat(e.target.value);
+                          const minutes = Math.round(hours * 60);
+                          field.onChange(minutes);
+                        }}
                       />
                     </FormControl>
                     <FormDescription>
