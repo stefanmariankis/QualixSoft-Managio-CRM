@@ -47,6 +47,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
       
       console.log(`API - Obținere task-uri pentru proiect ID=${projectId}`);
       const projectTasks = await storage.getTasksByProject(projectId);
+      console.log(`API - Task-uri găsite pentru proiect ID=${projectId}:`, projectTasks.length);
       return res.json(projectTasks);
     }
     
