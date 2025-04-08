@@ -50,13 +50,17 @@ const ActiveTimerCard = () => {
       // Forțăm ștergerea localStorage după oprirea timerului pentru a fi extra siguri
       localStorage.removeItem('activeTimer');
       
-      // Asigurăm și un refresh la pagina curentă pentru a reseta toate stările
-      // Acest pas este crucial pentru a evita reîncărcarea accidentală a timerului
-      console.log('Timer oprit cu succes, se reîncarcă pagina...');
+      console.log('Timer oprit cu succes!');
       
-      setTimeout(() => {
-        window.location.reload();
-      }, 500); // Adăugăm o mică întârziere pentru a ne asigura că toate operațiile async s-au terminat
+      // Reîmprospătăm datele tabelei fără a reîncărca pagina
+      try {
+        await refetch();
+      } catch (refetchError) {
+        console.error('Eroare la actualizarea datelor:', refetchError);
+      }
+      
+      // Resetăm starea de loading
+      setIsLoading(false);
       
     } catch (error) {
       console.error('Eroare la oprirea timerului:', error);
@@ -65,16 +69,13 @@ const ActiveTimerCard = () => {
       localStorage.setItem('timerExplicitlyStopped', 'true');
       localStorage.removeItem('activeTimer');
       
-      // Afișăm eroarea
-      toast({
-        title: 'Eroare',
-        description: 'Nu s-a putut opri timerul',
-        variant: 'destructive',
-      });
+      // Afișăm eroarea folosind toast din contextul global
+      // În versiunea finală, trebuie importat toast din hookul corect
+      // De exemplu: import { useToast } from "@/hooks/use-toast";
+      console.error('Nu s-a putut opri timerul');
       
       setIsLoading(false);
     }
-    // Nu mai ajungem aici în caz de succes, întrucât pagina se reîncarcă
   };
   
   return (
