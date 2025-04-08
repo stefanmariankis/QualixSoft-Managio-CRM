@@ -7,6 +7,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { useAuth } from "./context/auth-context";
 import { AuthProvider } from "./context/auth-context";
 import { NotificationsProvider } from "./hooks/use-notifications";
+import { TimeTrackingProvider } from "./context/time-tracking-context";
 import { Loader2 } from "lucide-react";
 import { Redirect } from "wouter";
 
@@ -178,8 +179,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <NotificationsProvider>
-          <Router />
-          <Toaster />
+          <TimeTrackingProvider>
+            <Router />
+            <Toaster />
+          </TimeTrackingProvider>
         </NotificationsProvider>
       </AuthProvider>
     </QueryClientProvider>

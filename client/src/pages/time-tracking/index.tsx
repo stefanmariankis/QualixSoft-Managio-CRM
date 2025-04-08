@@ -5,7 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Plus, BarChart, AlarmClock, Calendar } from "lucide-react";
+import { Clock, Plus, BarChart, AlarmClock, Calendar, Play, Pause, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
   Table, 
@@ -16,12 +16,83 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import TimeTrackingModal from "@/components/time-tracking/time-tracking-modal";
+import { useTimeTracking } from "@/context/time-tracking-context";
+import { Separator } from "@/components/ui/separator";
+import { Link } from "wouter";
 
 // Pagina de time tracking simplificată
+const ActiveTimerCard = () => {
+  const { timer, stopTimer } = useTimeTracking();
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Dacă nu există un timer activ, nu afișăm nimic
+  if (!timer.isActive) return null;
+  
+  // Formatare timp pentru afișare (format: HH:MM:SS)
+  const formatElapsedTime = () => {
+    const hours = Math.floor(timer.elapsedTime / 3600);
+    const minutes = Math.floor((timer.elapsedTime % 3600) / 60);
+    const seconds = timer.elapsedTime % 60;
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+  
+  // Handler pentru oprirea timerului
+  const handleStopTimer = async () => {
+    setIsLoading(true);
+    try {
+      await stopTimer();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  return (
+    <Card className="bg-primary/5 border-primary/20">
+      <CardContent className="p-6">
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+          <div className="flex flex-col">
+            <div className="flex items-center space-x-2">
+              <Clock className="h-5 w-5 text-primary animate-pulse" />
+              <h3 className="text-lg font-medium">Cronometrare activă</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              {timer.projectName}
+              {timer.taskName && ` • ${timer.taskName}`}
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold font-mono">{formatElapsedTime()}</div>
+              <div className="text-xs text-muted-foreground">Timp scurs</div>
+            </div>
+            
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleStopTimer}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Pause className="h-4 w-4 mr-2" />
+              )}
+              Oprește
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function TimeTrackingPage() {
   const [activeTab, setActiveTab] = useState("logs");
   const [isTimerModalOpen, setIsTimerModalOpen] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const { timer } = useTimeTracking();
   
   // Datele de time tracking
   const { data: timeLogs, isLoading } = useQuery({
@@ -113,6 +184,9 @@ export default function TimeTrackingPage() {
           onClose={() => setIsManualModalOpen(false)}
           isTimer={false}
         />
+        
+        {/* Timer activ */}
+        <ActiveTimerCard />
         
         {/* Statistici */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

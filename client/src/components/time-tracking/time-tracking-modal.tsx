@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useTimeTracking } from "@/context/time-tracking-context";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -69,11 +70,9 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { timer, startTimer, stopTimer } = useTimeTracking();
   const [selectedProject, setSelectedProject] = useState<number | null>(projectId || null);
-  const [isTracking, setIsTracking] = useState(false);
-  const [startTime, setStartTime] = useState<Date | null>(null);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [timerId, setTimerId] = useState<NodeJS.Timeout | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Obține lista de proiecte
   const { data: projects, isLoading: isLoadingProjects } = useQuery({
@@ -168,107 +167,17 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
     },
   });
 
-  // Mutație pentru pornirea timer-ului
-  const startTimerMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/time-logs", {
-        ...data,
-        start_time: new Date().toISOString(),
-      });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Eroare la pornirea timer-ului");
-      }
-      return await res.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Timer pornit",
-        description: "Cronometrarea timpului a început",
-      });
-      setIsTracking(true);
-      setStartTime(new Date());
-
-      // Pornește temporizatorul pentru a actualiza timpul scurs
-      const timer = setInterval(() => {
-        setElapsedTime((prev) => prev + 1);
-      }, 1000);
-      setTimerId(timer);
-
-      form.setValue("task_id", data.task_id);
-      form.setValue("project_id", data.project_id);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Eroare",
-        description: error.message || "Nu s-a putut porni timer-ul",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Mutație pentru oprirea timer-ului
-  const stopTimerMutation = useMutation({
-    mutationFn: async () => {
-      // Acest ID ar trebui să fie stocat când timer-ul este pornit
-      // Pentru simplitate, vom face o cerere nouă
-      const res = await apiRequest("POST", "/api/time-logs", {
-        project_id: form.getValues("project_id"),
-        task_id: form.getValues("task_id"),
-        date: new Date(),
-        start_time: startTime?.toISOString(),
-        end_time: new Date().toISOString(),
-        description: form.getValues("description"),
-        is_billable: form.getValues("is_billable"),
-      });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Eroare la oprirea timer-ului");
-      }
-      return await res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Timer oprit",
-        description: "Cronometrarea timpului s-a oprit",
-      });
-      setIsTracking(false);
-      setStartTime(null);
-      setElapsedTime(0);
-      if (timerId) {
-        clearInterval(timerId);
-        setTimerId(null);
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/time-logs"] });
-      onClose();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Eroare",
-        description: error.message || "Nu s-a putut opri timer-ul",
-        variant: "destructive",
-      });
-    },
-  });
+  // Folosim acum time tracking context în loc de mutații locale
 
   // Formatare timp scurs
   const formatElapsedTime = () => {
-    const hours = Math.floor(elapsedTime / 3600);
-    const minutes = Math.floor((elapsedTime % 3600) / 60);
-    const seconds = elapsedTime % 60;
+    const hours = Math.floor(timer.elapsedTime / 3600);
+    const minutes = Math.floor((timer.elapsedTime % 3600) / 60);
+    const seconds = timer.elapsedTime % 60;
     return `${hours.toString().padStart(2, "0")}:${minutes
       .toString()
       .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   };
-
-  // Curățare la închidere
-  useEffect(() => {
-    return () => {
-      if (timerId) {
-        clearInterval(timerId);
-      }
-    };
-  }, [timerId]);
 
   // Handle submit pentru formularul de adăugare manuală
   const onSubmit = (data: z.infer<typeof timeLogSchema>) => {
@@ -276,7 +185,7 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
   };
 
   // Handle pentru pornirea timer-ului
-  const handleStartTimer = () => {
+  const handleStartTimer = async () => {
     if (!form.getValues("project_id")) {
       toast({
         title: "Eroare",
@@ -285,19 +194,62 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
       });
       return;
     }
-
-    startTimerMutation.mutate({
-      project_id: form.getValues("project_id"),
-      task_id: form.getValues("task_id"),
-      date: new Date(),
-      description: form.getValues("description"),
-      is_billable: form.getValues("is_billable"),
-    });
+    
+    setIsLoading(true);
+    try {
+      const projectId = form.getValues("project_id");
+      const taskId = form.getValues("task_id");
+      
+      // Obținem proiectul selectat
+      const selectedProjectObj = projects?.find((p: any) => p.id === projectId);
+      const projectName = selectedProjectObj?.name || "Proiect necunoscut";
+      
+      // Obținem task-ul selectat, dacă există
+      const selectedTaskObj = tasks?.find((t: any) => t.id === taskId);
+      const taskName = selectedTaskObj?.title || null;
+      
+      // Pornim timer-ul în context-ul global
+      await startTimer(projectId, taskId, projectName, taskName);
+      
+      toast({
+        title: "Timer pornit",
+        description: "Cronometrarea timpului a început",
+      });
+      
+      onClose();
+    } catch (error: any) {
+      toast({
+        title: "Eroare",
+        description: error.message || "Nu s-a putut porni timer-ul",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle pentru oprirea timer-ului
-  const handleStopTimer = () => {
-    stopTimerMutation.mutate();
+  const handleStopTimer = async () => {
+    setIsLoading(true);
+    try {
+      await stopTimer();
+      
+      toast({
+        title: "Timer oprit",
+        description: "Cronometrarea timpului s-a oprit",
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/time-logs"] });
+      onClose();
+    } catch (error: any) {
+      toast({
+        title: "Eroare",
+        description: error.message || "Nu s-a putut opri timer-ul", 
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -327,7 +279,7 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
                 <FormItem className="flex flex-col">
                   <FormLabel>Proiect</FormLabel>
                   <Select
-                    disabled={isLoadingProjects || isTracking}
+                    disabled={isLoadingProjects || timer.isActive}
                     onValueChange={(value) => {
                       field.onChange(parseInt(value));
                       setSelectedProject(parseInt(value));
@@ -361,7 +313,7 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
                 <FormItem className="flex flex-col">
                   <FormLabel>Task (opțional)</FormLabel>
                   <Select
-                    disabled={isLoadingTasks || !selectedProject || isTracking}
+                    disabled={isLoadingTasks || !selectedProject || timer.isActive}
                     onValueChange={(value) => field.onChange(value && value !== "null" ? parseInt(value) : null)}
                     value={field.value?.toString() || ""}
                   >
@@ -396,7 +348,7 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
                       <DatePicker
                         date={field.value}
                         setDate={field.onChange}
-                        disabled={isTracking}
+                        disabled={timer.isActive}
                       />
                     </FormControl>
                     <FormMessage />
@@ -443,18 +395,18 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
                 <div className="text-center mb-4">
                   <div className="text-2xl font-bold">{formatElapsedTime()}</div>
                   <div className="text-muted-foreground text-sm">
-                    {isTracking ? "Cronometrarea este activă" : "Cronometrarea nu a început încă"}
+                    {timer.isActive ? "Cronometrarea este activă" : "Cronometrarea nu a început încă"}
                   </div>
                 </div>
                 <div className="flex justify-center">
-                  {isTracking ? (
+                  {timer.isActive ? (
                     <Button
                       type="button"
                       variant="destructive"
                       onClick={handleStopTimer}
-                      disabled={stopTimerMutation.isPending}
+                      disabled={isLoading}
                     >
-                      {stopTimerMutation.isPending ? (
+                      {isLoading ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : null}
                       Oprește
@@ -463,9 +415,9 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
                     <Button
                       type="button"
                       onClick={handleStartTimer}
-                      disabled={startTimerMutation.isPending}
+                      disabled={isLoading}
                     >
-                      {startTimerMutation.isPending ? (
+                      {isLoading ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : null}
                       Pornește
@@ -486,7 +438,7 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
                     <Textarea
                       placeholder="Descrieți activitatea efectuată"
                       {...field}
-                      disabled={isTracking}
+                      disabled={timer.isActive}
                     />
                   </FormControl>
                   <FormMessage />
@@ -504,7 +456,7 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
                     <Checkbox
                       checked={field.value}
                       onCheckedChange={field.onChange}
-                      disabled={isTracking}
+                      disabled={timer.isActive}
                     />
                   </FormControl>
                   <div className="space-y-1 leading-none">
