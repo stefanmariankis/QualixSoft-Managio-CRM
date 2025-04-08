@@ -418,7 +418,7 @@ export interface TimeLog {
   project_id: number;
   task_id?: number | null;
   date: Date;
-  hours: number;
+  duration_minutes: number;
   description?: string | null;
   is_billable: boolean;
   hourly_rate?: number | null;
@@ -426,7 +426,6 @@ export interface TimeLog {
   approved_at?: Date | null;
   start_time?: Date | null;
   end_time?: Date | null;
-  duration_minutes?: number;
   source?: string;
   created_at: Date;
   updated_at: Date;
@@ -438,7 +437,7 @@ export interface InsertTimeLog {
   project_id: number;
   task_id?: number | null;
   date: Date;
-  hours: number;
+  duration_minutes: number;
   description?: string | null;
   is_billable: boolean;
   hourly_rate?: number | null;
@@ -446,7 +445,6 @@ export interface InsertTimeLog {
   approved_at?: Date | null;
   start_time?: Date | null;
   end_time?: Date | null;
-  duration_minutes?: number;
   source?: string;
 }
 
@@ -784,7 +782,7 @@ export const timeLogSchema = z.object({
   project_id: z.number({ message: "Proiectul este obligatoriu" }),
   task_id: z.number().optional().nullable(),
   date: z.date({ message: "Data este obligatorie" }),
-  hours: z.number().positive({ message: "Numărul de ore trebuie să fie pozitiv" }),
+  duration_minutes: z.number().positive({ message: "Durata trebuie să fie pozitivă" }),
   description: z.string().optional().nullable(),
   is_billable: z.boolean().default(true),
   hourly_rate: z.number().nonnegative().optional().nullable(),

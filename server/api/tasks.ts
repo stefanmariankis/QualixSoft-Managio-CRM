@@ -39,8 +39,8 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
     };
     
     // Filtrare după proiect dacă este specificat
-    if (req.query.projectId) {
-      const projectId = getValidNumberParam(req.query.projectId as string, 'projectId');
+    if (req.query.project_id) {
+      const projectId = getValidNumberParam(req.query.project_id as string, 'project_id');
       if (projectId === null) {
         return res.status(400).json({ message: 'ID proiect invalid' });
       }
