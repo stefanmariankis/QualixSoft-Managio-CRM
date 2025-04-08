@@ -158,7 +158,15 @@ router.get('/:id/tasks', requireAuth, async (req: Request, res: Response) => {
     const tasks = await storage.getTasksByProject(projectId);
     console.log(`API - Task-uri găsite pentru proiect ID=${projectId}:`, tasks.length);
     
-    res.json(tasks);
+    // Asigurăm-ne că se setează header-ul Content-Type pentru JSON
+    res.setHeader('Content-Type', 'application/json');
+    
+    // Serializam explicit rezultatul și îl trimitem
+    const response = JSON.stringify(tasks);
+    console.log(`API - Response pentru /api/projects/${projectId}/tasks:`, 
+                response.length > 100 ? response.substring(0, 100) + '...' : response);
+    
+    res.send(response);
   } catch (error) {
     console.error('Eroare la obținerea task-urilor proiectului:', error);
     res.status(500).json({ message: 'Eroare la obținerea task-urilor proiectului' });
