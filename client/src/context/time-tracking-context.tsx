@@ -58,10 +58,15 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Salvează timer-ul în localStorage când se modifică
+  // Adăugăm o condiție suplimentară pentru a evita salvarea în localStorage în timpul resetării
   useEffect(() => {
-    if (timer.isActive || timer.elapsedTime > 0) {
+    // Verificăm dacă e un timer activ
+    if (timer.isActive) {
       localStorage.setItem('activeTimer', JSON.stringify(timer));
-    } else {
+    } 
+    // Dacă timer-ul nu e activ, dar nu suntem în procesul de resetare, ștergem din localStorage
+    else if (!timer.isActive && timer.elapsedTime === 0) {
+      // Asigurăm ștergerea din localStorage când timer-ul e inactiv și elapsedTime e 0
       localStorage.removeItem('activeTimer');
     }
   }, [timer]);
@@ -183,7 +188,11 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
       // Oprește cronometrul
       stopTimerInterval();
       
-      // Resetează starea timer-ului și șterge din localStorage
+      // Ștergem ÎNTÂI din localStorage pentru a preveni reîncărcarea
+      localStorage.removeItem('activeTimer');
+      
+      // APOI resetăm starea timer-ului (după ștergerea din localStorage)
+      // Acest lucru este important pentru ordinea execuției
       setTimer({
         isActive: false,
         startTime: null,
@@ -193,9 +202,6 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
         taskName: null,
         elapsedTime: 0
       });
-      
-      // Ștergem explicit datele din localStorage pentru a ne asigura că nu se reîncarcă
-      localStorage.removeItem('activeTimer');
       
       toast({
         title: 'Cronometru oprit',
@@ -214,6 +220,10 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
   // Funcție pentru resetarea timer-ului
   const resetTimer = () => {
     stopTimerInterval();
+    
+    // Ștergem ÎNTÂI din localStorage, apoi resetăm starea
+    localStorage.removeItem('activeTimer');
+    
     setTimer({
       isActive: false,
       startTime: null,
@@ -223,7 +233,6 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
       taskName: null,
       elapsedTime: 0
     });
-    localStorage.removeItem('activeTimer');
   };
 
   // Curățare la unmount
