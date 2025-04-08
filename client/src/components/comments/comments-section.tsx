@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -11,11 +10,14 @@ import { ro } from 'date-fns/locale';
 import { useAuth } from '@/context/auth-context';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Send, Trash2, Edit, Reply, Lock, Paperclip, Eye, EyeOff, Smile } from 'lucide-react';
+import { MessageSquare, Send, Trash2, Edit, Reply, Lock, Paperclip, Eye, EyeOff, Smile, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import RichTextEditor from './rich-text-editor';
+import EmojiPicker from './emoji-picker';
+import FileUploader from './file-uploader';
 
 interface CommentsProps {
   entityType: string;
@@ -35,7 +37,10 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
   const [editingComment, setEditingComment] = useState<number | null>(null);
   const [isInternal, setIsInternal] = useState<boolean>(false);
   
-  const { register, handleSubmit, reset, setValue, watch } = useForm<CommentFormValues>({
+  const [commentContent, setCommentContent] = useState<string>('');
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  
+  const { handleSubmit, reset, setValue, watch, getValues } = useForm<CommentFormValues>({
     defaultValues: {
       content: '',
       parent_id: null,
@@ -139,6 +144,7 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
   });
   
   const onSubmit = (data: CommentFormValues) => {
+    // Mergem doar cu date.content care a fost actualizat de rich text editor
     if (editingComment) {
       updateCommentMutation.mutate({ id: editingComment, content: data.content });
     } else {
@@ -153,7 +159,11 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
   const startReply = (commentId: number) => {
     setReplyTo(commentId);
     setEditingComment(null);
-    reset({ content: '', parent_id: commentId });
+    setCommentContent('');
+    setValue('content', '');
+    setUploadedFiles([]);
+    setIsInternal(false);
+    
     // Scroll la formularul de comentariu
     setTimeout(() => {
       const element = document.getElementById('comment-form');
@@ -166,7 +176,10 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
   const startEdit = (comment: Comment) => {
     setEditingComment(comment.id);
     setReplyTo(null);
+    setCommentContent(comment.content);
     setValue('content', comment.content);
+    setIsInternal(!!comment.is_internal);
+    
     // Scroll la formularul de comentariu
     setTimeout(() => {
       const element = document.getElementById('comment-form');
@@ -179,7 +192,10 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
   const cancelAction = () => {
     setReplyTo(null);
     setEditingComment(null);
-    reset();
+    setCommentContent('');
+    setValue('content', '');
+    setUploadedFiles([]);
+    setIsInternal(false);
   };
   
   const confirmDelete = (commentId: number) => {
@@ -252,7 +268,10 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
             </div>
           </CardHeader>
           <CardContent className="py-2">
-            <p className="whitespace-pre-wrap">{comment.content}</p>
+            <div 
+              className="prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{ __html: comment.content }}
+            />
           </CardContent>
           <CardFooter className="py-2 justify-between">
             <div className="text-xs text-gray-500">
@@ -299,10 +318,15 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
           </h4>
           
           <form onSubmit={handleSubmit(onSubmit)}>
-            <Textarea
-              {...register('content', { required: true })}
+            <RichTextEditor
+              content={commentContent}
+              onChange={(html) => {
+                setCommentContent(html);
+                setValue('content', html);
+              }}
               placeholder="Scrie un comentariu..."
-              className="min-h-[120px] mb-4"
+              minHeight="120px"
+              className="mb-4"
             />
             
             <div className="flex items-center justify-between mb-4">
@@ -317,30 +341,42 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
                 </Label>
               </div>
               <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="sm" 
-                  className="text-gray-500" 
-                  onClick={() => {}}
-                  title="Adaugă fișier atașat (funcționalitate viitoare)"
-                >
-                  <Paperclip className="h-4 w-4 mr-1" />
-                  Atașament
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="sm" 
-                  className="text-gray-500" 
-                  onClick={() => {}}
-                  title="Adaugă emoji (funcționalitate viitoare)"
-                >
-                  <Smile className="h-4 w-4 mr-1" />
-                  Emoji
-                </Button>
+                <FileUploader 
+                  onFileUpload={(files) => setUploadedFiles(files)}
+                  maxFiles={3}
+                  maxSize={5}
+                />
+                <EmojiPicker 
+                  onEmojiSelect={(emoji) => {
+                    setCommentContent(prev => prev + emoji);
+                    setValue('content', getValues('content') + emoji);
+                  }}
+                />
               </div>
             </div>
+            
+            {uploadedFiles.length > 0 && (
+              <div className="mb-4 p-2 bg-gray-100 rounded-md">
+                <div className="text-xs font-medium mb-1">Fișiere atașate ({uploadedFiles.length})</div>
+                <div className="flex flex-wrap gap-2">
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="bg-white p-1 rounded-md text-xs border flex items-center gap-1">
+                      <span className="truncate max-w-[150px]">{file.name}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-4 w-4 ml-1" 
+                        onClick={() => {
+                          setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             
             <div className="flex justify-end gap-2">
               {(replyTo || editingComment) && (
@@ -350,7 +386,7 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
               )}
               <Button 
                 type="submit" 
-                disabled={!watch('content') || addCommentMutation.isPending || updateCommentMutation.isPending}
+                disabled={!commentContent || addCommentMutation.isPending || updateCommentMutation.isPending}
                 className={isInternal ? "bg-amber-600 hover:bg-amber-700" : ""}
               >
                 <Send className="h-4 w-4 mr-2" />
