@@ -11,8 +11,11 @@ import { ro } from 'date-fns/locale';
 import { useAuth } from '@/context/auth-context';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Send, Trash2, Edit, Reply } from 'lucide-react';
+import { MessageSquare, Send, Trash2, Edit, Reply, Lock, Paperclip, Eye, EyeOff, Smile } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
 interface CommentsProps {
   entityType: string;
@@ -22,6 +25,7 @@ interface CommentsProps {
 interface CommentFormValues {
   content: string;
   parent_id?: number | null;
+  is_internal?: boolean;
 }
 
 export default function CommentsSection({ entityType, entityId }: CommentsProps) {
@@ -29,11 +33,13 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
   const { user } = useAuth();
   const [replyTo, setReplyTo] = useState<number | null>(null);
   const [editingComment, setEditingComment] = useState<number | null>(null);
+  const [isInternal, setIsInternal] = useState<boolean>(false);
   
   const { register, handleSubmit, reset, setValue, watch } = useForm<CommentFormValues>({
     defaultValues: {
       content: '',
-      parent_id: null
+      parent_id: null,
+      is_internal: false
     }
   });
   
@@ -138,7 +144,8 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
     } else {
       addCommentMutation.mutate({
         content: data.content,
-        parent_id: replyTo
+        parent_id: replyTo,
+        is_internal: isInternal
       });
     }
   };
@@ -201,10 +208,11 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
   const renderCommentWithReplies = (comment: Comment, level: number = 0) => {
     const isCurrentUserAuthor = user?.id === comment.user_id;
     const date = new Date(comment.created_at);
+    const isInternal = comment.is_internal;
     
     return (
       <div key={comment.id} className={cn("mb-4", level > 0 && "ml-6 border-l-2 border-gray-200 pl-4")}>
-        <Card>
+        <Card className={cn(isInternal && "border-2 border-amber-200 bg-amber-50")}>
           <CardHeader className="py-3">
             <div className="flex justify-between">
               <div className="flex items-center gap-2">
@@ -215,7 +223,17 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
                   <AvatarFallback>{comment.user_name?.charAt(0) || 'U'}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <div className="font-semibold">{comment.user_name || 'Utilizator necunoscut'}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{comment.user_name || 'Utilizator necunoscut'}</span>
+                    {isCurrentUserAuthor && (
+                      <Badge variant="outline" className="text-xs">Tu</Badge>
+                    )}
+                    {isInternal && (
+                      <Badge variant="secondary" className="bg-amber-200 text-amber-800 border-0">
+                        <Lock className="h-3 w-3 mr-1" /> Intern
+                      </Badge>
+                    )}
+                  </div>
                   <div className="text-xs text-gray-500">
                     {format(date, 'dd MMM yyyy, HH:mm', { locale: ro })}
                   </div>
@@ -236,7 +254,10 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
           <CardContent className="py-2">
             <p className="whitespace-pre-wrap">{comment.content}</p>
           </CardContent>
-          <CardFooter className="py-2 justify-end">
+          <CardFooter className="py-2 justify-between">
+            <div className="text-xs text-gray-500">
+              {/* Aici putem adăuga informații adiționale despre comentariu */}
+            </div>
             <Button variant="ghost" size="sm" onClick={() => startReply(comment.id)}>
               <Reply className="h-4 w-4 mr-1" />
               Răspunde
@@ -281,8 +302,45 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
             <Textarea
               {...register('content', { required: true })}
               placeholder="Scrie un comentariu..."
-              className="min-h-[120px] mb-2"
+              className="min-h-[120px] mb-4"
             />
+            
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="internal-comment"
+                  checked={isInternal}
+                  onCheckedChange={setIsInternal}
+                />
+                <Label htmlFor="internal-comment" className="flex items-center gap-1 cursor-pointer text-sm">
+                  <Lock className="h-3 w-3" /> Comentariu intern (vizibil doar pentru echipă)
+                </Label>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-gray-500" 
+                  onClick={() => {}}
+                  title="Adaugă fișier atașat (funcționalitate viitoare)"
+                >
+                  <Paperclip className="h-4 w-4 mr-1" />
+                  Atașament
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-gray-500" 
+                  onClick={() => {}}
+                  title="Adaugă emoji (funcționalitate viitoare)"
+                >
+                  <Smile className="h-4 w-4 mr-1" />
+                  Emoji
+                </Button>
+              </div>
+            </div>
             
             <div className="flex justify-end gap-2">
               {(replyTo || editingComment) && (
@@ -290,7 +348,11 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
                   Anulează
                 </Button>
               )}
-              <Button type="submit" disabled={!watch('content') || addCommentMutation.isPending || updateCommentMutation.isPending}>
+              <Button 
+                type="submit" 
+                disabled={!watch('content') || addCommentMutation.isPending || updateCommentMutation.isPending}
+                className={isInternal ? "bg-amber-600 hover:bg-amber-700" : ""}
+              >
                 <Send className="h-4 w-4 mr-2" />
                 {editingComment ? 'Actualizează' : 'Trimite'}
               </Button>
