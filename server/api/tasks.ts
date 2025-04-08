@@ -197,13 +197,11 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
     // Obține înregistrările de timp asociate acestui task
     const timeLogs = await storage.getTimeLogsByTask(taskId);
     
-    // Obține comentariile asociate acestui task
-    // În versiunea actuală funcția nu există, dar ar trebui implementată
-    const comments = []; // Într-o implementare reală, apelăm storage.getCommentsByEntity('task', taskId)
+    // Array gol pentru comentarii (tabela există dar nu este implementată funcționalitatea)
+    const comments = [];
     
-    // Obține atașamentele asociate acestui task 
-    // În versiunea actuală funcția nu există, dar ar trebui implementată
-    const attachments = []; // Într-o implementare reală, apelăm storage.getAttachmentsByEntity('task', taskId)
+    // Array gol pentru atașamente (nu este implementată funcționalitatea încă)
+    const attachments = [];
     
     // Obține informații despre proiect
     const project = await storage.getProject(task.project_id);
@@ -567,7 +565,15 @@ router.post('/:id/comments', requireAuth, async (req: Request, res: Response) =>
     //   created_at: new Date()
     // });
     
-    const comment = { id: 1, content }; // Mock pentru simulare
+    // Temporar folosim un ID fix pentru că funcționalitatea de comentarii
+    // va fi implementată complet în viitor
+    const comment = { 
+      id: Date.now(), // folosim timestamp ca ID temporar
+      content,
+      user_id: userId,
+      user_name: req.user?.name || 'Utilizator',
+      created_at: new Date().toISOString()
+    };
     
     // Adaugă o înregistrare în jurnalul de activitate
     await storage.createActivityLog({
