@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface ActiveTimer {
@@ -171,10 +171,19 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
         throw new Error(error.message || 'Nu s-a putut opri cronometrul');
       }
       
+      // Reîmprospătează lista de înregistrări de timp după oprirea cronometrului
+      // Acest lucru va face ca pagina de time tracking să își actualizeze datele
+      try {
+        // Declanșăm o reîmprospătare a datelor de pe server prin queryClient
+        await queryClient.invalidateQueries({ queryKey: ['/api/time-logs'] });
+      } catch (refreshError) {
+        console.error('Eroare la reîmprospătarea listei de înregistrări:', refreshError);
+      }
+      
       // Oprește cronometrul
       stopTimerInterval();
       
-      // Resetează starea timer-ului
+      // Resetează starea timer-ului și șterge din localStorage
       setTimer({
         isActive: false,
         startTime: null,
@@ -184,6 +193,9 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
         taskName: null,
         elapsedTime: 0
       });
+      
+      // Ștergem explicit datele din localStorage pentru a ne asigura că nu se reîncarcă
+      localStorage.removeItem('activeTimer');
       
       toast({
         title: 'Cronometru oprit',

@@ -95,7 +95,7 @@ export default function TimeTrackingPage() {
   const { timer } = useTimeTracking();
   
   // Datele de time tracking
-  const { data: timeLogs, isLoading } = useQuery({
+  const { data: timeLogs, isLoading, refetch } = useQuery({
     queryKey: ['/api/time-logs'],
     queryFn: async () => {
       try {
