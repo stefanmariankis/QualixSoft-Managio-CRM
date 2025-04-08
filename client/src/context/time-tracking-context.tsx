@@ -105,6 +105,7 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
         project_id: projectId,
         task_id: taskId,
         start_time: new Date().toISOString(),
+        date: new Date().toISOString().split('T')[0], // adăugăm data curentă în format YYYY-MM-DD
         is_billable: true
       });
       
@@ -159,7 +160,7 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
         duration_minutes: durationMinutes,
         description: `Timp înregistrat pentru ${timer.taskName || timer.projectName}`,
         is_billable: true,
-        date: new Date().toISOString()
+        date: new Date().toISOString().split("T")[0] // format YYYY-MM-DD
       });
       
       if (!res.ok) {
