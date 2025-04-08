@@ -2223,7 +2223,7 @@ export class DatabaseStorage implements IStorage {
       const result = await db`
         SELECT * FROM time_logs
         WHERE project_id = ${projectId}
-        ORDER BY date DESC
+        ORDER BY date DESC, start_time DESC
       `;
 
       return result as unknown as TimeLog[];
@@ -2241,7 +2241,7 @@ export class DatabaseStorage implements IStorage {
       const result = await db`
         SELECT * FROM time_logs
         WHERE user_id = ${userId}
-        ORDER BY date DESC
+        ORDER BY date DESC, start_time DESC
       `;
 
       return result as unknown as TimeLog[];
@@ -2259,13 +2259,31 @@ export class DatabaseStorage implements IStorage {
       const result = await db`
         SELECT * FROM time_logs
         WHERE task_id = ${taskId}
-        ORDER BY date DESC
+        ORDER BY date DESC, start_time DESC
       `;
 
       return result as unknown as TimeLog[];
     } catch (error) {
       console.error(
         "Eroare la obținerea înregistrărilor de timp pentru task:",
+        error,
+      );
+      return [];
+    }
+  }
+  
+  async getTimeLogsByOrganization(organizationId: number): Promise<TimeLog[]> {
+    try {
+      const result = await db`
+        SELECT * FROM time_logs
+        WHERE organization_id = ${organizationId}
+        ORDER BY date DESC, start_time DESC
+      `;
+
+      return result as unknown as TimeLog[];
+    } catch (error) {
+      console.error(
+        "Eroare la obținerea înregistrărilor de timp pentru organizație:",
         error,
       );
       return [];

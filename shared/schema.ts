@@ -424,6 +424,10 @@ export interface TimeLog {
   hourly_rate?: number | null;
   approved_by?: number | null;
   approved_at?: Date | null;
+  start_time?: Date | null;
+  end_time?: Date | null;
+  duration_minutes?: number;
+  source?: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -440,6 +444,10 @@ export interface InsertTimeLog {
   hourly_rate?: number | null;
   approved_by?: number | null;
   approved_at?: Date | null;
+  start_time?: Date | null;
+  end_time?: Date | null;
+  duration_minutes?: number;
+  source?: string;
 }
 
 // Enums pentru Automatizări

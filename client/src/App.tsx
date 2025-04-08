@@ -30,6 +30,7 @@ const TeamMemberDetailsPage = lazy(() => import("@/pages/team/[id]"));
 const DepartmentsPage = lazy(() => import("@/pages/departments/index"));
 const DepartmentDetailsPage = lazy(() => import("@/pages/departments/[id]"));
 const NotificationsPage = lazy(() => import("@/pages/notifications/index"));
+const TimeTrackingPage = lazy(() => import("@/pages/time-tracking/index"));
 
 // Module care vor fi implementate în viitor
 // Module avansate
@@ -160,6 +161,10 @@ function Router() {
         
         <ProtectedRoute path="/notifications">
           <NotificationsPage />
+        </ProtectedRoute>
+        
+        <ProtectedRoute path="/time-tracking">
+          <TimeTrackingPage />
         </ProtectedRoute>
         
         <Route component={NotFound} />

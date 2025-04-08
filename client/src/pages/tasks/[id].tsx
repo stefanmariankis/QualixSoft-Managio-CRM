@@ -180,7 +180,10 @@ export default function TaskDetails() {
       const response = await apiRequest('POST', `/api/time-logs`, { 
         task_id: taskId,
         project_id: data?.task.project_id,
-        description: `Lucru la task: ${data?.task.title}`
+        description: `Lucru la task: ${data?.task.title}`,
+        date: new Date().toISOString().split('T')[0],
+        start_time: new Date().toISOString(),
+        is_billable: true
       });
       return response.json();
     },
