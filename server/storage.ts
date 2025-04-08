@@ -2090,8 +2090,10 @@ export class DatabaseStorage implements IStorage {
   // Creează tabelul de comentarii dacă nu există
   async checkAndCreateCommentsTable(): Promise<boolean> {
     try {
+      // Verificăm dacă tabela există
       const commentsExists = await this.tableExists('comments');
       if (!commentsExists) {
+        // Creăm tabela dacă nu există
         await db`
           CREATE TABLE IF NOT EXISTS comments (
             id SERIAL PRIMARY KEY,
@@ -2115,7 +2117,21 @@ export class DatabaseStorage implements IStorage {
         await db`CREATE INDEX idx_comments_user ON comments(user_id)`;
         
         console.log("Tabelul comments a fost creat cu succes");
-        return true;
+      } else {
+        // Verificăm dacă coloana parent_id există
+        const columnExists = await db`
+          SELECT EXISTS (
+            SELECT 1 
+            FROM information_schema.columns 
+            WHERE table_name = 'comments' AND column_name = 'parent_id'
+          ) as exists
+        `;
+        
+        // Adăugăm coloana parent_id dacă nu există
+        if (!columnExists[0].exists) {
+          console.log("Adăugăm coloana parent_id la tabela comments");
+          await db`ALTER TABLE comments ADD COLUMN parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE`;
+        }
       }
       return true;
     } catch (error) {
