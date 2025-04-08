@@ -63,6 +63,8 @@ export function setupAuth(app: Express) {
       // Caută utilizatorul după email
       const user = await storage.getUserByUsername(email);
 
+      console.log('Info: ', user, validationResult.data)
+
       if (!user) {
         return res.status(401).json({ message: "Email sau parolă incorecte" });
       }

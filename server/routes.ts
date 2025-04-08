@@ -6,8 +6,33 @@ import { db } from "./db";
 import bcrypt from "bcryptjs";
 import { registrationSchema } from "../shared/schema";
 import { setupAuth } from "./auth";
+import 'dotenv/config';
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Endpoint pentru testarea conexiunii la baza de date
+  app.get("/api/test-db-connection", async (req, res) => {
+    try {
+      console.log("Testăm conexiunea la baza de date...");
+      console.log("DATABASE_URL:", process.env.DATABASE_URL ? "Setat (valoare ascunsă)" : "Nesetat");
+      
+      const result = await db`SELECT 1 as test`;
+      console.log("Rezultat test conexiune:", result);
+      
+      return res.status(200).json({
+        success: true,
+        message: "Conexiune reușită la baza de date",
+        result
+      });
+    } catch (error: any) {
+      console.error("Eroare la testarea conexiunii:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Eroare la conectarea la baza de date",
+        error: error.message
+      });
+    }
+  });
+
   // Middleware de autorizare pentru a verifica dacă utilizatorul este autentificat și are organizație
   const requireAuth = async (req: any, res: Response, next: NextFunction) => {
     try {
