@@ -1,60 +1,95 @@
-// Fișier special pentru cPanel - servește doar conținutul static
-// Încarcă variabilele de mediu din fișierul .env
-require('dotenv').config();
-
-// Importă modulele necesare
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const app = express();
+const port = process.env.PORT || 3000;
 
-// Definește directoarele pentru fișierele statice
-const DIST_DIR = path.join(__dirname, 'dist');
-const CLIENT_DIR = path.join(DIST_DIR, 'client');
-const INDEX_PATH = path.join(CLIENT_DIR, 'index.html');
+// Variabile de configurare
+const STATIC_DIR = path.join(__dirname);
+const PUBLIC_DIR = path.join(__dirname, 'public');
+const ASSETS_DIR = path.join(__dirname, 'public', 'assets');
+const INDEX_HTML = path.join(__dirname, 'public', 'index.html');
 
-// Verifică dacă directoarele și fișierele există
-console.log('Verificare structură fișiere și directoare:');
-console.log('DIST_DIR exists:', fs.existsSync(DIST_DIR));
-console.log('CLIENT_DIR exists:', fs.existsSync(CLIENT_DIR));
-console.log('INDEX_PATH exists:', fs.existsSync(INDEX_PATH));
+// Verifică dacă fișierele și directoarele necesare există
+console.log('Directorul static:', STATIC_DIR, 'există:', fs.existsSync(STATIC_DIR));
+console.log('Directorul public:', PUBLIC_DIR, 'există:', fs.existsSync(PUBLIC_DIR));
+console.log('Directorul assets:', ASSETS_DIR, 'există:', fs.existsSync(ASSETS_DIR));
+console.log('Fișierul index.html:', INDEX_HTML, 'există:', fs.existsSync(INDEX_HTML));
 
-// Listează conținutul directorului dist pentru depanare
-try {
-  if (fs.existsSync(DIST_DIR)) {
-    console.log('Conținut director dist:');
-    fs.readdirSync(DIST_DIR).forEach(file => {
-      console.log('- ' + file);
-    });
-
-    if (fs.existsSync(CLIENT_DIR)) {
-      console.log('Conținut director client:');
-      fs.readdirSync(CLIENT_DIR).forEach(file => {
-        console.log('- ' + file);
-      });
-    }
-  }
-} catch (err) {
-  console.error('Eroare la listarea conținutului directoarelor:', err);
+// Listează directorul public pentru debugging
+if (fs.existsSync(PUBLIC_DIR)) {
+  console.log('\nConținut director public:');
+  fs.readdirSync(PUBLIC_DIR).forEach(file => {
+    console.log(' - ' + file);
+  });
 }
 
-// Middleware pentru servirea fișierelor statice din dist/client
-app.use(express.static(CLIENT_DIR));
+// Listează directorul assets pentru debugging
+if (fs.existsSync(ASSETS_DIR)) {
+  console.log('\nConținut director assets:');
+  fs.readdirSync(ASSETS_DIR).forEach(file => {
+    console.log(' - ' + file);
+  });
+}
 
-// Middleware pentru toate request-urile care nu corespund unui fișier static
-// Returnează index.html pentru a funcționa rutarea client-side
-app.get('*', (req, res) => {
-  console.log(`Serving SPA for route: ${req.path}`);
-  
-  if (fs.existsSync(INDEX_PATH)) {
-    res.sendFile(INDEX_PATH);
-  } else {
-    res.status(404).send('Fișierul index.html nu a fost găsit. Asigură-te că ai rulat comanda de build.');
-  }
+// Servește fișierele statice din directorul public
+app.use(express.static(PUBLIC_DIR));
+
+// Middleware pentru logare
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
 });
 
-// Pornim serverul
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server cPanel pornit pe portul ${PORT}`);
+// Setări pentru a evita problemele de cache browser
+app.use((req, res, next) => {
+  // Dezactivează cache pentru index.html
+  if (req.url === '/' || req.url === '/index.html') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  // Permite cache pentru resurse statice (care conțin hash-uri)
+  else if (req.url.match(/\.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+  }
+  next();
+});
+
+// Verifică dacă resursele CSS și JS există
+app.get('/check-resources', (req, res) => {
+  const resources = [];
+  
+  // Verificăm fișierele CSS
+  if (fs.existsSync(ASSETS_DIR)) {
+    const cssFiles = fs.readdirSync(ASSETS_DIR)
+      .filter(file => file.endsWith('.css'))
+      .map(file => `/assets/${file}`);
+    
+    resources.push(...cssFiles.map(file => ({ type: 'css', path: file, exists: true })));
+  }
+  
+  res.json({
+    resources,
+    publicDir: fs.existsSync(PUBLIC_DIR),
+    assetsDir: fs.existsSync(ASSETS_DIR),
+    indexHtml: fs.existsSync(INDEX_HTML)
+  });
+});
+
+// Pentru rutele SPA, trimite întotdeauna index.html
+app.get('*', (req, res) => {
+  res.sendFile(INDEX_HTML);
+});
+
+// Gestionarea erorilor
+app.use((err, req, res, next) => {
+  console.error('Eroare server:', err);
+  res.status(500).send('Eroare internă de server');
+});
+
+// Pornește serverul
+app.listen(port, () => {
+  console.log(`Aplicația frontend rulează pe portul ${port}`);
+  console.log(`Acces local: http://localhost:${port}`);
 });

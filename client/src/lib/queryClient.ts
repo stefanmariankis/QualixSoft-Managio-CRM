@@ -1,7 +1,8 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import apiClient from './apiClient';
 
-// URL-ul backend-ului Railway
-const API_BASE_URL = "https://managiosync-production.up.railway.app";
+// URL-ul backend-ului Railway va fi preluat din apiClient
+const API_BASE_URL = apiClient.baseUrl();
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {

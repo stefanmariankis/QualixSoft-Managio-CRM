@@ -5,8 +5,19 @@
     
     # Nu face proxy pentru resurse statice (CSS, JS, imagini, etc.)
     RewriteCond %{REQUEST_URI} !^/assets/.*$
+    RewriteCond %{REQUEST_URI} !^/public/.*$
+    RewriteCond %{REQUEST_URI} !^/static/.*$
+    RewriteCond %{REQUEST_URI} !^/css/.*$
+    RewriteCond %{REQUEST_URI} !^/js/.*$
+    RewriteCond %{REQUEST_URI} !^/images/.*$
+    RewriteCond %{REQUEST_URI} !^/img/.*$
+    RewriteCond %{REQUEST_URI} !^/fonts/.*$
     RewriteCond %{REQUEST_URI} !^/favicon\.ico$
     RewriteCond %{REQUEST_URI} !^/robots\.txt$
+    RewriteCond %{REQUEST_URI} !^/manifest\.json$
+    
+    # Nu redirecționa fișierele cu extensii specifice
+    RewriteCond %{REQUEST_URI} !\.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|json|webp)$
     
     # Redirecționează toate celelalte solicitări către aplicația Node.js
     RewriteRule ^(.*)$ http://localhost:3000/$1 [P,L]
