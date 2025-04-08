@@ -1,6 +1,13 @@
+// Încarcă variabilele de mediu din fișierul .env
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+
+// Afișează variabilele de mediu importante pentru depanare
+console.log("Variabile de mediu:");
+console.log("- DATABASE_URL: " + (process.env.DATABASE_URL ? "Setat (valoare ascunsă)" : "NESETAT"));
+console.log("- SESSION_SECRET: " + (process.env.SESSION_SECRET ? "Setat" : "NESETAT"));
 
 const app = express();
 app.use(express.json());
