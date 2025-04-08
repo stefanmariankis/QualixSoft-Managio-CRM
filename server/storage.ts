@@ -2119,7 +2119,7 @@ export class DatabaseStorage implements IStorage {
         console.log("Tabelul comments a fost creat cu succes");
       } else {
         // Verificăm dacă coloana parent_id există
-        const columnExists = await db`
+        const parentIdExists = await db`
           SELECT EXISTS (
             SELECT 1 
             FROM information_schema.columns 
@@ -2128,9 +2128,24 @@ export class DatabaseStorage implements IStorage {
         `;
         
         // Adăugăm coloana parent_id dacă nu există
-        if (!columnExists[0].exists) {
+        if (!parentIdExists[0].exists) {
           console.log("Adăugăm coloana parent_id la tabela comments");
           await db`ALTER TABLE comments ADD COLUMN parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE`;
+        }
+        
+        // Verificăm dacă coloana attachment_ids există
+        const attachmentIdsExists = await db`
+          SELECT EXISTS (
+            SELECT 1 
+            FROM information_schema.columns 
+            WHERE table_name = 'comments' AND column_name = 'attachment_ids'
+          ) as exists
+        `;
+        
+        // Adăugăm coloana attachment_ids dacă nu există
+        if (!attachmentIdsExists[0].exists) {
+          console.log("Adăugăm coloana attachment_ids la tabela comments");
+          await db`ALTER TABLE comments ADD COLUMN attachment_ids INTEGER[]`;
         }
       }
       return true;
