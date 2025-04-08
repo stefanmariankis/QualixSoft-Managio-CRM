@@ -37,27 +37,41 @@ const ActiveTimerCard = () => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
   
-  // Handler pentru oprirea timerului
+  // Handler pentru oprirea timerului cu măsuri de siguranță multiple
   const handleStopTimer = async () => {
     setIsLoading(true);
     try {
+      // Înainte de a opri timerul, adăugăm flag-ul timerExplicitlyStopped
+      localStorage.setItem('timerExplicitlyStopped', 'true');
+      
+      // Oprim timerul prin context
       await stopTimer();
       
       // Forțăm ștergerea localStorage după oprirea timerului pentru a fi extra siguri
       localStorage.removeItem('activeTimer');
       
       // Asigurăm și un refresh la pagina curentă pentru a reseta toate stările
+      // Acest pas este crucial pentru a evita reîncărcarea accidentală a timerului
+      console.log('Timer oprit cu succes, se reîncarcă pagina...');
+      
       setTimeout(() => {
         window.location.reload();
       }, 500); // Adăugăm o mică întârziere pentru a ne asigura că toate operațiile async s-au terminat
       
     } catch (error) {
       console.error('Eroare la oprirea timerului:', error);
+      
+      // Chiar și în caz de eroare, ne asigurăm că timerul este marcat ca oprit
+      localStorage.setItem('timerExplicitlyStopped', 'true');
+      localStorage.removeItem('activeTimer');
+      
+      // Afișăm eroarea
       toast({
         title: 'Eroare',
         description: 'Nu s-a putut opri timerul',
         variant: 'destructive',
       });
+      
       setIsLoading(false);
     }
     // Nu mai ajungem aici în caz de succes, întrucât pagina se reîncarcă
