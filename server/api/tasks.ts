@@ -631,4 +631,57 @@ router.post('/:id/comments', requireAuth, async (req: Request, res: Response) =>
   }
 });
 
+// Ștergerea unui comentariu
+router.delete('/comments/:commentId', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: 'Neautorizat' });
+    }
+    
+    console.log("API - DELETE /api/tasks/comments/:commentId - parametru brut:", req.params.commentId, "tip:", typeof req.params.commentId);
+    
+    // Convertim explicit parametrul la număr
+    let commentId: number;
+    try {
+      commentId = Number(req.params.commentId);
+      
+      // Verificăm dacă este un număr valid
+      if (isNaN(commentId) || commentId <= 0 || !Number.isInteger(commentId)) {
+        console.error(`API - ID comentariu invalid: ${req.params.commentId} => ${commentId}`);
+        return res.status(400).json({ message: 'ID comentariu invalid' });
+      }
+      
+      console.log("API - ID comentariu convertit cu succes:", commentId, "tip:", typeof commentId);
+    } catch (err) {
+      console.error(`API - Eroare la conversie ID comentariu: ${req.params.commentId}`, err);
+      return res.status(400).json({ message: 'ID comentariu invalid' });
+    }
+    
+    // Obținem comentariul pentru a verifica dacă utilizatorul are dreptul să-l șteargă
+    const comment = await storage.getComment(commentId);
+    
+    if (!comment) {
+      return res.status(404).json({ message: 'Comentariu negăsit' });
+    }
+    
+    // Verificăm dacă comentariul aparține utilizatorului curent
+    if (comment.user_id !== userId) {
+      return res.status(403).json({ message: 'Nu aveți permisiunea de a șterge acest comentariu' });
+    }
+    
+    // Ștergem comentariul
+    const deleted = await storage.deleteComment(commentId);
+    
+    if (!deleted) {
+      return res.status(500).json({ message: 'Nu s-a putut șterge comentariul' });
+    }
+    
+    res.status(200).json({ message: 'Comentariu șters cu succes' });
+  } catch (error) {
+    console.error('Eroare la ștergerea comentariului:', error);
+    res.status(500).json({ message: 'Eroare la ștergerea comentariului' });
+  }
+});
+
 export default router;

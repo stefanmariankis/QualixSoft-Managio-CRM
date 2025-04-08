@@ -108,7 +108,8 @@ export default function CommentsSection({ entityType, entityId }: CommentsProps)
   // Mutație pentru ștergerea unui comentariu
   const deleteCommentMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest('DELETE', `/api/comments/${id}`);
+      // Actualizat pentru a folosi noul endpoint în tasks.ts
+      const response = await apiRequest('DELETE', `/api/tasks/comments/${id}`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Eroare la ștergerea comentariului');
