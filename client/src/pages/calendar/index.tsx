@@ -88,91 +88,17 @@ const generateEvents = (taskData: Task[]): CalendarEvent[] => {
     id: task.id,
     title: task.title,
     description: task.description,
-    startDate: task.due_date || new Date(),
+    startDate: task.due_date ? new Date(task.due_date) : new Date(),
     endDate: null,
     allDay: true,
     type: "task" as const,
     projectId: task.project_id,
     taskId: task.id,
-    color: getPriorityColor(task.priority)
+    color: getPriorityColor(task.priority || 'medium')
   }));
   
-  // Adăugăm câteva evenimente de meeting
-  const meetings: CalendarEvent[] = [
-    {
-      id: 1001,
-      title: "Ședință de planificare",
-      description: "Planificare sprint luna viitoare",
-      startDate: new Date(new Date().setHours(10, 0, 0, 0)),
-      endDate: new Date(new Date().setHours(11, 30, 0, 0)),
-      allDay: false,
-      type: "meeting",
-      color: "#3b82f6"
-    },
-    {
-      id: 1002,
-      title: "Prezentare proiect client",
-      description: "Prezentare progres proiect website",
-      startDate: new Date(new Date().setDate(new Date().getDate() + 2)),
-      endDate: new Date(new Date().setDate(new Date().getDate() + 2)),
-      allDay: true,
-      type: "meeting",
-      projectId: 2,
-      color: "#3b82f6"
-    },
-    {
-      id: 1003,
-      title: "Call echipă dezvoltare",
-      description: "Actualizări săptămânale proiect",
-      startDate: new Date(new Date().setDate(new Date().getDate() + 1)),
-      endDate: new Date(new Date().setDate(new Date().getDate() + 1)),
-      allDay: false,
-      type: "meeting",
-      projectId: 3,
-      color: "#3b82f6"
-    }
-  ];
-  
-  // Adăugăm câteva deadline-uri
-  const deadlines: CalendarEvent[] = [
-    {
-      id: 2001,
-      title: "Deadline proiect e-commerce",
-      description: "Finalizare fază 1 a proiectului",
-      startDate: new Date(new Date().setDate(new Date().getDate() + 10)),
-      endDate: null,
-      allDay: true,
-      type: "deadline",
-      projectId: 1,
-      color: "#ef4444"
-    },
-    {
-      id: 2002,
-      title: "Închidere raportare lunară",
-      description: null,
-      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 28),
-      endDate: null,
-      allDay: true,
-      type: "deadline",
-      color: "#ef4444"
-    }
-  ];
-  
-  // Adăugăm câteva remindere
-  const reminders: CalendarEvent[] = [
-    {
-      id: 3001,
-      title: "Reînnoire licențe software",
-      description: null,
-      startDate: new Date(new Date().setDate(new Date().getDate() + 5)),
-      endDate: null,
-      allDay: true,
-      type: "reminder",
-      color: "#f97316"
-    }
-  ];
-  
-  return [...taskEvents, ...meetings, ...deadlines, ...reminders];
+  // Returnăm doar evenimentele generate din task-uri reale din baza de date
+  return taskEvents;
 };
 
 // Obține culoare în funcție de prioritate
@@ -234,34 +160,9 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   
-  // Simulăm apel API pentru a obține taskurile
+  // Obținem task-urile din API
   const { data: tasks, isLoading: tasksLoading } = useQuery({
     queryKey: ["/api/tasks"],
-    queryFn: async () => {
-      // În implementarea reală, de înlocuit cu apelul API real
-      const fakeTasks: Task[] = Array.from({ length: 10 }, (_, i) => ({
-        id: i + 1,
-        organization_id: 1,
-        project_id: Math.floor(Math.random() * 5) + 1,
-        title: `Task ${i + 1}`,
-        description: i % 3 === 0 ? `Descriere pentru task ${i + 1}` : null,
-        status: ['neînceput', 'în lucru', 'în verificare', 'finalizat'][i % 4] as any,
-        priority: ['low', 'medium', 'high', 'urgent'][i % 4] as any,
-        assigned_to: Math.floor(Math.random() * 3) + 1,
-        created_by: 1,
-        start_date: new Date(viewDate.getFullYear(), viewDate.getMonth(), Math.floor(Math.random() * 28) + 1),
-        due_date: new Date(viewDate.getFullYear(), viewDate.getMonth(), Math.floor(Math.random() * 28) + 1),
-        estimated_hours: Math.floor(Math.random() * 10) + 1,
-        completion_percentage: Math.floor(Math.random() * 100),
-        parent_task_id: i % 10 === 0 ? i : null,
-        created_at: new Date(),
-        updated_at: new Date(),
-      }));
-
-      return new Promise<Task[]>((resolve) => {
-        setTimeout(() => resolve(fakeTasks), 300);
-      });
-    },
   });
   
   // Generăm evenimente

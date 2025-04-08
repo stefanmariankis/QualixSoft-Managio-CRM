@@ -35,6 +35,10 @@ import {
   InsertTeamMember,
   DepartmentMember,
   InsertDepartmentMember,
+  Notification,
+  InsertNotification,
+  NotificationPreference,
+  InsertNotificationPreference,
 } from "../shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -60,6 +64,21 @@ export interface IStorage {
     id: number,
     structureData: { has_departments: boolean },
   ): Promise<Organization | undefined>;
+  
+  // Notification operations
+  getNotificationById(id: number): Promise<Notification | undefined>;
+  getNotificationsByUser(userId: number): Promise<Notification[]>;
+  getUnreadNotificationsByUser(userId: number): Promise<Notification[]>;
+  getUnreadNotificationsCount(userId: number): Promise<number>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationAsRead(id: number): Promise<boolean>;
+  markAllNotificationsAsRead(userId: number): Promise<boolean>;
+  deleteNotification(id: number): Promise<boolean>;
+  
+  // Notification preferences operations
+  getNotificationPreferences(userId: number): Promise<NotificationPreference | undefined>;
+  createNotificationPreferences(preferences: InsertNotificationPreference): Promise<NotificationPreference>;
+  updateNotificationPreferences(userId: number, preferences: Partial<NotificationPreference>): Promise<NotificationPreference | undefined>;
 
   // Client operations
   getClient(id: number): Promise<Client | undefined>;
@@ -99,6 +118,13 @@ export interface IStorage {
   getInvoicesByClient(clientId: number): Promise<Invoice[]>;
   getInvoicesByProject(projectId: number): Promise<Invoice[]>;
   getInvoiceItems(invoiceId: number): Promise<InvoiceItem[]>;
+  
+  // Comment operations
+  getComment(id: number): Promise<Comment | undefined>;
+  getCommentsByEntity(entityType: string, entityId: number): Promise<Comment[]>;
+  createComment(comment: InsertComment): Promise<Comment>;
+  updateComment(id: number, commentData: Partial<Comment>): Promise<Comment | undefined>;
+  deleteComment(id: number): Promise<boolean>;
   getInvoicePayments(invoiceId: number): Promise<InvoicePayment[]>;
   createInvoicePayment(payment: InsertInvoicePayment): Promise<InvoicePayment>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
@@ -1726,6 +1752,325 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
+  // Notification operations
+  async checkAndCreateNotificationTables(): Promise<boolean> {
+    try {
+      // Verifică dacă tabelul notifications există
+      const notificationsExists = await this.tableExists('notifications');
+      if (!notificationsExists) {
+        // Creează tabelul dacă nu există
+        await db`
+          CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            organization_id INTEGER NOT NULL,
+            recipient_id INTEGER NOT NULL,
+            sender_id INTEGER,
+            type VARCHAR(50) NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            priority VARCHAR(20) NOT NULL DEFAULT 'normal',
+            read_status VARCHAR(20) NOT NULL DEFAULT 'unread',
+            entity_type VARCHAR(50) NOT NULL,
+            entity_id INTEGER,
+            action_url TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            expires_at TIMESTAMP
+          )
+        `;
+        console.log("Tabelul notifications a fost creat cu succes");
+      }
+      
+      // Verifică dacă tabelul notification_preferences există
+      const preferencesExists = await this.tableExists('notification_preferences');
+      if (!preferencesExists) {
+        // Creează tabelul dacă nu există
+        await db`
+          CREATE TABLE IF NOT EXISTS notification_preferences (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL UNIQUE,
+            email_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+            push_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+            browser_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+            task_assigned BOOLEAN NOT NULL DEFAULT TRUE,
+            task_completed BOOLEAN NOT NULL DEFAULT TRUE,
+            task_deadline BOOLEAN NOT NULL DEFAULT TRUE,
+            comment_added BOOLEAN NOT NULL DEFAULT TRUE,
+            project_update BOOLEAN NOT NULL DEFAULT TRUE,
+            invoice_status BOOLEAN NOT NULL DEFAULT TRUE,
+            payment_received BOOLEAN NOT NULL DEFAULT TRUE,
+            team_member_added BOOLEAN NOT NULL DEFAULT TRUE,
+            system_alert BOOLEAN NOT NULL DEFAULT TRUE,
+            quiet_hours_start VARCHAR(5),
+            quiet_hours_end VARCHAR(5),
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+          )
+        `;
+        console.log("Tabelul notification_preferences a fost creat cu succes");
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Eroare la verificarea/crearea tabelelor pentru notificări:", error);
+      return false;
+    }
+  }
+  
+  async getNotificationById(id: number): Promise<Notification | undefined> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const result = await db`
+        SELECT * FROM notifications
+        WHERE id = ${id}
+        LIMIT 1
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as Notification;
+    } catch (error) {
+      console.error("Eroare la obținerea notificării:", error);
+      return undefined;
+    }
+  }
+  
+  async getNotificationsByUser(userId: number): Promise<Notification[]> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const result = await db`
+        SELECT n.*, 
+               CONCAT(u.first_name, ' ', u.last_name) as sender_name,
+               CASE 
+                 WHEN n.created_at > NOW() - INTERVAL '24 hours' THEN true 
+                 ELSE false 
+               END as is_new
+        FROM notifications n
+        LEFT JOIN users u ON n.sender_id = u.id
+        WHERE n.recipient_id = ${userId}
+        ORDER BY n.created_at DESC
+      `;
+
+      return result as Notification[];
+    } catch (error) {
+      console.error("Eroare la obținerea notificărilor utilizatorului:", error);
+      return [];
+    }
+  }
+  
+  async getUnreadNotificationsByUser(userId: number): Promise<Notification[]> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const result = await db`
+        SELECT n.*, 
+               CONCAT(u.first_name, ' ', u.last_name) as sender_name,
+               CASE 
+                 WHEN n.created_at > NOW() - INTERVAL '24 hours' THEN true 
+                 ELSE false 
+               END as is_new
+        FROM notifications n
+        LEFT JOIN users u ON n.sender_id = u.id
+        WHERE n.recipient_id = ${userId}
+          AND n.read_status = 'unread'
+          AND (n.expires_at IS NULL OR n.expires_at > NOW())
+        ORDER BY n.created_at DESC
+      `;
+
+      return result as Notification[];
+    } catch (error) {
+      console.error("Eroare la obținerea notificărilor necitite ale utilizatorului:", error);
+      return [];
+    }
+  }
+  
+  async getUnreadNotificationsCount(userId: number): Promise<number> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const result = await db`
+        SELECT COUNT(*) as count
+        FROM notifications
+        WHERE recipient_id = ${userId}
+          AND read_status = 'unread'
+          AND (expires_at IS NULL OR expires_at > NOW())
+      `;
+
+      return parseInt(result[0]?.count) || 0;
+    } catch (error) {
+      console.error("Eroare la numărarea notificărilor necitite:", error);
+      return 0;
+    }
+  }
+  
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const now = new Date();
+      const notificationData = {
+        ...notification,
+        created_at: now
+      };
+
+      const result = await db`
+        INSERT INTO notifications ${db(notificationData)}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        throw new Error("Notificarea a fost creată dar nu a putut fi recuperată");
+      }
+
+      return result[0] as Notification;
+    } catch (error: any) {
+      console.error("Eroare la crearea notificării:", error);
+      throw new Error(
+        `Nu s-a putut crea notificarea: ${error.message || "Eroare necunoscută"}`,
+      );
+    }
+  }
+  
+  async markNotificationAsRead(id: number): Promise<boolean> {
+    try {
+      const now = new Date();
+      const result = await db`
+        UPDATE notifications
+        SET read_status = 'read', read_at = ${now}
+        WHERE id = ${id}
+        RETURNING id
+      `;
+
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la marcarea notificării ca citită:", error);
+      return false;
+    }
+  }
+  
+  async markAllNotificationsAsRead(userId: number): Promise<boolean> {
+    try {
+      const now = new Date();
+      const result = await db`
+        UPDATE notifications
+        SET read_status = 'read', read_at = ${now}
+        WHERE recipient_id = ${userId}
+          AND read_status = 'unread'
+        RETURNING id
+      `;
+
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la marcarea tuturor notificărilor ca citite:", error);
+      return false;
+    }
+  }
+  
+  async deleteNotification(id: number): Promise<boolean> {
+    try {
+      const result = await db`
+        DELETE FROM notifications
+        WHERE id = ${id}
+        RETURNING id
+      `;
+
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la ștergerea notificării:", error);
+      return false;
+    }
+  }
+  
+  // Notification preferences operations
+  async getNotificationPreferences(userId: number): Promise<NotificationPreference | undefined> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const result = await db`
+        SELECT * FROM notification_preferences
+        WHERE user_id = ${userId}
+        LIMIT 1
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as NotificationPreference;
+    } catch (error) {
+      console.error("Eroare la obținerea preferințelor de notificare:", error);
+      return undefined;
+    }
+  }
+  
+  async createNotificationPreferences(preferences: InsertNotificationPreference): Promise<NotificationPreference> {
+    try {
+      // Asigurăm-ne că tabelele există
+      await this.checkAndCreateNotificationTables();
+      
+      const now = new Date();
+      const preferencesData = {
+        ...preferences,
+        created_at: now,
+        updated_at: now
+      };
+
+      const result = await db`
+        INSERT INTO notification_preferences ${db(preferencesData)}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        throw new Error("Preferințele de notificare au fost create dar nu au putut fi recuperate");
+      }
+
+      return result[0] as NotificationPreference;
+    } catch (error: any) {
+      console.error("Eroare la crearea preferințelor de notificare:", error);
+      throw new Error(
+        `Nu s-au putut crea preferințele de notificare: ${error.message || "Eroare necunoscută"}`,
+      );
+    }
+  }
+  
+  async updateNotificationPreferences(userId: number, preferences: Partial<NotificationPreference>): Promise<NotificationPreference | undefined> {
+    try {
+      if (Object.keys(preferences).length === 0) {
+        return await this.getNotificationPreferences(userId);
+      }
+
+      const updatedData = {
+        ...preferences,
+        updated_at: new Date()
+      };
+
+      const result = await db`
+        UPDATE notification_preferences
+        SET ${db(updatedData)}
+        WHERE user_id = ${userId}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as NotificationPreference;
+    } catch (error) {
+      console.error("Eroare la actualizarea preferințelor de notificare:", error);
+      return undefined;
+    }
+  }
+  
   async tableExists(tableName: string): Promise<boolean> {
     try {
       const result = await db`
@@ -1738,6 +2083,237 @@ export class DatabaseStorage implements IStorage {
       return result[0].exists;
     } catch (error) {
       console.error(`Eroare la verificarea existenței tabelului ${tableName}:`, error);
+      return false;
+    }
+  }
+  
+  // Creează tabelul de comentarii dacă nu există
+  async checkAndCreateCommentsTable(): Promise<boolean> {
+    try {
+      // Verificăm dacă tabela există
+      const commentsExists = await this.tableExists('comments');
+      if (!commentsExists) {
+        // Creăm tabela dacă nu există
+        await db`
+          CREATE TABLE IF NOT EXISTS comments (
+            id SERIAL PRIMARY KEY,
+            entity_type VARCHAR(50) NOT NULL,
+            entity_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            parent_id INTEGER,
+            attachment_ids INTEGER[],
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            CONSTRAINT fk_user
+              FOREIGN KEY(user_id) 
+              REFERENCES users(id)
+              ON DELETE CASCADE
+          )
+        `;
+        
+        // Creăm indecșii pentru eficiență
+        await db`CREATE INDEX idx_comments_entity ON comments(entity_type, entity_id)`;
+        await db`CREATE INDEX idx_comments_user ON comments(user_id)`;
+        
+        console.log("Tabelul comments a fost creat cu succes");
+      } else {
+        // Verificăm dacă coloana parent_id există
+        const parentIdExists = await db`
+          SELECT EXISTS (
+            SELECT 1 
+            FROM information_schema.columns 
+            WHERE table_name = 'comments' AND column_name = 'parent_id'
+          ) as exists
+        `;
+        
+        // Adăugăm coloana parent_id dacă nu există
+        if (!parentIdExists[0].exists) {
+          console.log("Adăugăm coloana parent_id la tabela comments");
+          await db`ALTER TABLE comments ADD COLUMN parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE`;
+        }
+        
+        // Verificăm dacă coloana attachment_ids există
+        const attachmentIdsExists = await db`
+          SELECT EXISTS (
+            SELECT 1 
+            FROM information_schema.columns 
+            WHERE table_name = 'comments' AND column_name = 'attachment_ids'
+          ) as exists
+        `;
+        
+        // Adăugăm coloana attachment_ids dacă nu există
+        if (!attachmentIdsExists[0].exists) {
+          console.log("Adăugăm coloana attachment_ids la tabela comments");
+          await db`ALTER TABLE comments ADD COLUMN attachment_ids INTEGER[]`;
+        }
+      }
+      return true;
+    } catch (error) {
+      console.error("Eroare la verificarea/crearea tabelului comments:", error);
+      return false;
+    }
+  }
+  
+  // Comment operations
+  async getComment(id: number): Promise<Comment | undefined> {
+    try {
+      // Asigurăm că tabelul există
+      await this.checkAndCreateCommentsTable();
+      
+      const result = await db`
+        SELECT 
+          c.*,
+          CONCAT(u.first_name, ' ', u.last_name) as user_name,
+          u.avatar as user_avatar
+        FROM comments c
+        LEFT JOIN users u ON c.user_id = u.id
+        WHERE c.id = ${id}
+        LIMIT 1
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+
+      return result[0] as unknown as Comment;
+    } catch (error) {
+      console.error("Eroare la obținerea comentariului:", error);
+      return undefined;
+    }
+  }
+
+  async getCommentsByEntity(entityType: string, entityId: number): Promise<Comment[]> {
+    try {
+      // Asigurăm că tabelul există
+      await this.checkAndCreateCommentsTable();
+      
+      const result = await db`
+        SELECT 
+          c.*,
+          CONCAT(u.first_name, ' ', u.last_name) as user_name,
+          u.avatar as user_avatar
+        FROM comments c
+        LEFT JOIN users u ON c.user_id = u.id
+        WHERE c.entity_type = ${entityType} AND c.entity_id = ${entityId}
+        ORDER BY c.created_at DESC
+      `;
+
+      return result as unknown as Comment[];
+    } catch (error) {
+      console.error(`Eroare la obținerea comentariilor pentru ${entityType} cu ID ${entityId}:`, error);
+      return [];
+    }
+  }
+
+  async createComment(comment: InsertComment): Promise<Comment> {
+    try {
+      // Asigurăm că tabelul există
+      await this.checkAndCreateCommentsTable();
+      
+      const now = new Date();
+      const commentData = {
+        entity_type: comment.entity_type,
+        entity_id: comment.entity_id,
+        user_id: comment.user_id,
+        content: comment.content,
+        parent_id: comment.parent_id || null,
+        attachment_ids: comment.attachment_ids || null,
+        is_internal: comment.is_internal || false,
+        created_at: now,
+        updated_at: now
+      };
+
+      const result = await db`
+        INSERT INTO comments ${db(commentData)}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        throw new Error("Comentariul a fost creat dar nu a putut fi recuperat");
+      }
+      
+      // Obținem numele utilizatorului
+      const userData = await db`
+        SELECT CONCAT(first_name, ' ', last_name) as user_name, avatar
+        FROM users
+        WHERE id = ${comment.user_id}
+        LIMIT 1
+      `;
+      
+      const commentWithUserData = {
+        ...result[0],
+        user_name: userData.length > 0 ? userData[0].user_name : 'Utilizator necunoscut',
+        user_avatar: userData.length > 0 ? userData[0].avatar : null
+      };
+
+      return commentWithUserData as unknown as Comment;
+    } catch (error: any) {
+      console.error("Eroare la crearea comentariului:", error);
+      throw new Error(
+        `Nu s-a putut crea comentariul: ${error.message || "Eroare necunoscută"}`,
+      );
+    }
+  }
+
+  async updateComment(id: number, commentData: Partial<Comment>): Promise<Comment | undefined> {
+    try {
+      if (Object.keys(commentData).length === 0) {
+        return await this.getComment(id);
+      }
+
+      const updatedData = {
+        ...commentData,
+        updated_at: new Date(),
+      };
+      
+      // Eliminăm câmpurile care nu sunt în schema bazei de date
+      delete (updatedData as any).user_name;
+      delete (updatedData as any).user_avatar;
+
+      const result = await db`
+        UPDATE comments
+        SET ${db(updatedData)}
+        WHERE id = ${id}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        return undefined;
+      }
+      
+      // Obținem numele utilizatorului
+      const userData = await db`
+        SELECT CONCAT(first_name, ' ', last_name) as user_name, avatar
+        FROM users
+        WHERE id = ${result[0].user_id}
+        LIMIT 1
+      `;
+      
+      const commentWithUserData = {
+        ...result[0],
+        user_name: userData.length > 0 ? userData[0].user_name : 'Utilizator necunoscut',
+        user_avatar: userData.length > 0 ? userData[0].avatar : null
+      };
+
+      return commentWithUserData as unknown as Comment;
+    } catch (error) {
+      console.error("Eroare la actualizarea comentariului:", error);
+      return undefined;
+    }
+  }
+
+  async deleteComment(id: number): Promise<boolean> {
+    try {
+      const result = await db`
+        DELETE FROM comments
+        WHERE id = ${id}
+        RETURNING id
+      `;
+
+      return result.length > 0;
+    } catch (error) {
+      console.error("Eroare la ștergerea comentariului:", error);
       return false;
     }
   }
@@ -1885,7 +2461,7 @@ export class DatabaseStorage implements IStorage {
       const result = await db`
         SELECT * FROM time_logs
         WHERE project_id = ${projectId}
-        ORDER BY date DESC
+        ORDER BY date DESC, start_time DESC
       `;
 
       return result as unknown as TimeLog[];
@@ -1903,7 +2479,7 @@ export class DatabaseStorage implements IStorage {
       const result = await db`
         SELECT * FROM time_logs
         WHERE user_id = ${userId}
-        ORDER BY date DESC
+        ORDER BY date DESC, start_time DESC
       `;
 
       return result as unknown as TimeLog[];
@@ -1921,13 +2497,31 @@ export class DatabaseStorage implements IStorage {
       const result = await db`
         SELECT * FROM time_logs
         WHERE task_id = ${taskId}
-        ORDER BY date DESC
+        ORDER BY date DESC, start_time DESC
       `;
 
       return result as unknown as TimeLog[];
     } catch (error) {
       console.error(
         "Eroare la obținerea înregistrărilor de timp pentru task:",
+        error,
+      );
+      return [];
+    }
+  }
+  
+  async getTimeLogsByOrganization(organizationId: number): Promise<TimeLog[]> {
+    try {
+      const result = await db`
+        SELECT * FROM time_logs
+        WHERE organization_id = ${organizationId}
+        ORDER BY date DESC, start_time DESC
+      `;
+
+      return result as unknown as TimeLog[];
+    } catch (error) {
+      console.error(
+        "Eroare la obținerea înregistrărilor de timp pentru organizație:",
         error,
       );
       return [];

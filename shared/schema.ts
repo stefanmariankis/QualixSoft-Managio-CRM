@@ -410,6 +410,34 @@ export interface InsertInvoicePayment {
   created_by: number;
 }
 
+// Tipuri pentru Comment (Comentarii)
+export interface Comment {
+  id: number;
+  entity_type: string; // 'task', 'project', etc.
+  entity_id: number;
+  user_id: number;
+  content: string;
+  is_internal?: boolean;
+  parent_id?: number | null;
+  attachment_ids?: number[] | null;
+  created_at: Date;
+  updated_at: Date;
+  
+  // Câmpuri pentru afișare, nefiind parte din DB
+  user_name?: string;
+  user_avatar?: string | null;
+}
+
+export interface InsertComment {
+  entity_type: string; // 'task', 'project', etc.
+  entity_id: number;
+  user_id: number;
+  content: string;
+  is_internal?: boolean;
+  parent_id?: number | null;
+  attachment_ids?: number[] | null;
+}
+
 // Tipuri pentru TimeLog
 export interface TimeLog {
   id: number;
@@ -418,12 +446,15 @@ export interface TimeLog {
   project_id: number;
   task_id?: number | null;
   date: Date;
-  hours: number;
+  duration_minutes: number;
   description?: string | null;
   is_billable: boolean;
   hourly_rate?: number | null;
   approved_by?: number | null;
   approved_at?: Date | null;
+  start_time?: Date | null;
+  end_time?: Date | null;
+  source?: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -434,12 +465,15 @@ export interface InsertTimeLog {
   project_id: number;
   task_id?: number | null;
   date: Date;
-  hours: number;
+  duration_minutes: number;
   description?: string | null;
   is_billable: boolean;
   hourly_rate?: number | null;
   approved_by?: number | null;
   approved_at?: Date | null;
+  start_time?: Date | null;
+  end_time?: Date | null;
+  source?: string;
 }
 
 // Enums pentru Automatizări
@@ -776,7 +810,7 @@ export const timeLogSchema = z.object({
   project_id: z.number({ message: "Proiectul este obligatoriu" }),
   task_id: z.number().optional().nullable(),
   date: z.date({ message: "Data este obligatorie" }),
-  hours: z.number().positive({ message: "Numărul de ore trebuie să fie pozitiv" }),
+  duration_minutes: z.number().positive({ message: "Durata trebuie să fie pozitivă" }),
   description: z.string().optional().nullable(),
   is_billable: z.boolean().default(true),
   hourly_rate: z.number().nonnegative().optional().nullable(),
@@ -825,3 +859,120 @@ export const teamMemberSchema = z.object({
 });
 
 export type TeamMemberFormData = z.infer<typeof teamMemberSchema>;
+
+// Enums pentru notificări
+export const notificationTypes = [
+  "task_assigned", 
+  "task_completed", 
+  "task_deadline", 
+  "comment_added", 
+  "project_update", 
+  "invoice_status", 
+  "payment_received", 
+  "team_member_added", 
+  "system_alert"
+] as const;
+
+export const notificationPriorities = [
+  "low", 
+  "normal", 
+  "high", 
+  "urgent"
+] as const;
+
+export const notificationReadStatus = [
+  "unread", 
+  "read"
+] as const;
+
+// Tipuri pentru Notification
+export interface Notification {
+  id: number;
+  organization_id: number;
+  recipient_id: number;
+  sender_id?: number | null;
+  type?: (typeof notificationTypes)[number];
+  notification_type?: string; // Pentru a susține notification_type_new din baza de date
+  title: string;
+  message: string;
+  priority: (typeof notificationPriorities)[number];
+  read_status: (typeof notificationReadStatus)[number];
+  read_at?: Date | null; // Adăugat câmpul read_at folosit în componente
+  entity_type: string;
+  entity_id?: number | null;
+  action_url?: string | null;
+  created_at: Date;
+  expires_at?: Date | null;
+}
+
+export interface InsertNotification {
+  organization_id: number;
+  recipient_id: number;
+  sender_id?: number | null;
+  type: (typeof notificationTypes)[number];
+  title: string;
+  message: string;
+  priority: (typeof notificationPriorities)[number];
+  read_status: (typeof notificationReadStatus)[number];
+  entity_type: string;
+  entity_id?: number | null;
+  action_url?: string | null;
+  expires_at?: Date | null;
+}
+
+// Tipuri pentru NotificationPreference
+export interface NotificationPreference {
+  id: number;
+  user_id: number;
+  email_notifications: boolean;
+  push_notifications: boolean;
+  browser_notifications: boolean;
+  task_assigned: boolean;
+  task_completed: boolean;
+  task_deadline: boolean;
+  comment_added: boolean;
+  project_update: boolean;
+  invoice_status: boolean;
+  payment_received: boolean;
+  team_member_added: boolean;
+  system_alert: boolean;
+  quiet_hours_start?: string | null;
+  quiet_hours_end?: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface InsertNotificationPreference {
+  user_id: number;
+  email_notifications?: boolean;
+  push_notifications?: boolean;
+  browser_notifications?: boolean;
+  task_assigned?: boolean;
+  task_completed?: boolean;
+  task_deadline?: boolean;
+  comment_added?: boolean;
+  project_update?: boolean;
+  invoice_status?: boolean;
+  payment_received?: boolean;
+  team_member_added?: boolean;
+  system_alert?: boolean;
+  quiet_hours_start?: string | null;
+  quiet_hours_end?: string | null;
+}
+
+// Schema pentru validare notificare
+export const notificationSchema = z.object({
+  recipient_id: z.number(),
+  type: z.enum(notificationTypes, {
+    errorMap: () => ({ message: "Tipul notificării este obligatoriu" }),
+  }),
+  title: z.string().min(1, { message: "Titlul este obligatoriu" }),
+  message: z.string().min(1, { message: "Mesajul este obligatoriu" }),
+  priority: z.enum(notificationPriorities).default("normal"),
+  entity_type: z.string().min(1, { message: "Tipul entității este obligatoriu" }),
+  entity_id: z.number().optional().nullable(),
+  action_url: z.string().url({ message: "URL-ul trebuie să fie valid" }).optional().nullable(),
+  expires_at: z.date().optional().nullable()
+});
+
+export type NotificationFormData = z.infer<typeof notificationSchema>;

@@ -13,16 +13,18 @@ import {
   Gauge, 
   Calendar, 
   Settings, 
-  Bell, 
   ChevronLeft, 
   ChevronRight,
   LogOut,
   UserRound,
-  Building2
+  Building2,
+  Clock,
+  Bell
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import Header from "./header";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -54,6 +56,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     ...(isCEO ? [{ href: "/clients", label: "Clienți", icon: Users }] : []),
     { href: "/projects", label: "Proiecte", icon: FolderKanban },
     { href: "/tasks", label: "Sarcini", icon: FileText },
+    { href: "/time-tracking", label: "Monitorizare Timp", icon: Clock },
     { href: "/invoices", label: "Facturi", icon: Receipt },
     { href: "/team", label: "Echipă", icon: UserRound },
     // Afișăm link-ul către departamente doar dacă funcționalitatea este activată
@@ -114,34 +117,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             ))}
           </nav>
         </ScrollArea>
-
-        {/* User area */}
-        <div className="mt-auto border-t p-4">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9">
-              <AvatarImage src={user?.avatar_url || ''} alt={user?.first_name || 'Utilizator'} />
-              <AvatarFallback>{userInitials}</AvatarFallback>
-            </Avatar>
-            {!collapsed && (
-              <div className="overflow-hidden">
-                <p className="text-sm font-medium leading-none text-foreground truncate">
-                  {user?.first_name} {user?.last_name}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-              </div>
-            )}
-            {!collapsed && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="ml-auto" 
-                onClick={() => signOut()}
-              >
-                <LogOut size={18} />
-              </Button>
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Mobile header & menu */}
@@ -176,15 +151,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </svg>
             <h1 className="text-xl font-bold text-foreground">Managio</h1>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <Button variant="ghost" size="icon">
-              <Bell size={20} />
-            </Button>
-            <Avatar className="h-9 w-9">
-              <AvatarImage src={user?.avatar_url || ''} alt={user?.first_name || 'Utilizator'} />
-              <AvatarFallback>{userInitials}</AvatarFallback>
-            </Avatar>
-          </div>
+          <Header />
         </div>
 
         {/* Mobile menu */}
@@ -230,6 +197,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           "pt-16 lg:pt-0"
         )}
       >
+        {/* Desktop header */}
+        <div className="h-16 border-b hidden lg:flex items-center px-6">
+          <Header />
+        </div>
         <main className="flex-1 px-4 py-6">
           {children}
         </main>
