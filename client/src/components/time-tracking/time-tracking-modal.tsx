@@ -362,7 +362,7 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
                   <FormLabel>Task (opțional)</FormLabel>
                   <Select
                     disabled={isLoadingTasks || !selectedProject || isTracking}
-                    onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
+                    onValueChange={(value) => field.onChange(value && value !== "null" ? parseInt(value) : null)}
                     value={field.value?.toString() || ""}
                   >
                     <FormControl>
@@ -371,7 +371,7 @@ const TimeTrackingModal: React.FC<TimeTrackingModalProps> = ({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Fără task specific</SelectItem>
+                      <SelectItem value="null">Fără task specific</SelectItem>
                       {tasks?.map((task: any) => (
                         <SelectItem key={task.id} value={task.id.toString()}>
                           {task.title}
