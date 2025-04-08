@@ -15,12 +15,15 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
+import TimeTrackingModal from "@/components/time-tracking/time-tracking-modal";
 
 // Pagina de time tracking simplificată
 export default function TimeTrackingPage() {
   const [activeTab, setActiveTab] = useState("logs");
+  const [isTimerModalOpen, setIsTimerModalOpen] = useState(false);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   
-  // Mock data pentru demo
+  // Datele de time tracking
   const { data: timeLogs, isLoading } = useQuery({
     queryKey: ['/api/time-logs'],
     queryFn: async () => {
@@ -80,16 +83,36 @@ export default function TimeTrackingPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button className="w-full sm:w-auto">
+            <Button 
+              className="w-full sm:w-auto"
+              onClick={() => setIsTimerModalOpen(true)}
+            >
               <AlarmClock className="mr-2 h-4 w-4" />
               Pornește timp
             </Button>
-            <Button variant="outline" className="w-full sm:w-auto">
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto"
+              onClick={() => setIsManualModalOpen(true)}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Adaugă manual
             </Button>
           </div>
         </div>
+        
+        {/* Modaluri */}
+        <TimeTrackingModal
+          open={isTimerModalOpen}
+          onClose={() => setIsTimerModalOpen(false)}
+          isTimer={true}
+        />
+        
+        <TimeTrackingModal
+          open={isManualModalOpen}
+          onClose={() => setIsManualModalOpen(false)}
+          isTimer={false}
+        />
         
         {/* Statistici */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -198,7 +221,10 @@ export default function TimeTrackingPage() {
                   <p className="mt-2 text-center text-muted-foreground max-w-sm">
                     Nu există înregistrări de timp. Poți începe să cronometrezi timpul sau să adaugi înregistrări manual.
                   </p>
-                  <Button className="mt-6">
+                  <Button 
+                    className="mt-6"
+                    onClick={() => setIsManualModalOpen(true)}
+                  >
                     <Plus className="mr-2 h-4 w-4" />
                     Adaugă prima înregistrare
                   </Button>

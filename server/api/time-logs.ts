@@ -196,28 +196,26 @@ router.post("/", requireAuth, async (req: any, res) => {
       : timeLogData.date;
       
     // Construim un obiect cu datele pentru inserare
-    const insertData: InsertTimeLog = {
+    // Nu folosim tipul InsertTimeLog din schema deoarece nu se potrivește cu tabelul
+    const insertData: any = {
       organization_id: req.user.organization_id,
       user_id: req.user.id,
       project_id: timeLogData.project_id,
       task_id: timeLogData.task_id || null,
       date: date,
-      hours: timeLogData.hours || durationMinutes / 60,
       description: timeLogData.description || null,
       is_billable: timeLogData.is_billable,
+      duration_minutes: durationMinutes
     };
     
-    // Adăugăm start_time și end_time în baza de date (acestea nu sunt în schema InsertTimeLog)
+    // Adăugăm start_time și end_time în baza de date
     if (timeLogData.start_time) {
-      (insertData as any).start_time = new Date(timeLogData.start_time);
+      insertData.start_time = new Date(timeLogData.start_time);
     }
     
     if (timeLogData.end_time) {
-      (insertData as any).end_time = new Date(timeLogData.end_time);
+      insertData.end_time = new Date(timeLogData.end_time);
     }
-    
-    // Adăugăm durata în minute
-    (insertData as any).duration_minutes = durationMinutes;
     
     // Inserăm în baza de date
     const newTimeLog = await storage.createTimeLog(insertData);
@@ -318,19 +316,34 @@ router.patch("/:id", requireAuth, async (req: any, res) => {
     }
     
     // Pregătim datele pentru actualizare
-    const updateData: Partial<TimeLog> = { 
-      ...timeLogData,
+    // Folosim any pentru a asigura compatibilitatea cu baza de date
+    const updateData: any = { 
       updated_at: new Date() 
     };
     
+    // Copiem doar proprietățile care sunt sigur compatibile cu baza de date
+    if (timeLogData.project_id !== undefined) updateData.project_id = timeLogData.project_id;
+    if (timeLogData.task_id !== undefined) updateData.task_id = timeLogData.task_id;
+    if (timeLogData.description !== undefined) updateData.description = timeLogData.description;
+    if (timeLogData.is_billable !== undefined) updateData.is_billable = timeLogData.is_billable;
+    
     // Convertim date din string în Date dacă este necesar
-    if (typeof updateData.date === 'string') {
-      updateData.date = new Date(updateData.date);
+    if (timeLogData.date) {
+      updateData.date = typeof timeLogData.date === 'string' ? new Date(timeLogData.date) : timeLogData.date;
+    }
+    
+    // Adăugăm start_time și end_time
+    if (timeLogData.start_time) {
+      updateData.start_time = new Date(timeLogData.start_time);
+    }
+    
+    if (timeLogData.end_time) {
+      updateData.end_time = new Date(timeLogData.end_time);
     }
     
     // Adăugăm durata în minute dacă s-a calculat
     if (durationMinutes !== undefined) {
-      (updateData as any).duration_minutes = durationMinutes;
+      updateData.duration_minutes = durationMinutes;
     }
     
     // Actualizăm înregistrarea
