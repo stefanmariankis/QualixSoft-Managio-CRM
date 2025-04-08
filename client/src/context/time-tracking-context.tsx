@@ -35,15 +35,44 @@ export function TimeTrackingProvider({ children }: { children: ReactNode }) {
   const [intervalId, setIntervalId] = useState<NodeJS.Timeout | null>(null);
 
   // Verifică la încărcare dacă există un timer activ în localStorage
+  // și asigură-te că este validat corect
   useEffect(() => {
     const storedTimer = localStorage.getItem('activeTimer');
     if (storedTimer) {
       try {
         const parsedTimer = JSON.parse(storedTimer);
+        
+        // Verifică dacă parsedTimer are toate proprietățile necesare și dacă startTime este valid
+        if (!parsedTimer || !parsedTimer.isActive || !parsedTimer.startTime) {
+          // Dacă timerul nu este complet sau valid, ștergem din localStorage
+          console.log('Timer invalid sau incomplet găsit în localStorage, se șterge...');
+          localStorage.removeItem('activeTimer');
+          return;
+        }
+        
         // Actualizează startTime ca obiect Date
         if (parsedTimer.startTime) {
           parsedTimer.startTime = new Date(parsedTimer.startTime);
+          
+          // Verifică dacă startTime este în viitor (posibil timer corupt)
+          const now = new Date();
+          if (parsedTimer.startTime > now) {
+            console.log('Timer corupt: startTime în viitor, se șterge...');
+            localStorage.removeItem('activeTimer');
+            return;
+          }
+          
+          // Verifică dacă timerul e mai vechi de 24 ore (probabil a rămas blocat)
+          const oneDayInMs = 24 * 60 * 60 * 1000;
+          if ((now.getTime() - parsedTimer.startTime.getTime()) > oneDayInMs) {
+            console.log('Timer foarte vechi (>24 ore), probabil blocat, se șterge...');
+            localStorage.removeItem('activeTimer');
+            return;
+          }
         }
+        
+        // Timerul pare valid, îl setăm
+        console.log('Timer valid găsit în localStorage, se încarcă...');
         setTimer(parsedTimer);
         
         // Dacă timerul este activ, pornește cronometrul

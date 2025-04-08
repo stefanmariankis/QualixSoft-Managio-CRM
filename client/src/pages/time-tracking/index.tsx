@@ -42,9 +42,25 @@ const ActiveTimerCard = () => {
     setIsLoading(true);
     try {
       await stopTimer();
-    } finally {
+      
+      // Forțăm ștergerea localStorage după oprirea timerului pentru a fi extra siguri
+      localStorage.removeItem('activeTimer');
+      
+      // Asigurăm și un refresh la pagina curentă pentru a reseta toate stările
+      setTimeout(() => {
+        window.location.reload();
+      }, 500); // Adăugăm o mică întârziere pentru a ne asigura că toate operațiile async s-au terminat
+      
+    } catch (error) {
+      console.error('Eroare la oprirea timerului:', error);
+      toast({
+        title: 'Eroare',
+        description: 'Nu s-a putut opri timerul',
+        variant: 'destructive',
+      });
       setIsLoading(false);
     }
+    // Nu mai ajungem aici în caz de succes, întrucât pagina se reîncarcă
   };
   
   return (
