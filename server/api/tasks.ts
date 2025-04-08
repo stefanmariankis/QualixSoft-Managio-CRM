@@ -518,6 +518,49 @@ router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
 });
 
 // Adaugă un comentariu la un task
+// Obține comentariile pentru un task
+router.get('/:id/comments', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: 'Neautorizat' });
+    }
+    
+    console.log("API - GET /api/tasks/:id/comments - parametru brut:", req.params.id, "tip:", typeof req.params.id);
+    
+    // Convertim explicit parametrul la număr
+    let taskId: number;
+    try {
+      taskId = Number(req.params.id);
+      
+      // Verificăm dacă este un număr valid
+      if (isNaN(taskId) || taskId <= 0 || !Number.isInteger(taskId)) {
+        console.error(`API - ID task invalid pentru comentarii: ${req.params.id} => ${taskId}`);
+        return res.status(400).json({ message: 'ID task invalid' });
+      }
+      
+      console.log("API - ID task convertit cu succes:", taskId, "tip:", typeof taskId);
+    } catch (err) {
+      console.error(`API - Eroare la conversie ID task pentru comentarii: ${req.params.id}`, err);
+      return res.status(400).json({ message: 'ID task invalid' });
+    }
+    
+    const task = await storage.getTask(taskId);
+    if (!task || task.organization_id !== req.user!.organization_id) {
+      return res.status(404).json({ message: 'Task negăsit' });
+    }
+    
+    // Obținem comentariile pentru acest task
+    const comments = await storage.getCommentsByEntity('task', taskId);
+    console.log(`API - S-au găsit ${comments.length} comentarii pentru task-ul cu ID ${taskId}`);
+    
+    return res.json(comments);
+  } catch (error) {
+    console.error("Eroare la obținerea comentariilor pentru task:", error);
+    return res.status(500).json({ message: 'Eroare internă server' });
+  }
+});
+
 router.post('/:id/comments', requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;

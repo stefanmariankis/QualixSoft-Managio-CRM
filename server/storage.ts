@@ -2219,6 +2219,7 @@ export class DatabaseStorage implements IStorage {
         content: comment.content,
         parent_id: comment.parent_id || null,
         attachment_ids: comment.attachment_ids || null,
+        is_internal: comment.is_internal || false,
         created_at: now,
         updated_at: now
       };

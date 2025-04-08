@@ -417,6 +417,7 @@ export interface Comment {
   entity_id: number;
   user_id: number;
   content: string;
+  is_internal?: boolean;
   parent_id?: number | null;
   attachment_ids?: number[] | null;
   created_at: Date;
@@ -432,6 +433,7 @@ export interface InsertComment {
   entity_id: number;
   user_id: number;
   content: string;
+  is_internal?: boolean;
   parent_id?: number | null;
   attachment_ids?: number[] | null;
 }
