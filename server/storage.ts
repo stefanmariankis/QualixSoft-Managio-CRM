@@ -812,6 +812,9 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
+      console.log(`[DEBUG] Căutare utilizator cu email: ${username}`);
+      console.log(`[DEBUG] String de conexiune: ${process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 20) + '...' : 'nedefinit'}`);
+      
       // Folosim clientul PostgreSQL direct - username este de fapt email în implementarea noastră
       const result = await db`
         SELECT * FROM users
@@ -819,13 +822,15 @@ export class DatabaseStorage implements IStorage {
         LIMIT 1
       `;
 
+      console.log(`[DEBUG] Rezultat căutare utilizator: ${result.length > 0 ? 'Găsit' : 'Negăsit'}`);
+      
       if (result.length === 0) {
         return undefined;
       }
 
       return result[0] as User;
     } catch (error) {
-      console.error("Eroare la obținerea utilizatorului după email:", error);
+      console.error("[DEBUG] Eroare la obținerea utilizatorului după email:", error);
       return undefined;
     }
   }
