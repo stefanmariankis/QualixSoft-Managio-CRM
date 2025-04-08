@@ -14,7 +14,7 @@ const createTimeLogSchema = z.object({
   task_id: z.number().int().positive().optional().nullable(),
   date: z.date().or(z.string().refine(val => !isNaN(Date.parse(val)), { message: "Data trebuie să fie validă" })),
   description: z.string().optional(),
-  hours: z.number().min(0).optional(),
+  duration_minutes: z.number().min(0).optional(),
   is_billable: z.boolean().default(true),
   start_time: z.string().datetime().optional(),
   end_time: z.string().datetime().optional(),
@@ -26,7 +26,7 @@ const updateTimeLogSchema = z.object({
   task_id: z.number().int().positive().optional().nullable(),
   date: z.date().or(z.string().refine(val => !isNaN(Date.parse(val)), { message: "Data trebuie să fie validă" })).optional(),
   description: z.string().optional(),
-  hours: z.number().min(0).optional(),
+  duration_minutes: z.number().min(0).optional(),
   is_billable: z.boolean().optional(),
   start_time: z.string().datetime().optional(),
   end_time: z.string().datetime().optional(),
@@ -169,8 +169,8 @@ router.post("/", requireAuth, async (req: any, res) => {
     
     // Calculăm durata în minute între start_time și end_time, dacă există
     let durationMinutes = 0;
-    if (timeLogData.hours) {
-      durationMinutes = Math.round(timeLogData.hours * 60);
+    if (timeLogData.duration_minutes) {
+      durationMinutes = timeLogData.duration_minutes;
     } else if (timeLogData.start_time && timeLogData.end_time) {
       const startTime = new Date(timeLogData.start_time);
       const endTime = new Date(timeLogData.end_time);
@@ -185,8 +185,8 @@ router.post("/", requireAuth, async (req: any, res) => {
       // Pentru cronometrare în timp real, durata este 0 până când se oprește
       durationMinutes = 0;
     } else {
-      throw new ValidationError("Trebuie să specificați fie numărul de ore, fie timpul de început și sfârșit", {
-        hours: ["Trebuie să specificați fie numărul de ore, fie timpul de început și sfârșit"]
+      throw new ValidationError("Trebuie să specificați fie durata în minute, fie timpul de început și sfârșit", {
+        duration_minutes: ["Trebuie să specificați fie durata în minute, fie timpul de început și sfârșit"]
       });
     }
     
@@ -285,9 +285,9 @@ router.patch("/:id", requireAuth, async (req: any, res) => {
     // Calculăm durata în minute între start_time și end_time, dacă se actualizează
     let durationMinutes;
     
-    if (timeLogData.hours !== undefined) {
-      // Dacă s-a specificat direct numărul de ore
-      durationMinutes = Math.round(timeLogData.hours * 60);
+    if (timeLogData.duration_minutes !== undefined) {
+      // Dacă s-a specificat direct durata în minute
+      durationMinutes = timeLogData.duration_minutes;
     } else if (timeLogData.start_time && timeLogData.end_time) {
       // Dacă s-au specificat orele de început și sfârșit
       const startTime = new Date(timeLogData.start_time);
@@ -311,8 +311,8 @@ router.patch("/:id", requireAuth, async (req: any, res) => {
         });
       }
       
-      // Calculăm și orele pentru afișare
-      timeLogData.hours = durationMinutes / 60;
+      // Calculăm și durata în minute pentru actualizare
+      timeLogData.duration_minutes = durationMinutes;
     }
     
     // Pregătim datele pentru actualizare
