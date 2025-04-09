@@ -2,6 +2,21 @@
  * Tipuri comune utilizate în mai multe locuri din aplicație
  */
 
+// Tipuri de organizație
+export enum OrganizationType {
+  INDIVIDUAL = 'individual',
+  AGENCY = 'agency',
+  COMPANY = 'company'
+}
+
+// Planuri de abonament
+export enum SubscriptionPlan {
+  FREE = 'free',
+  BASIC = 'basic',
+  PRO = 'pro',
+  ENTERPRISE = 'enterprise'
+}
+
 // Rolurile utilizatorilor
 export type UserRole = 'super_admin' | 'ceo' | 'manager' | 'director' | 'employee' | 'client';
 

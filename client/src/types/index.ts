@@ -6,9 +6,9 @@
 export * from './common.types';
 export * from './user.types';
 export * from './invoice.types';
+export * from './organization.types';
 
 // TODO: Completează cu celelalte fișiere de tipuri după ce sunt create:
-// export * from './organization.types';
 // export * from './project.types'; 
 // export * from './client.types';
 // export * from './task.types';
@@ -17,10 +17,14 @@ export * from './invoice.types';
 // export * from './automation.types';
 // export * from './activity.types';
 
+import { User } from './user.types';
+import { Organization } from './organization.types';
+
 // Starea de autentificare
 export interface AuthState {
   user: User | null;
-  isLoading: boolean;
+  organization: Organization | null;
+  loading: boolean;
   error: Error | null;
 }
 

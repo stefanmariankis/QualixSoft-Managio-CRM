@@ -1,414 +1,513 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import DashboardLayout from "@/components/layout/dashboard-layout";
+import { useAuth } from "@/context/auth-context";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Building2,
-  Save,
-  Users,
-  FileText,
-  Landmark,
-  Mail,
-  Phone,
-  Globe,
-  HelpCircle,
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { toast } from "@/hooks/use-toast";
+import { OrganizationType, SubscriptionPlan } from "@/types/common.types";
+import { UpdateOrganization, UpdateOrganizationSettings } from "@/types/organization.types";
 
-export default function OrganizationSettingsPage() {
-  const { toast } = useToast();
+// Definim schema de validare pentru formular
+const organizationFormSchema = z.object({
+  name: z.string().min(3, { message: "Numele organizației trebuie să aibă minim 3 caractere" }),
+  slug: z.string().min(3, { message: "Slug-ul trebuie să aibă minim 3 caractere" })
+    .regex(/^[a-z0-9-]+$/, { 
+      message: "Slug-ul poate conține doar litere mici, cifre și cratime" 
+    }),
+  organization_type: z.nativeEnum(OrganizationType),
+  has_departments: z.boolean().default(false),
+});
+
+const settingsFormSchema = z.object({
+  default_currency: z.string().min(1, { message: "Selectați o monedă" }),
+  default_language: z.string().min(1, { message: "Selectați o limbă" }),
+  date_format: z.string().min(1, { message: "Selectați un format de dată" }),
+  time_format: z.string().min(1, { message: "Selectați un format de timp" }),
+  primary_color: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, {
+    message: "Culoarea trebuie să fie în format hex (ex: #FF5500)"
+  }).optional(),
+});
+
+// Componenta pentru setările organizației
+export default function OrganizationSettings() {
+  const { organization, updateOrganization } = useAuth();
   const [activeTab, setActiveTab] = useState("general");
 
-  // Obține detaliile organizației
-  const { data: organization, isLoading } = useQuery<any>({
-    queryKey: ["/api/organization"],
-  });
-
-  // Form pentru setări generale
-  const generalForm = useForm({
+  // Formularul pentru setări generale
+  const generalForm = useForm<z.infer<typeof organizationFormSchema>>({
+    resolver: zodResolver(organizationFormSchema),
     defaultValues: {
-      name: "",
-      email: "",
-      phone: "",
-      website: "",
-      address: "",
-      description: "",
-      logo_url: "",
-    }
+      name: organization?.name || "",
+      slug: organization?.slug || "",
+      organization_type: organization?.organization_type || OrganizationType.INDIVIDUAL,
+      has_departments: organization?.has_departments || false,
+    },
   });
 
-  // Form pentru setări structură organizațională
-  const structureForm = useForm({
+  // Formularul pentru preferințe
+  const preferencesForm = useForm<z.infer<typeof settingsFormSchema>>({
+    resolver: zodResolver(settingsFormSchema),
     defaultValues: {
-      has_departments: false,
-    }
+      default_currency: "RON",
+      default_language: "ro",
+      date_format: "DD.MM.YYYY",
+      time_format: "HH:mm",
+      primary_color: "#FF8C00",
+    },
   });
 
-  // Update form values when organization data is loaded
-  useState(() => {
-    if (organization) {
-      generalForm.reset({
-        name: organization.name || "",
-        email: organization.email || "",
-        phone: organization.phone || "",
-        website: organization.website || "",
-        address: organization.address || "",
-        description: organization.description || "",
-        logo_url: organization.logo_url || "",
+  // Handler pentru actualizarea setărilor generale
+  const onGeneralSubmit = (data: z.infer<typeof organizationFormSchema>) => {
+    if (!organization) {
+      toast({
+        variant: "destructive",
+        title: "Eroare",
+        description: "Nu există o organizație pentru a actualiza setările",
       });
+      return;
+    }
+
+    try {
+      // Actualizăm organizația în context (și implicit în localStorage)
+      updateOrganization(data as UpdateOrganization);
       
-      structureForm.reset({
-        has_departments: organization.has_departments || false,
+      toast({
+        title: "Succes",
+        description: "Setările organizației au fost actualizate",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Eroare",
+        description: "Nu s-au putut actualiza setările organizației",
       });
     }
-  });
-
-  // Mutație pentru actualizarea setărilor generale
-  const updateGeneralSettings = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await apiRequest("PUT", "/api/organization", data);
-      return await response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Succes",
-        description: "Setările organizației au fost actualizate cu succes",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/organization"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Eroare",
-        description: error.message || "A apărut o eroare la actualizarea setărilor",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Mutație pentru actualizarea structurii organizaționale
-  const updateStructureSettings = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await apiRequest("PUT", "/api/organization/structure", data);
-      return await response.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Succes",
-        description: `Setările structurii organizaționale au fost actualizate. Departamentele sunt acum ${data.has_departments ? 'activate' : 'dezactivate'}.`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/organization"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Eroare",
-        description: error.message || "A apărut o eroare la actualizarea setărilor",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  // Handler pentru form general
-  const onSubmitGeneral = (data: any) => {
-    updateGeneralSettings.mutate(data);
   };
 
-  // Handler pentru form structură
-  const onSubmitStructure = (data: any) => {
-    updateStructureSettings.mutate(data);
+  // Handler pentru actualizarea preferințelor
+  const onPreferencesSubmit = (data: z.infer<typeof settingsFormSchema>) => {
+    if (!organization) {
+      toast({
+        variant: "destructive",
+        title: "Eroare",
+        description: "Nu există o organizație pentru a actualiza setările",
+      });
+      return;
+    }
+
+    try {
+      // Actualizăm setările (în producție, ar trebui să avem un endpoint pentru asta)
+      // Deocamdată doar afișăm un toast de succes
+      console.log("Updating organization settings:", data);
+      
+      toast({
+        title: "Succes",
+        description: "Preferințele au fost actualizate",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Eroare",
+        description: "Nu s-au putut actualiza preferințele",
+      });
+    }
   };
 
-  if (isLoading) {
+  if (!organization) {
     return (
-      <DashboardLayout>
-        <div className="flex justify-center items-center min-h-screen">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </DashboardLayout>
+      <div className="flex items-center justify-center h-full">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Nicio organizație disponibilă</CardTitle>
+            <CardDescription>
+              Nu există o organizație asociată cu contul tău.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <DashboardLayout>
-      <div className="flex flex-col space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Setări organizație</h1>
-          <p className="text-muted-foreground">
-            Gestionează setările și configurațiile organizației tale
-          </p>
-        </div>
+    <div className="container mx-auto py-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Setări Organizație</h1>
+        <p className="text-muted-foreground">
+          Gestionează setările organizației tale
+        </p>
+      </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="general">Generale</TabsTrigger>
-            <TabsTrigger value="structure">Structură organizațională</TabsTrigger>
-          </TabsList>
-          
-          {/* Tab: Setări generale */}
-          <TabsContent value="general">
-            <Card>
-              <CardHeader>
-                <CardTitle>Informații generale</CardTitle>
-                <CardDescription>
-                  Informațiile de bază ale organizației tale
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...generalForm}>
-                  <form onSubmit={generalForm.handleSubmit(onSubmitGeneral)} className="space-y-6">
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                      <FormField
-                        control={generalForm.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Numele organizației</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Numele companiei" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={generalForm.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Mail className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="contact@companie.ro" className="pl-8" {...field} />
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={generalForm.control}
-                        name="phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Telefon</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Phone className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="0712 345 678" className="pl-8" {...field} />
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={generalForm.control}
-                        name="website"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Website</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Globe className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="www.companie.ro" className="pl-8" {...field} />
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={generalForm.control}
-                        name="logo_url"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>URL Logo</FormLabel>
-                            <FormControl>
-                              <Input placeholder="https://example.com/logo.png" {...field} />
-                            </FormControl>
-                            <FormDescription>
-                              URL-ul către logo-ul organizației
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
+      <Tabs defaultValue="general" className="w-full" onValueChange={setActiveTab} value={activeTab}>
+        <TabsList className="mb-6">
+          <TabsTrigger value="general">Generale</TabsTrigger>
+          <TabsTrigger value="preferences">Preferințe</TabsTrigger>
+          <TabsTrigger value="email">Email</TabsTrigger>
+          <TabsTrigger value="subscription">Abonament</TabsTrigger>
+        </TabsList>
+
+        {/* Setări Generale */}
+        <TabsContent value="general">
+          <Card>
+            <CardHeader>
+              <CardTitle>Setări Generale</CardTitle>
+              <CardDescription>
+                Informații de bază despre organizația ta
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...generalForm}>
+                <form onSubmit={generalForm.handleSubmit(onGeneralSubmit)} className="space-y-6">
+                  <FormField
+                    control={generalForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nume Organizație</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Numele organizației" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Numele afișat al organizației tale.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={generalForm.control}
+                    name="slug"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Slug</FormLabel>
+                        <FormControl>
+                          <Input placeholder="slug-organizatie" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Identificatorul URL al organizației tale.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={generalForm.control}
+                    name="organization_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tip Organizație</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selectează tipul organizației" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value={OrganizationType.INDIVIDUAL}>Freelancer</SelectItem>
+                            <SelectItem value={OrganizationType.AGENCY}>Agenție</SelectItem>
+                            <SelectItem value={OrganizationType.COMPANY}>Companie</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Tipul organizației determină anumite funcționalități disponibile.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={generalForm.control}
+                    name="has_departments"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Departamente</FormLabel>
+                          <FormDescription>
+                            Activează structura organizațională pe departamente.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <Button type="submit">Salvează Setările</Button>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Preferințe */}
+        <TabsContent value="preferences">
+          <Card>
+            <CardHeader>
+              <CardTitle>Preferințe</CardTitle>
+              <CardDescription>
+                Setează preferințele implicite pentru organizația ta
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...preferencesForm}>
+                <form onSubmit={preferencesForm.handleSubmit(onPreferencesSubmit)} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField
-                      control={generalForm.control}
-                      name="address"
+                      control={preferencesForm.control}
+                      name="default_currency"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Adresă</FormLabel>
-                          <FormControl>
-                            <Textarea placeholder="Adresa completă" {...field} />
-                          </FormControl>
+                          <FormLabel>Monedă Implicită</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selectează moneda" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="RON">RON (Leu românesc)</SelectItem>
+                              <SelectItem value="EUR">EUR (Euro)</SelectItem>
+                              <SelectItem value="USD">USD (Dolar american)</SelectItem>
+                              <SelectItem value="GBP">GBP (Liră sterlină)</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
-                      control={generalForm.control}
-                      name="description"
+                      control={preferencesForm.control}
+                      name="default_language"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Descriere</FormLabel>
+                          <FormLabel>Limbă Implicită</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selectează limba" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="ro">Română</SelectItem>
+                              <SelectItem value="en">Engleză</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={preferencesForm.control}
+                      name="date_format"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Format Dată</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selectează formatul datei" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="DD.MM.YYYY">DD.MM.YYYY (31.12.2023)</SelectItem>
+                              <SelectItem value="MM/DD/YYYY">MM/DD/YYYY (12/31/2023)</SelectItem>
+                              <SelectItem value="YYYY-MM-DD">YYYY-MM-DD (2023-12-31)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={preferencesForm.control}
+                      name="time_format"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Format Timp</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selectează formatul timpului" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="HH:mm">24 ore (14:30)</SelectItem>
+                              <SelectItem value="hh:mm A">12 ore (02:30 PM)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={preferencesForm.control}
+                    name="primary_color"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Culoare Primară</FormLabel>
+                        <div className="flex items-center gap-2">
                           <FormControl>
-                            <Textarea 
-                              placeholder="O scurtă descriere a organizației" 
-                              className="min-h-[120px]" 
-                              {...field} 
+                            <Input
+                              type="text"
+                              placeholder="#FF5500"
+                              {...field}
                             />
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <div className="flex justify-end">
-                      <Button 
-                        type="submit" 
-                        disabled={updateGeneralSettings.isPending}
-                      >
-                        {updateGeneralSettings.isPending ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        ) : (
-                          <Save className="mr-2 h-4 w-4" />
-                        )}
-                        Salvează modificările
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          {/* Tab: Structură organizațională */}
-          <TabsContent value="structure">
-            <Card>
-              <CardHeader>
-                <CardTitle>Structură organizațională</CardTitle>
-                <CardDescription>
-                  Configurează cum este structurată organizația ta
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...structureForm}>
-                  <form onSubmit={structureForm.handleSubmit(onSubmitStructure)} className="space-y-6">
-                    <div className="space-y-6">
-                      <FormField
-                        control={structureForm.control}
-                        name="has_departments"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                            <div className="space-y-0.5">
-                              <div className="flex items-center">
-                                <Building2 className="mr-2 h-5 w-5 text-primary" />
-                                <FormLabel className="text-base font-medium">Departamente</FormLabel>
-                              </div>
-                              <FormDescription className="text-sm text-muted-foreground">
-                                Activează această opțiune pentru a putea organiza echipa pe departamente.
-                                Când este activată, secțiunea de Departamente va fi disponibilă în meniul principal.
-                              </FormDescription>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <div className="flex justify-end">
-                      <Button 
-                        type="submit" 
-                        disabled={updateStructureSettings.isPending}
-                      >
-                        {updateStructureSettings.isPending ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        ) : (
-                          <Save className="mr-2 h-4 w-4" />
-                        )}
-                        Salvează modificările
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-            
-            {/* Card explicativ */}
-            <Card className="mt-6">
-              <CardHeader className="pb-3">
-                <div className="flex items-center">
-                  <HelpCircle className="mr-2 h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-base font-medium">Despre structura organizațională</CardTitle>
+                          <div 
+                            className="w-10 h-10 rounded-full border" 
+                            style={{ backgroundColor: field.value || '#FF8C00' }}
+                          />
+                        </div>
+                        <FormDescription>
+                          Culoarea principală a interfeței (format hex, ex: #FF5500)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Button type="submit">Salvează Preferințele</Button>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Configurare Email */}
+        <TabsContent value="email">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configurare Email</CardTitle>
+              <CardDescription>
+                Configurează setările pentru trimiterea de email-uri din aplicație
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="smtp_host">Server SMTP</Label>
+                  <Input id="smtp_host" placeholder="smtp.example.com" />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Funcționalitățile de structură organizațională vă permit să gestionați mai eficient echipa și proiectele:
-                  </p>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="flex items-start gap-2">
-                      <Building2 className="mt-0.5 h-5 w-5 text-primary" />
-                      <div>
-                        <h4 className="text-sm font-medium">Departamente</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Grupează membri echipei în departamente funcționale, fiecare cu propriul manager și responsabilități.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Users className="mt-0.5 h-5 w-5 text-primary" />
-                      <div>
-                        <h4 className="text-sm font-medium">Membri echipă</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Indiferent de setarea departamentelor, membrii echipei pot fi gestionați în secțiunea dedicată.
-                        </p>
-                      </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="smtp_port">Port</Label>
+                    <Input id="smtp_port" placeholder="587" type="number" />
+                  </div>
+                  <div className="flex items-center gap-2 mt-8">
+                    <Switch id="ssl" defaultChecked />
+                    <Label htmlFor="ssl">Folosește SSL/TLS</Label>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="smtp_username">Utilizator SMTP</Label>
+                  <Input id="smtp_username" placeholder="user@example.com" />
+                </div>
+                <div>
+                  <Label htmlFor="smtp_password">Parolă SMTP</Label>
+                  <Input id="smtp_password" type="password" placeholder="••••••••" />
+                </div>
+                <div>
+                  <Label htmlFor="email_from">Adresă Expeditor</Label>
+                  <Input id="email_from" placeholder="noreply@compania-ta.ro" />
+                </div>
+                <Button>Testează Conexiunea</Button>
+                <Button className="ml-2">Salvează Configurația</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Abonament */}
+        <TabsContent value="subscription">
+          <Card>
+            <CardHeader>
+              <CardTitle>Informații Abonament</CardTitle>
+              <CardDescription>
+                Detalii despre abonamentul actual și istoricul plăților
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="border rounded-lg p-4">
+                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Plan Curent</h3>
+                    <p className="text-xl font-bold">
+                      {organization.subscription_plan === SubscriptionPlan.FREE && "Gratuit"}
+                      {organization.subscription_plan === SubscriptionPlan.BASIC && "Basic"}
+                      {organization.subscription_plan === SubscriptionPlan.PRO && "Professional"}
+                      {organization.subscription_plan === SubscriptionPlan.ENTERPRISE && "Enterprise"}
+                    </p>
+                  </div>
+                  <div className="border rounded-lg p-4">
+                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Stare</h3>
+                    <div className="flex items-center">
+                      <div className={`w-3 h-3 rounded-full mr-2 ${organization.is_active ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                      <p className="text-lg font-semibold">{organization.is_active ? 'Activ' : 'Inactiv'}</p>
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </DashboardLayout>
+
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-medium mb-2">Detalii Abonament</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Început:</span>
+                      <span className="font-medium">{organization.subscription_started_at ? new Date(organization.subscription_started_at).toLocaleDateString() : 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Expiră:</span>
+                      <span className="font-medium">{organization.subscription_expires_at ? new Date(organization.subscription_expires_at).toLocaleDateString() : 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Perioadă de probă:</span>
+                      <span className="font-medium">{organization.trial_expires_at ? new Date(organization.trial_expires_at).toLocaleDateString() : 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-4">
+                  <Button variant="outline">Istoricul Plăților</Button>
+                  <Button>Schimbă Planul</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

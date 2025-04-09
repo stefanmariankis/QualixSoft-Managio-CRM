@@ -1,7 +1,9 @@
-import { createContext, useContext, useState, ReactNode } from "react";
-import { AuthState, User, Organization } from "@/types";
+import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { AuthState } from "@/types";
+import { User } from "@/types/user.types";
+import { Organization } from "@/types/organization.types";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LoginData, RegistrationData } from "@shared/schema";
 
@@ -22,6 +24,43 @@ interface AuthResponse {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Funcții de utilitate pentru localStorage
+const getStoredUser = (): User | null => {
+  const stored = localStorage.getItem('managio_user');
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch (e) {
+    localStorage.removeItem('managio_user');
+    return null;
+  }
+};
+
+const getStoredOrganization = (): Organization | null => {
+  const stored = localStorage.getItem('managio_organization');
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch (e) {
+    localStorage.removeItem('managio_organization');
+    return null;
+  }
+};
+
+const storeUserData = (user: User | null, organization: Organization | null) => {
+  if (user) {
+    localStorage.setItem('managio_user', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('managio_user');
+  }
+  
+  if (organization) {
+    localStorage.setItem('managio_organization', JSON.stringify(organization));
+  } else {
+    localStorage.removeItem('managio_organization');
+  }
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -30,46 +69,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     error: null,
   });
   const { toast } = useToast();
-
-  // Folosim react-query pentru a verifica sesiunea
-  const { refetch } = useQuery<AuthResponse>({
-    queryKey: ['/api/me'],
-    queryFn: async () => {
-      try {
-        const response = await fetch('/api/me', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        });
-        
-        if (!response.ok) {
-          if (response.status === 401) {
-            setState(prev => ({ ...prev, loading: false, user: null, organization: null }));
-            return { user: null, organization: null } as any;
-          }
-          throw new Error('Eroare la verificarea sesiunii');
-        }
-        
-        const data = await response.json();
-        setState({
-          user: data.user,
-          organization: data.organization,
-          loading: false,
-          error: null,
-        });
-        return data;
-      } catch (error) {
-        setState(prev => ({ 
-          ...prev, 
-          error: error instanceof Error ? error.message : 'A apărut o eroare la verificarea sesiunii', 
-          loading: false 
-        }));
-        throw error;
-      }
-    },
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
+  
+  // Încarcă datele din localStorage la pornirea aplicației
+  useEffect(() => {
+    const storedUser = getStoredUser();
+    const storedOrganization = getStoredOrganization();
+    
+    setState({
+      user: storedUser,
+      organization: storedOrganization,
+      loading: false,
+      error: null
+    });
+  }, []);
+  
+  // Funcție pentru reîmprospătarea datelor utilizatorului
+  const refreshUserData = async () => {
+    // În implementarea temporară, doar reîncarcăm datele din localStorage
+    const storedUser = getStoredUser();
+    const storedOrganization = getStoredOrganization();
+    
+    setState(prev => ({
+      ...prev,
+      user: storedUser,
+      organization: storedOrganization
+    }));
+    
+    // Funcția trebuie să returneze void conform interfeței
+  };
 
   // Folosim mutații pentru operațiile de autentificare
   const loginMutation = useMutation({
@@ -90,22 +117,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         const data = await response.json();
+        
+        // Stocăm datele în localStorage
+        storeUserData(data.user, data.organization);
+        
         setState({
           user: data.user,
           organization: data.organization,
           loading: false,
           error: null,
         });
-
-        // Invalidăm query-ul curent pentru a forța o reîncărcare
-        queryClient.invalidateQueries({ queryKey: ['/api/me'] });
         
         return data;
       } catch (error) {
         setState(prev => ({ 
           ...prev, 
           loading: false,
-          error: error instanceof Error ? error.message : 'Autentificare eșuată'
+          error: error instanceof Error ? new Error(error.message) : new Error('Autentificare eșuată')
         }));
         throw error;
       }
@@ -130,22 +158,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         const data = await response.json();
+        
+        // Stocăm datele în localStorage
+        storeUserData(data.user, data.organization);
+        
         setState({
           user: data.user,
           organization: data.organization,
           loading: false,
           error: null,
         });
-
-        // Invalidăm query-ul curent pentru a forța o reîncărcare
-        queryClient.invalidateQueries({ queryKey: ['/api/me'] });
         
         return data;
       } catch (error) {
         setState(prev => ({ 
           ...prev, 
           loading: false,
-          error: error instanceof Error ? error.message : 'Înregistrare eșuată'
+          error: error instanceof Error ? new Error(error.message) : new Error('Înregistrare eșuată')
         }));
         throw error;
       }
@@ -168,22 +197,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           throw new Error(errorData.message || 'Deconectare eșuată');
         }
         
+        // Ștergem datele din localStorage
+        storeUserData(null, null);
+        
         setState({ 
           user: null, 
           organization: null,
           loading: false, 
           error: null 
         });
-
-        // Invalidăm query-ul curent pentru a forța o reîncărcare
-        queryClient.invalidateQueries({ queryKey: ['/api/me'] });
         
         return await response.json();
       } catch (error) {
         setState(prev => ({ 
           ...prev, 
           loading: false,
-          error: error instanceof Error ? error.message : 'Deconectare eșuată'
+          error: error instanceof Error ? new Error(error.message) : new Error('Deconectare eșuată')
         }));
         throw error;
       }
@@ -205,7 +234,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setState(prev => ({ 
           ...prev, 
           loading: false,
-          error: error instanceof Error ? error.message : 'Resetare parolă eșuată'
+          error: error instanceof Error ? new Error(error.message) : new Error('Resetare parolă eșuată')
         }));
         throw error;
       }
@@ -222,12 +251,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Actualizăm starea utilizatorului local
+        const updatedUser = state.user ? {
+          ...state.user,
+          ...userData
+        } : null;
+        
+        // Actualizăm localStorage
+        storeUserData(updatedUser, state.organization);
+        
         setState(prev => ({
           ...prev,
-          user: prev.user ? {
-            ...prev.user,
-            ...userData
-          } : null,
+          user: updatedUser,
           loading: false,
           error: null,
         }));
@@ -237,7 +271,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setState(prev => ({ 
           ...prev, 
           loading: false,
-          error: error instanceof Error ? error.message : 'Actualizare date eșuată'
+          error: error instanceof Error ? new Error(error.message) : new Error('Actualizare date eșuată')
         }));
         throw error;
       }
@@ -250,7 +284,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await loginMutation.mutateAsync({ email, password, rememberMe: true });
       toast({
         title: "Autentificare reușită",
-        description: `Bine ai revenit, ${state.user?.first_name || 'utilizator'}!`,
+        description: `Bine ai revenit, ${state.user?.name || 'utilizator'}!`,
       });
     } catch (error) {
       toast({
@@ -337,14 +371,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const refreshUserData = async () => {
-    await refetch();
-  };
-
   const updateOrganization = (data: Partial<Organization>) => {
+    const updatedOrg = state.organization 
+      ? { ...state.organization, ...data } 
+      : null;
+    
+    // Actualizăm localStorage
+    storeUserData(state.user, updatedOrg);
+    
     setState(prev => ({
       ...prev,
-      organization: prev.organization ? { ...prev.organization, ...data } : null
+      organization: updatedOrg
     }));
   };
 
