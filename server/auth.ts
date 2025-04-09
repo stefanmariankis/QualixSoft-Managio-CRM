@@ -29,8 +29,7 @@ export function setupAuth(app: Express) {
       cookie: {
         secure: process.env.NODE_ENV === "production", // în producție, folosește doar HTTPS
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 săptămână
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        httpOnly: true,
+        sameSite: "none"
       },
     }),
   );

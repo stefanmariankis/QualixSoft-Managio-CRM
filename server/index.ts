@@ -32,7 +32,8 @@ if (process.env.NODE_ENV !== 'production') {
         callback(null, false);
       }
     },
-    credentials: true // Permitem trimiterea de cookie-uri cross-domain
+    credentials: true, // Permitem trimiterea de cookie-uri cross-domain,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
   }));
 }
 
