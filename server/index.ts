@@ -4,16 +4,22 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Versiuni constante
 const API_VERSION = "1.0.0";
 const MANAGIO_VERSION = "1.2.0";
 
+// Modifică configurația portului
+const PORT = process.env.PORT || 3000;
+
 // Afișează variabilele de mediu importante pentru depanare
 console.log("Variabile de mediu:");
 console.log("- DATABASE_URL: " + (process.env.DATABASE_URL ? "Setat (valoare ascunsă)" : "NESETAT"));
 console.log("- SESSION_SECRET: " + (process.env.SESSION_SECRET ? "Setat" : "NESETAT"));
-console.log("- PORT: " + (process.env.PORT || "5000 (default)"));
+console.log("- PORT: " + (PORT || "3000 (default)"));
 console.log("- NODE_ENV: " + (process.env.NODE_ENV || "development (default)"));
 
 const app = express();
@@ -89,19 +95,17 @@ app.get('/api/status', (req, res) => {
   });
 
   // Configurează mediul de dezvoltare cu Vite
-  if (process.env.NODE_ENV !== "production") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+  if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(__dirname, '../public')));
+    
+    // Catch all pentru SPA
+    app.get('*', (req, res) => {
+      if (req.path.startsWith('/api')) return next();
+      res.sendFile(path.join(__dirname, '../public/index.html'));
+    });
   }
 
-  // Utilizează portul din variabila de mediu PORT sau valoarea implicită 5000
-  const port = parseInt(process.env.PORT || "5000");
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`Server Managio pornit pe portul ${port} în mediul ${process.env.NODE_ENV || 'development'}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
   });
 })();
