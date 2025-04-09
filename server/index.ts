@@ -14,6 +14,7 @@ const allowedOrigins = [
   'https://managio.ro',
   'https://app.managio.ro',
   'https://managiosync.up.railway.app',
+  'https://qualixsoft-managio-crm-production.up.railway.app'
   // Trebuie să adăugați domeniul Railway sau custom domain al aplicației aici
 ];
 
