@@ -6,33 +6,8 @@ import { db } from "./db";
 import bcrypt from "bcryptjs";
 import { registrationSchema } from "../shared/schema";
 import { setupAuth } from "./auth";
-import 'dotenv/config';
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Endpoint pentru testarea conexiunii la baza de date
-  app.get("/api/test-db-connection", async (req, res) => {
-    try {
-      console.log("Testăm conexiunea la baza de date...");
-      console.log("DATABASE_URL:", process.env.DATABASE_URL ? "Setat (valoare ascunsă)" : "Nesetat");
-      
-      const result = await db`SELECT 1 as test`;
-      console.log("Rezultat test conexiune:", result);
-      
-      return res.status(200).json({
-        success: true,
-        message: "Conexiune reușită la baza de date",
-        result
-      });
-    } catch (error: any) {
-      console.error("Eroare la testarea conexiunii:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Eroare la conectarea la baza de date",
-        error: error.message
-      });
-    }
-  });
-
   // Middleware de autorizare pentru a verifica dacă utilizatorul este autentificat și are organizație
   const requireAuth = async (req: any, res: Response, next: NextFunction) => {
     try {
@@ -73,8 +48,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { departmentsRouter } = await import("./api/departments");
   const { teamRouter } = await import("./api/team");
   const { default: organizationRouter } = await import("./api/organization");
-  const { default: timeLogsRouter } = await import("./api/time-logs");
-  const { default: notificationsRouter } = await import("./api/notifications");
   const {
     getAutomations,
     getAutomationById,
@@ -92,8 +65,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/departments", departmentsRouter);
   app.use("/api/team", teamRouter);
   app.use("/api/organization", organizationRouter);
-  app.use("/api/notifications", notificationsRouter);
-  app.use("/api/time-logs", timeLogsRouter);
 
   // Rute pentru automatizări
   app.get("/api/automations", requireAuth, getAutomations);
@@ -105,6 +76,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Rută de test
   app.get("/api/test", (req, res) => {
     return res.json({ success: true, message: "API funcționează corect" });
+  });
+
+  // Health check endpoint pentru Railway
+  app.get("/health", (req, res) => {
+    return res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
   });
 
   // Rută pentru verificarea schemei bazei de date
@@ -1398,159 +1374,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res
         .status(500)
         .json({ error: "Eroare la obținerea evenimentelor apropiate" });
-    }
-  });
-  
-  // API pentru gestionarea comentariilor
-  // Obține toate comentariile pentru o entitate (task, proiect, etc.)
-  app.get("/api/:entityType/:entityId/comments", async (req, res) => {
-    try {
-      const { entityType, entityId } = req.params;
-      
-      if (!entityType || !entityId) {
-        return res.status(400).json({ error: "Tipul entității și ID-ul sunt obligatorii" });
-      }
-      
-      const entityIdNum = parseInt(entityId);
-      if (isNaN(entityIdNum)) {
-        return res.status(400).json({ error: "ID-ul entității trebuie să fie un număr valid" });
-      }
-      
-      const comments = await storage.getCommentsByEntity(entityType, entityIdNum);
-      res.json(comments);
-    } catch (error) {
-      console.error("Eroare la obținerea comentariilor:", error);
-      res.status(500).json({ error: "Eroare la obținerea comentariilor" });
-    }
-  });
-  
-  // Adaugă un comentariu nou pentru o entitate
-  app.post("/api/:entityType/:entityId/comments", async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ error: "Trebuie să fiți autentificat pentru a adăuga comentarii" });
-      }
-      
-      const { entityType, entityId } = req.params;
-      const { content, parent_id } = req.body;
-      
-      if (!entityType || !entityId || !content) {
-        return res.status(400).json({ error: "Tipul entității, ID-ul și conținutul sunt obligatorii" });
-      }
-      
-      const entityIdNum = parseInt(entityId);
-      if (isNaN(entityIdNum)) {
-        return res.status(400).json({ error: "ID-ul entității trebuie să fie un număr valid" });
-      }
-      
-      const userId = req.user.id;
-      const organizationId = req.user.organization_id;
-      
-      const newComment = await storage.createComment({
-        entity_type: entityType,
-        entity_id: entityIdNum,
-        user_id: userId,
-        content,
-        parent_id: parent_id || null
-      });
-      
-      // Creare log de activitate
-      await storage.createActivityLog({
-        organization_id: organizationId,
-        user_id: userId,
-        entity_type: entityType,
-        entity_id: entityIdNum,
-        action: "comment_added",
-        metadata: { comment_id: newComment.id }
-      });
-      
-      res.status(201).json(newComment);
-    } catch (error) {
-      console.error("Eroare la adăugarea comentariului:", error);
-      res.status(500).json({ error: "Eroare la adăugarea comentariului" });
-    }
-  });
-  
-  // Actualizează un comentariu existent
-  app.put("/api/comments/:commentId", async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ error: "Trebuie să fiți autentificat pentru a actualiza comentarii" });
-      }
-      
-      const { commentId } = req.params;
-      const { content } = req.body;
-      
-      if (!commentId || !content) {
-        return res.status(400).json({ error: "ID-ul comentariului și conținutul sunt obligatorii" });
-      }
-      
-      const commentIdNum = parseInt(commentId);
-      if (isNaN(commentIdNum)) {
-        return res.status(400).json({ error: "ID-ul comentariului trebuie să fie un număr valid" });
-      }
-      
-      // Verificăm dacă utilizatorul este autorul comentariului
-      const existingComment = await storage.getComment(commentIdNum);
-      if (!existingComment) {
-        return res.status(404).json({ error: "Comentariul nu a fost găsit" });
-      }
-      
-      const userId = req.user.id;
-      if (existingComment.user_id !== userId && req.user.role !== "super_admin" && req.user.role !== "ceo") {
-        return res.status(403).json({ error: "Nu aveți permisiunea de a actualiza acest comentariu" });
-      }
-      
-      const updatedComment = await storage.updateComment(commentIdNum, { content });
-      if (!updatedComment) {
-        return res.status(404).json({ error: "Comentariul nu a putut fi actualizat" });
-      }
-      
-      res.json(updatedComment);
-    } catch (error) {
-      console.error("Eroare la actualizarea comentariului:", error);
-      res.status(500).json({ error: "Eroare la actualizarea comentariului" });
-    }
-  });
-  
-  // Șterge un comentariu
-  app.delete("/api/comments/:commentId", async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ error: "Trebuie să fiți autentificat pentru a șterge comentarii" });
-      }
-      
-      const { commentId } = req.params;
-      
-      if (!commentId) {
-        return res.status(400).json({ error: "ID-ul comentariului este obligatoriu" });
-      }
-      
-      const commentIdNum = parseInt(commentId);
-      if (isNaN(commentIdNum)) {
-        return res.status(400).json({ error: "ID-ul comentariului trebuie să fie un număr valid" });
-      }
-      
-      // Verificăm dacă utilizatorul este autorul comentariului
-      const existingComment = await storage.getComment(commentIdNum);
-      if (!existingComment) {
-        return res.status(404).json({ error: "Comentariul nu a fost găsit" });
-      }
-      
-      const userId = req.user.id;
-      if (existingComment.user_id !== userId && req.user.role !== "super_admin" && req.user.role !== "ceo") {
-        return res.status(403).json({ error: "Nu aveți permisiunea de a șterge acest comentariu" });
-      }
-      
-      const success = await storage.deleteComment(commentIdNum);
-      if (!success) {
-        return res.status(500).json({ error: "Comentariul nu a putut fi șters" });
-      }
-      
-      res.status(204).end();
-    } catch (error) {
-      console.error("Eroare la ștergerea comentariului:", error);
-      res.status(500).json({ error: "Eroare la ștergerea comentariului" });
     }
   });
 

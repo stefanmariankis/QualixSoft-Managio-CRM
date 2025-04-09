@@ -1,57 +1,40 @@
-// Încarcă variabilele de mediu din fișierul .env
-import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import * as dotenv from 'dotenv';
 import cors from 'cors';
-
-// Versiuni constante
-const API_VERSION = "1.0.0";
-const MANAGIO_VERSION = "1.2.0";
-
-// Afișează variabilele de mediu importante pentru depanare
-console.log("Variabile de mediu:");
-console.log("- DATABASE_URL: " + (process.env.DATABASE_URL ? "Setat (valoare ascunsă)" : "NESETAT"));
-console.log("- SESSION_SECRET: " + (process.env.SESSION_SECRET ? "Setat" : "NESETAT"));
-console.log("- PORT: " + (process.env.PORT || "5000 (default)"));
-console.log("- NODE_ENV: " + (process.env.NODE_ENV || "development (default)"));
+dotenv.config(); // Înlocuim import-ul 'dotenv/config' care cauzează probleme la bundling
 
 const app = express();
-
-// Setări CORS pentru a permite cereri de la domeniul frontend-ului
-const allowedOrigins = [
-  'https://managio.ro',                      // Domeniul principal
-  'https://www.managio.ro',                  // Subdomeniu www
-  'https://app.managio.ro',                  // Subdomeniu aplicație
-  'http://localhost:5173',                   // Dezvoltare locală - Vite
-  'http://localhost:3000',                   // Dezvoltare locală - port alternativ
-];
-
-// Adaugă domeniul Railway generat la lista de origini permise dacă suntem în producție
-if (process.env.RAILWAY_STATIC_URL) {
-  allowedOrigins.push(`https://${process.env.RAILWAY_STATIC_URL}`);
-}
-
-app.use(cors({
-  origin: function(origin, callback) {
-    // Permite cererile fără origine (cum ar fi apeluri API directe)
-    if (!origin) return callback(null, true);
-    
-    // Verifică dacă originea este în lista de origini permise
-    // sau dacă suntem în dezvoltare (permite toate în dev)
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-}));
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Middleware pentru logare cereri API și răspunsuri
+// Configurare CORS pentru Railway
+const allowedOrigins = [
+  'https://managio.ro',
+  'https://app.managio.ro',
+  'https://managiosync.up.railway.app',
+  // Trebuie să adăugați domeniul Railway sau custom domain al aplicației aici
+];
+
+// În development, permitem toate originile
+if (process.env.NODE_ENV !== 'production') {
+  app.use(cors());
+} else {
+  app.use(cors({
+    origin: function(origin: any, callback: any) {
+      // Permitem cereri fără origin (de exemplu, din Postman sau curl)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.railway.app')) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
+    credentials: true // Permitem trimiterea de cookie-uri cross-domain
+  }));
+}
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -82,50 +65,37 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rută de informații API
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'ManagioSync API este funcțional!',
-    version: API_VERSION,
-    managioVersion: MANAGIO_VERSION 
-  });
-});
-
-app.get('/api/status', (req, res) => {
-  res.json({ 
-    status: 'online', 
-    environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString(),
-    version: API_VERSION
-  });
-});
-
 (async () => {
   const server = await registerRoutes(app);
 
-  // Middleware global pentru gestionarea erorilor
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    console.error("Eroare server:", err);
+    throw err;
   });
 
-  // Configurează mediul de dezvoltare cu Vite
-  if (process.env.NODE_ENV !== "production") {
+  // importantly only setup vite in development and after
+  // setting up all the other routes so the catch-all route
+  // doesn't interfere with the other routes
+  if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // Utilizează portul din variabila de mediu PORT sau valoarea implicită 5000
-  const port = parseInt(process.env.PORT || "5000");
+  // Folosim portul furnizat de Railway sau default 5000
+  const port = process.env.PORT || 5000;
   server.listen({
-    port,
+    port: Number(port),
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    log(`Server Managio pornit pe portul ${port} în mediul ${process.env.NODE_ENV || 'development'}`);
+    log(`serving on port ${port}`);
   });
+  
+  // Configurări pentru conexiuni persistente
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 66000;
 })();

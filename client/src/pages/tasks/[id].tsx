@@ -24,7 +24,6 @@ import {
   TableHeader, TableRow 
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CommentsSection from "@/components/comments/comments-section";
 
 // Tipurile de date
 type Task = {
@@ -105,6 +104,7 @@ export default function TaskDetails() {
   const taskId = parseInt(params.id);
   const { toast } = useToast();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [commentContent, setCommentContent] = useState('');
   const [trackingActive, setTrackingActive] = useState(false);
   const [activeTimeLogId, setActiveTimeLogId] = useState<number | null>(null);
   
@@ -151,7 +151,28 @@ export default function TaskDetails() {
     }
   });
   
-
+  // Mutația pentru adăugarea unui comentariu
+  const addCommentMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const response = await apiRequest('POST', `/api/tasks/${taskId}/comments`, { content });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Comentariu adăugat",
+        description: "Comentariul a fost adăugat cu succes",
+      });
+      setCommentContent('');
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks', taskId] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Eroare",
+        description: error.message || "Nu s-a putut adăuga comentariul",
+        variant: "destructive",
+      });
+    }
+  });
   
   // Mutația pentru începerea timekeeping-ului
   const startTimeTrackingMutation = useMutation({
@@ -159,10 +180,7 @@ export default function TaskDetails() {
       const response = await apiRequest('POST', `/api/time-logs`, { 
         task_id: taskId,
         project_id: data?.task.project_id,
-        description: `Lucru la task: ${data?.task.title}`,
-        date: new Date().toISOString().split('T')[0],
-        start_time: new Date().toISOString(),
-        is_billable: true
+        description: `Lucru la task: ${data?.task.title}`
       });
       return response.json();
     },
@@ -239,7 +257,12 @@ export default function TaskDetails() {
     setDeleteDialogOpen(false);
   };
   
-  // Gestionarea acțiunilor de timp
+  const handleAddComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (commentContent.trim()) {
+      addCommentMutation.mutate(commentContent);
+    }
+  };
   
   const handleTimeTracking = () => {
     if (trackingActive) {
@@ -702,8 +725,58 @@ export default function TaskDetails() {
           
           <TabsContent value="comments" className="mt-4">
             <Card>
-              <CardContent className="pt-6">
-                <CommentsSection entityType="tasks" entityId={taskId} />
+              <CardHeader>
+                <CardTitle>Comentarii</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {comments.length === 0 ? (
+                  <div className="text-center p-6 text-muted-foreground">
+                    Nu există comentarii pentru acest task.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {comments.map((comment) => (
+                      <div key={comment.id} className="flex gap-3 pb-4 border-b">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                            {getInitials(comment.user_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-baseline justify-between mb-1">
+                            <h4 className="font-medium">{comment.user_name}</h4>
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(comment.created_at), 'd MMM yyyy, HH:mm', { locale: ro })}
+                            </span>
+                          </div>
+                          <p className="text-sm whitespace-pre-line">{comment.content}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <form onSubmit={handleAddComment} className="mt-6">
+                  <div className="flex flex-col gap-2">
+                    <textarea
+                      placeholder="Adaugă un comentariu..."
+                      className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={commentContent}
+                      onChange={(e) => setCommentContent(e.target.value)}
+                    />
+                    <div className="flex justify-end">
+                      <Button 
+                        type="submit" 
+                        disabled={!commentContent.trim() || addCommentMutation.isPending}
+                      >
+                        {addCommentMutation.isPending && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Adaugă comentariu
+                      </Button>
+                    </div>
+                  </div>
+                </form>
               </CardContent>
             </Card>
           </TabsContent>

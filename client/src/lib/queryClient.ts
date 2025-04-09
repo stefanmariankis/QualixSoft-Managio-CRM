@@ -1,8 +1,4 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import apiClient from './apiClient';
-
-// URL-ul backend-ului Railway va fi preluat din apiClient
-const API_BASE_URL = apiClient.baseUrl();
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -13,14 +9,11 @@ async function throwIfResNotOk(res: Response) {
 
 export async function apiRequest(
   method: string,
-  endpoint: string,
+  url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Construiește URL-ul complet doar dacă endpoint-ul nu este deja URL complet
-  const fullUrl = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
-  
   // Asigurăm-ne că URL-ul nu conține // (double slashes)
-  const cleanUrl = fullUrl.replace(/([^:]\/)\/+/g, "$1");
+  const cleanUrl = url.replace(/([^:]\/)\/+/g, "$1");
   console.log(`API Request: ${method} ${cleanUrl}`);
   
   try {
@@ -45,14 +38,9 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    // Verifică dacă queryKey-ul este un string (endpoint)
-    const urlKey = queryKey[0] as string;
-    
-    // Construiește URL-ul complet doar dacă nu începe deja cu http
-    const fullUrl = urlKey.startsWith('http') ? urlKey : `${API_BASE_URL}${urlKey}`;
-    
     // Asigurăm-ne că URL-ul nu conține // (double slashes)
-    const cleanUrl = fullUrl.replace(/([^:]\/)\/+/g, "$1");
+    const urlKey = queryKey[0] as string;
+    const cleanUrl = urlKey.replace(/([^:]\/)\/+/g, "$1");
     console.log(`Query Request: GET ${cleanUrl}`);
     
     try {

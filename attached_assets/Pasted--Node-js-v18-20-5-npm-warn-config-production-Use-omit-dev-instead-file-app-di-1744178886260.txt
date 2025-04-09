@@ -1,0 +1,129 @@
+ 
+
+Node.js v18.20.5
+
+npm warn config production Use `--omit=dev` instead.
+
+ 
+
+file:///app/dist/server/index.js:11
+
+  throw Error('Dynamic require of "' + x + '" is not supported');
+
+        ^
+
+ 
+
+Error: Dynamic require of "fs" is not supported
+
+    at file:///app/dist/server/index.js:11:9
+
+    at node_modules/dotenv/lib/main.js (file:///app/dist/server/index.js:111:15)
+
+    at __require4 (file:///app/dist/server/index.js:17:50)
+
+    at file:///app/dist/server/index.js:418:7
+
+    at node_modules/dotenv/config.js (file:///app/dist/server/index.js:425:7)
+
+    at __init (file:///app/dist/server/index.js:14:56)
+
+    at file:///app/dist/server/index.js:238701:1
+
+    at ModuleJob.run (node:internal/modules/esm/module_job:195:25)
+
+    at async ModuleLoader.import (node:internal/modules/esm/loader:337:24)
+
+    at async loadESM (node:internal/process/esm_loader:34:7)
+
+ 
+
+Node.js v18.20.5
+
+npm warn config production Use `--omit=dev` instead.
+
+ 
+
+> rest-express@1.0.0 start
+
+> NODE_ENV=production node dist/server/index.js
+
+ 
+
+file:///app/dist/server/index.js:11
+
+  throw Error('Dynamic require of "' + x + '" is not supported');
+
+        ^
+
+ 
+
+Error: Dynamic require of "fs" is not supported
+
+    at file:///app/dist/server/index.js:11:9
+
+    at node_modules/dotenv/lib/main.js (file:///app/dist/server/index.js:111:15)
+
+    at __require4 (file:///app/dist/server/index.js:17:50)
+
+    at file:///app/dist/server/index.js:418:7
+
+    at node_modules/dotenv/config.js (file:///app/dist/server/index.js:425:7)
+
+    at __init (file:///app/dist/server/index.js:14:56)
+
+    at file:///app/dist/server/index.js:238701:1
+
+    at ModuleJob.run (node:internal/modules/esm/module_job:195:25)
+
+    at async ModuleLoader.import (node:internal/modules/esm/loader:337:24)
+
+    at async loadESM (node:internal/process/esm_loader:34:7)
+
+ 
+
+Node.js v18.20.5
+
+npm warn config production Use `--omit=dev` instead.
+
+ 
+
+> rest-express@1.0.0 start
+
+> NODE_ENV=production node dist/server/index.js
+
+ 
+
+file:///app/dist/server/index.js:11
+
+  throw Error('Dynamic require of "' + x + '" is not supported');
+
+        ^
+
+ 
+
+Error: Dynamic require of "fs" is not supported
+
+    at file:///app/dist/server/index.js:11:9
+
+    at node_modules/dotenv/lib/main.js (file:///app/dist/server/index.js:111:15)
+
+    at __require4 (file:///app/dist/server/index.js:17:50)
+
+    at file:///app/dist/server/index.js:418:7
+
+    at node_modules/dotenv/config.js (file:///app/dist/server/index.js:425:7)
+
+    at __init (file:///app/dist/server/index.js:14:56)
+
+    at file:///app/dist/server/index.js:238701:1
+
+    at ModuleJob.run (node:internal/modules/esm/module_job:195:25)
+
+    at async ModuleLoader.import (node:internal/modules/esm/loader:337:24)
+
+    at async loadESM (node:internal/process/esm_loader:34:7)
+
+ 
+
+Node.js v18.20.5

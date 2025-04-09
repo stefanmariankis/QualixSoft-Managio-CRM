@@ -29,8 +29,8 @@ export function setupAuth(app: Express) {
       cookie: {
         secure: process.env.NODE_ENV === "production", // în producție, folosește doar HTTPS
         maxAge: 1000 * 60 * 60 * 24 * 7, // 1 săptămână
+        sameSite: process.env.NODE_ENV === "production" ? 'none' : 'lax',
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Important pentru cross-domain în producție
       },
     })
   );
@@ -63,8 +63,6 @@ export function setupAuth(app: Express) {
 
       // Caută utilizatorul după email
       const user = await storage.getUserByUsername(email);
-
-      console.log('Info: ', user, validationResult.data)
 
       if (!user) {
         return res.status(401).json({ message: "Email sau parolă incorecte" });
