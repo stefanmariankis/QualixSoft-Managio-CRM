@@ -26,11 +26,13 @@ export function setupAuth(app: Express) {
       resave: false,
       saveUninitialized: false,
       store: storage.sessionStore,
+      proxy: true,
       cookie: {
-        secure: process.env.NODE_ENV === "production", // în producție, folosește doar HTTPS
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 1 săptămână
+        secure: true,
+        maxAge: 1000 * 60 * 60 * 24 * 7,
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Important pentru cross-domain în producție
+        sameSite: 'none',
+        domain: process.env.NODE_ENV === "production" ? ".railway.app" : undefined
       },
     })
   );
