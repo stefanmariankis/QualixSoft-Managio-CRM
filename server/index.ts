@@ -19,8 +19,32 @@ console.log("- NODE_ENV: " + (process.env.NODE_ENV || "development (default)"));
 const app = express();
 
 // Setări CORS pentru a permite cereri de la domeniul frontend-ului
+const allowedOrigins = [
+  'https://managio.ro',                      // Domeniul principal
+  'https://www.managio.ro',                  // Subdomeniu www
+  'https://app.managio.ro',                  // Subdomeniu aplicație
+  'http://localhost:5173',                   // Dezvoltare locală - Vite
+  'http://localhost:3000',                   // Dezvoltare locală - port alternativ
+];
+
+// Adaugă domeniul Railway generat la lista de origini permise dacă suntem în producție
+if (process.env.RAILWAY_STATIC_URL) {
+  allowedOrigins.push(`https://${process.env.RAILWAY_STATIC_URL}`);
+}
+
 app.use(cors({
-  origin: ['https://managio.ro', 'http://managio.ro', 'http://localhost:5173', 'http://localhost:3000'],
+  origin: function(origin, callback) {
+    // Permite cererile fără origine (cum ar fi apeluri API directe)
+    if (!origin) return callback(null, true);
+    
+    // Verifică dacă originea este în lista de origini permise
+    // sau dacă suntem în dezvoltare (permite toate în dev)
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 

@@ -8,8 +8,8 @@ const getApiBaseUrl = (): string => {
   const isProduction = import.meta.env.PROD;
   
   if (isProduction) {
-    // În producție, folosim URL-ul API-ului de pe Railway
-    return 'https://managiosync-production.up.railway.app';
+    // În producție, folosim URL-ul API-ului configurat în variabila de mediu sau valoarea implicită
+    return import.meta.env.VITE_API_URL || '';
   } else {
     // În dezvoltare, folosim serverul local
     return '';
